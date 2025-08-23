@@ -107,6 +107,7 @@ impl FileGenerator {
         let encoder = match container {
             FileContainer::Mp4 | FileContainer::Mkv | FileContainer::Avi => {
                 let enc = ElementBuilder::x264enc(Some("encoder"))?;
+                // use string values for enum properties
                 enc.set_property_from_str("speed-preset", "ultrafast");
                 enc.set_property_from_str("tune", "zerolatency");
                 enc

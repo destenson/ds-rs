@@ -88,8 +88,14 @@ impl MockBackend {
         
         // Create ghost pads
         if !elements.is_empty() {
-            let sink_pad = elements[0].static_pad("sink").unwrap();
-            let src_pad = elements[elements.len() - 1].static_pad("src").unwrap();
+            let sink_pad = elements[0].static_pad("sink")
+                .ok_or_else(|| DeepStreamError::PadLinking(
+                    format!("Failed to get sink pad from {}", name)
+                ))?;
+            let src_pad = elements[elements.len() - 1].static_pad("src")
+                .ok_or_else(|| DeepStreamError::PadLinking(
+                    format!("Failed to get src pad from {}", name)
+                ))?;
             
             bin.add_pad(&gst::GhostPad::with_target(&sink_pad)?)?;
             bin.add_pad(&gst::GhostPad::with_target(&src_pad)?)?;

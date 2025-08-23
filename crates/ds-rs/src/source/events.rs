@@ -277,10 +277,10 @@ mod tests {
                     assert_eq!(id.0, 1);
                     assert_eq!(uri, "file:///test.mp4");
                 }
-                _ => panic!("Unexpected event type"),
+                _ => assert!(false, "Unexpected event type"),
             }
         } else {
-            panic!("No event received");
+            assert!(false, "No event received");
         }
     }
     

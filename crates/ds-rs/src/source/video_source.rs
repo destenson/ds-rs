@@ -65,7 +65,10 @@ impl VideoSource {
     pub fn connect_pad_added_default(&mut self, streammux: &gst::Element) -> Result<()> {
         self.connect_pad_added(streammux, |_decodebin, pad, source_id, mux| {
             let caps = pad.current_caps().unwrap_or_else(|| pad.query_caps(None));
-            let structure = caps.structure(0).expect("Failed to get caps structure");
+            let Some(structure) = caps.structure(0) else {
+                eprintln!("Failed to get caps structure for source {}", source_id);
+                return;
+            };
             let name = structure.name().as_str();
             
             println!("New pad {} from source {}", name, source_id);

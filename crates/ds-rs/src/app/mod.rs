@@ -10,6 +10,7 @@ use crate::elements::factory::ElementFactory;
 use gstreamer as gst;
 use gstreamer::prelude::*;
 use std::sync::{Arc, Mutex};
+use std::sync::atomic::{AtomicBool, Ordering};
 use tokio::sync::mpsc;
 
 /// Main application demonstrating runtime source addition/deletion
@@ -21,6 +22,7 @@ pub struct Application {
     running: Arc<Mutex<bool>>,
     shutdown_tx: mpsc::Sender<()>,
     shutdown_rx: Option<mpsc::Receiver<()>>,
+    shutdown_flag: Option<Arc<AtomicBool>>,
 }
 
 impl Application {
@@ -39,7 +41,12 @@ impl Application {
             running: Arc::new(Mutex::new(false)),
             shutdown_tx,
             shutdown_rx: Some(shutdown_rx),
+            shutdown_flag: None,
         })
+    }
+    
+    pub fn set_shutdown_flag(&mut self, flag: Arc<AtomicBool>) {
+        self.shutdown_flag = Some(flag);
     }
     
     pub fn init(&mut self) -> Result<()> {
@@ -173,11 +180,25 @@ impl Application {
             timers::source_addition_timer(source_controller, running, initial_uri).await
         });
         
-        // Run main event loop
+        // Run main event loop with shutdown monitoring
         let shutdown_rx = self.shutdown_rx.take().unwrap();
-        runner::run_main_loop(self.pipeline.clone(), shutdown_rx).await?;
+        let shutdown_flag = self.shutdown_flag.clone();
         
-        add_sources_handle.abort();
+        // Monitor both shutdown channel and shutdown flag
+        tokio::select! {
+            result = runner::run_main_loop(self.pipeline.clone(), shutdown_rx) => {
+                result?;
+            }
+            _ = async {
+                if let Some(flag) = shutdown_flag {
+                    while !flag.load(Ordering::Relaxed) {
+                        tokio::time::sleep(tokio::time::Duration::from_millis(100)).await;
+                    }
+                }
+            } => {
+                println!("Shutdown requested");
+            }
+        }
         
         self.cleanup()?;
         Ok(())

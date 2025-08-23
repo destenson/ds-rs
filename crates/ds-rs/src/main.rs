@@ -1,3 +1,4 @@
+#![allow(unused)]
 use clap::Parser;
 use ds_rs::{init, app::Application};
 use std::sync::Arc;
@@ -58,20 +59,20 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         // Initialize the pipeline
         app.init()?;
         
-        // Set up signal handler for graceful shutdown
-        let app_handle = Arc::new(tokio::sync::Mutex::new(app));
-        let app_for_signal = app_handle.clone();
+        // Create a separate shutdown channel for the signal handler
+        let shutdown_requested = std::sync::Arc::new(std::sync::atomic::AtomicBool::new(false));
+        let shutdown_clone = shutdown_requested.clone();
         
+        // Set up signal handler for graceful shutdown
         ctrlc::set_handler(move || {
             println!("\nReceived interrupt signal, shutting down...");
-            let app = app_for_signal.blocking_lock();
-            if let Err(e) = app.stop() {
-                eprintln!("Error during shutdown: {:?}", e);
-            }
+            shutdown_clone.store(true, std::sync::atomic::Ordering::Relaxed);
         })?;
         
+        // Pass the shutdown flag to the application
+        app.set_shutdown_flag(shutdown_requested.clone());
+        
         // Run the application
-        let mut app = app_handle.lock().await;
         app.run().await?;
         
         Ok::<(), Box<dyn std::error::Error>>(())

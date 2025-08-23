@@ -47,10 +47,10 @@ impl FileGenerator {
         let src = ElementBuilder::videotestsrc(Some("source"))?;
         
         if let crate::config::VideoSourceType::TestPattern { pattern } = &self.config.source_type {
-            let pattern = TestPattern::from_str(pattern)?;
-            src.set_property("pattern", pattern.to_gst_pattern());
+            let _pattern = TestPattern::from_str(pattern)?; // Validate pattern exists
+            src.set_property_from_str("pattern", pattern);
         } else {
-            src.set_property("pattern", 0i32);
+            src.set_property_from_str("pattern", "smpte");
         }
         
         if let Some(num_buffers) = self.config.num_buffers {
@@ -307,7 +307,6 @@ pub fn generate_test_file(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use tempfile::tempdir;
     
     #[test]
     fn test_file_generator_creation() {

@@ -1,3 +1,4 @@
+#![allow(unused)]
 use source_videos::{
     AppConfig, SourceVideos, TestPattern, VideoSourceConfig,
     generate_test_file, create_test_rtsp_server, Result, SourceVideoError

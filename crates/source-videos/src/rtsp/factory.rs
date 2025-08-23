@@ -63,10 +63,15 @@ impl MediaFactoryBuilder {
     }
     
     fn create_launch_string(&self, config: &VideoSourceConfig) -> Result<String> {
-        let pattern = if let crate::config::VideoSourceType::TestPattern { pattern } = &config.source_type {
-            TestPattern::from_str(pattern)?
+        // Validate pattern if it exists
+        if let crate::config::VideoSourceType::TestPattern { pattern } = &config.source_type {
+            let _pattern = TestPattern::from_str(pattern)?;
+        }
+        
+        let pattern_name = if let crate::config::VideoSourceType::TestPattern { pattern } = &config.source_type {
+            pattern
         } else {
-            TestPattern::Smpte
+            "smpte"
         };
         
         let launch = format!(
@@ -75,7 +80,7 @@ impl MediaFactoryBuilder {
              videoconvert ! \
              x264enc tune=zerolatency speed-preset=ultrafast bitrate=2000 ! \
              rtph264pay name=pay0 pt=96 config-interval=1 )",
-            pattern.to_gst_pattern(),
+            pattern_name,
             config.resolution.width,
             config.resolution.height,
             config.framerate.numerator,
@@ -88,7 +93,7 @@ impl MediaFactoryBuilder {
 }
 
 pub fn create_test_pattern_factory(pattern: &str) -> Result<rtsp_server::RTSPMediaFactory> {
-    let pattern = TestPattern::from_str(pattern)?;
+    let _pattern = TestPattern::from_str(pattern)?; // Validate pattern exists
     
     let launch = format!(
         "( videotestsrc pattern={} is-live=true ! \
@@ -96,7 +101,7 @@ pub fn create_test_pattern_factory(pattern: &str) -> Result<rtsp_server::RTSPMed
          videoconvert ! \
          x264enc tune=zerolatency speed-preset=ultrafast ! \
          rtph264pay name=pay0 pt=96 config-interval=1 )",
-        pattern.to_gst_pattern()
+        pattern
     );
     
     MediaFactoryBuilder::new()

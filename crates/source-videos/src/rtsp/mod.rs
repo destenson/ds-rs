@@ -23,8 +23,11 @@ impl RtspServer {
         server.set_service(&config.port.to_string());
         server.set_address(&config.address);
         
-        if let Some(max_conn) = config.max_connections.checked_add(0) {
-            server.set_property("max-threads", max_conn);
+        // Set max threads on the thread pool instead of the server directly
+        if config.max_connections > 0 {
+            if let Some(thread_pool) = server.thread_pool() {
+                thread_pool.set_max_threads(config.max_connections as i32);
+            }
         }
         
         let mounts = server.mount_points()

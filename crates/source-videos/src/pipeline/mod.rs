@@ -27,8 +27,8 @@ impl TestPatternPipeline {
             .build()
             .map_err(|_| SourceVideoError::element("videotestsrc"))?;
         
-        let pattern = TestPattern::from_str(pattern)?;
-        src.set_property("pattern", pattern.to_gst_pattern());
+        let _pattern = TestPattern::from_str(pattern)?; // Validate pattern exists
+        src.set_property_from_str("pattern", pattern);
         
         Ok(src)
     }

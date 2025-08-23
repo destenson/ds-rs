@@ -1,3 +1,4 @@
+#![allow(unused)]
 // ONNX-based object detector supporting multiple YOLO versions
 // Supports: YOLOv3-v12, YOLO-RD, and future versions with auto-detection
 // Ultralytics (v3-v12): https://docs.ultralytics.com/models/

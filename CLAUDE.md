@@ -16,10 +16,11 @@ This is a Rust port of NVIDIA's DeepStream runtime source addition/deletion refe
 
 ### Implementation Phases (PRPs)
 1. **Core Infrastructure** - FFI bindings, build system, error handling
-2. **GStreamer Pipeline** - Pipeline management with DeepStream elements
-3. **Source Control APIs** - Runtime source addition/deletion
-4. **DeepStream Integration** - Metadata handling and inference processing
-5. **Main Application** - CLI and demonstration runner
+2. **Hardware Abstraction** - Runtime detection and fallback to standard GStreamer
+3. **GStreamer Pipeline** - Pipeline management with abstracted elements
+4. **Source Control APIs** - Runtime source addition/deletion
+5. **DeepStream Integration** - Metadata handling and inference processing
+6. **Main Application** - CLI and demonstration runner
 
 ### Key Dependencies
 - `gstreamer = "0.24.1"` - Official GStreamer Rust bindings (includes DeepStream element access)
@@ -119,9 +120,33 @@ Key functions to reference:
 - `delete_sources()` - Runtime source removal
 - `cb_newpad()` - Dynamic pad handling
 
+## Hardware Abstraction and Cross-Platform Support
+
+The application includes a hardware abstraction layer (PRP-06) that enables it to run on systems without NVIDIA hardware:
+
+### Backend Detection
+```rust
+// Runtime detection of available backends
+let backend = detect_available_backends();
+match backend {
+    BackendType::DeepStream => // Use NVIDIA elements
+    BackendType::Standard => // Use standard GStreamer elements
+    BackendType::Mock => // Use mock elements for testing
+}
+```
+
+### Element Mapping
+- **nvstreammux** → compositor + queue
+- **nvinfer** → fakesink or appsink with mock inference
+- **nvtracker** → identity element
+- **nvdsosd** → textoverlay + videobox
+- **nvvideoconvert** → videoconvert
+
+This enables development and testing on any system with GStreamer installed.
+
 ## DeepStream Element Usage
 
-DeepStream functionality is accessed through GStreamer elements, not FFI:
+When NVIDIA hardware is available, DeepStream functionality is accessed through GStreamer elements:
 ```rust
 // Create DeepStream elements using gstreamer-rs
 let streammux = gst::ElementFactory::make("nvstreammux")

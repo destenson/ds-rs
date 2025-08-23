@@ -1,22 +1,22 @@
-# PRP: DeepStream SDK Integration and Metadata Handling
+# PRP: DeepStream Metadata Handling and Message Processing
 
 ## Executive Summary
 
-Complete the DeepStream SDK integration by implementing metadata handling, inference result processing, and DeepStream-specific message handling. This PRP bridges the gap between basic GStreamer functionality and NVIDIA's AI-powered video analytics capabilities.
+Implement metadata extraction and processing for DeepStream elements, handling inference results and DeepStream-specific messages. This PRP focuses on the minimal FFI required for metadata structures while using DeepStream elements through the standard GStreamer API.
 
 ## Problem Statement
 
 ### Current State
-- Basic pipeline and source management implemented (PRP-01 to PRP-03)
-- No DeepStream metadata access or processing
+- DeepStream elements accessible through gstreamer-rs (PRP-01 to PRP-03)
+- No metadata extraction from GstBuffer
 - Missing inference result handling
 - No DeepStream-specific message processing
 
 ### Desired State
-- Full access to NvDsBatchMeta and object metadata
-- Inference result extraction and processing
-- Stream-specific EOS handling
-- Complete DeepStream feature integration
+- Minimal FFI for NvDsBatchMeta structure access
+- Inference result extraction from metadata
+- Stream-specific EOS handling through gst-nvmessage
+- Safe wrappers for metadata traversal
 
 ### Business Value
 Enables AI-powered video analytics with object detection, tracking, and classification capabilities essential for intelligent video processing applications.
@@ -48,8 +48,8 @@ The C implementation uses gstnvdsmeta.h for metadata access, processes inference
 - url: https://docs.nvidia.com/metropolis/deepstream/dev-guide/text/DS_plugin_metadata.html
   why: DeepStream metadata structures and access patterns
 
-- url: https://github.com/aosoft/nvidia-deepstream-rs
-  why: Existing metadata bindings to extend
+- url: https://github.com/rust-lang/rust-bindgen
+  why: Generate minimal FFI bindings for nvdsmeta.h
 
 - file: vendor\NVIDIA-AI-IOT--deepstream_reference_apps\runtime_source_add_delete\deepstream_test_rt_src_add_del.c
   why: Metadata handling example (lines 358-375)
@@ -68,18 +68,18 @@ The C implementation uses gstnvdsmeta.h for metadata access, processes inference
 
 ```yaml
 Task 1:
-CREATE src/metadata/mod.rs:
-  - DEFINE safe wrappers for NvDsBatchMeta
-  - IMPLEMENT metadata extraction from GstBuffer
-  - ADD iterator patterns for frame/object metadata
-  - ENSURE lifetime safety
+CREATE src/ffi/nvdsmeta.rs:
+  - USE bindgen for minimal nvdsmeta.h bindings
+  - FOCUS on NvDsBatchMeta, NvDsFrameMeta, NvDsObjectMeta
+  - INCLUDE gst_buffer_get_nvds_batch_meta function
+  - KEEP bindings minimal and focused
 
 Task 2:
-CREATE src/metadata/batch.rs:
-  - WRAP NvDsBatchMeta structure
-  - IMPLEMENT frame metadata iteration
-  - HANDLE source metadata access
-  - PROVIDE display metadata manipulation
+CREATE src/metadata/mod.rs:
+  - DEFINE safe wrappers around FFI types
+  - IMPLEMENT metadata extraction from GstBuffer
+  - ADD iterator patterns for traversing metadata
+  - ENSURE lifetime safety with PhantomData
 
 Task 3:
 CREATE src/metadata/object.rs:
@@ -124,11 +124,11 @@ CREATE src/messages/mod.rs:
   - EMIT high-level events
 
 Task 9:
-CREATE src/surface/mod.rs:
-  - WRAP NvBufSurface access
-  - IMPLEMENT safe surface mapping
-  - HANDLE CUDA interop
-  - PROVIDE pixel access methods
+CREATE build.rs:
+  - CONFIGURE bindgen for nvdsmeta.h
+  - SET include paths for DeepStream headers
+  - GENERATE only required structures
+  - HANDLE platform-specific paths
 
 Task 10:
 CREATE examples/detection_app.rs:
@@ -139,10 +139,11 @@ CREATE examples/detection_app.rs:
 ```
 
 ### Out of Scope
+- Full DeepStream SDK FFI bindings (only metadata needed)
 - Custom inference model training
 - Advanced visualization beyond OSD
 - CUDA kernel implementation
-- Model optimization
+- NvBufSurface direct manipulation
 
 ## Success Criteria
 
@@ -157,12 +158,12 @@ CREATE examples/detection_app.rs:
 
 ### Technical Dependencies
 - Completed PRP-01, PRP-02, PRP-03
-- nvidia-deepstream-rs crate
-- DeepStream SDK headers
+- bindgen for minimal FFI generation
+- DeepStream SDK headers (nvdsmeta.h)
 
 ### Knowledge Dependencies
 - DeepStream metadata architecture
-- Inference result formats
+- FFI safety in Rust
 - GStreamer buffer metadata
 
 ## Risks and Mitigation
@@ -170,9 +171,9 @@ CREATE examples/detection_app.rs:
 | Risk | Probability | Impact | Mitigation Strategy |
 |------|------------|--------|-------------------|
 | Unsafe metadata access crashes | Medium | High | Extensive safety wrappers and validation |
+| Bindgen output complexity | Low | Medium | Generate only required structures |
 | Metadata format changes | Low | High | Version detection and compatibility layer |
-| Performance overhead | Medium | Medium | Optimize hot paths, benchmark regularly |
-| Incomplete bindings | Medium | Medium | Generate additional bindings as needed |
+| FFI overhead | Low | Low | Minimal bindings, direct access patterns |
 
 ## Architecture Decisions
 
@@ -186,15 +187,15 @@ CREATE examples/detection_app.rs:
 
 **Rationale:** Maximizes safety without runtime overhead
 
-### Decision: Config File Handling
+### Decision: FFI Scope
 **Options Considered:**
-1. Direct file paths to elements
-2. Parse and validate in Rust
-3. Generate configs programmatically
+1. Full DeepStream SDK bindings
+2. Minimal metadata-only bindings
+3. No FFI - metadata via GObject properties
 
-**Decision:** Option 2 - Parse and validate for safety
+**Decision:** Option 2 - Minimal metadata-only bindings
 
-**Rationale:** Catches errors early and provides better diagnostics
+**Rationale:** Metadata structures require direct access, everything else works through GStreamer
 
 ## Validation Strategy
 
@@ -226,4 +227,4 @@ CREATE examples/detection_app.rs:
 - **Created**: 2025-08-22
 - **Last Modified**: 2025-08-22
 - **Status**: Draft
-- **Confidence Level**: 7 - Complex unsafe interop but clear documentation available
+- **Confidence Level**: 8 - Reduced complexity with minimal FFI scope, clear documentation available

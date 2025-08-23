@@ -55,18 +55,19 @@ The DeepStream Rust port project is in its initial planning phase with comprehen
 
 ## Recommendation
 
-**Next Action**: Execute PRP-01 (Core Infrastructure Setup)
+**Next Action**: Execute PRP-06 (Hardware Abstraction) alongside PRP-01 (Core Infrastructure)
 
 **Justification**:
-- **Current capability**: Project structure and planning complete, gstreamer-rs supports DeepStream elements
-- **Gap**: No actual implementation - need to create pipeline using DeepStream GStreamer elements
-- **Impact**: Establishes foundation for all subsequent development, unblocks pipeline implementation
-- **Complexity**: Simplified - DeepStream elements work through standard GStreamer API
+- **Current capability**: Project structure and planning complete, gstreamer-rs supports both DeepStream and standard elements
+- **Gap**: No hardware abstraction - limits development to NVIDIA hardware only
+- **Impact**: Enables development and testing on any hardware, critical for project accessibility
+- **Complexity**: Well-defined abstraction pattern using runtime detection
+- **Priority**: Must be implemented early to avoid hardware lock-in
 
 ## 90-Day Roadmap
 
-### Week 1-2: Core Infrastructure (PRP-01)
-→ **Outcome**: Build system configured for both x86/Jetson, DeepStream element creation working through gstreamer-rs
+### Week 1-2: Core Infrastructure (PRP-01) + Hardware Abstraction (PRP-06)
+→ **Outcome**: Build system configured, hardware detection working, backend abstraction in place for both DeepStream and standard GStreamer
 
 ### Week 3-4: GStreamer Pipeline (PRP-02)
 → **Outcome**: Pipeline construction working, DeepStream elements created and linked, state management functional

@@ -2,19 +2,19 @@
 
 ## Executive Summary
 
-Establish the foundational infrastructure for porting the NVIDIA DeepStream runtime source add/delete application from C to Rust. This PRP sets up the project structure, dependencies, and basic FFI bindings necessary for subsequent development phases.
+Establish the foundational infrastructure for porting the NVIDIA DeepStream runtime source add/delete application from C to Rust. This PRP sets up the project structure, dependencies, and DeepStream GStreamer element integration necessary for subsequent development phases.
 
 ## Problem Statement
 
 ### Current State
 - Existing C implementation in `vendor\NVIDIA-AI-IOT--deepstream_reference_apps\runtime_source_add_delete`
 - Workspace structure exists with basic Cargo.toml and gstreamer dependency
-- No DeepStream-specific Rust bindings or infrastructure
+- No DeepStream element usage implemented yet
 
 ### Desired State
 - Complete Rust project structure with proper module organization
-- Essential DeepStream FFI bindings generated and integrated
-- Build system configured for NVIDIA GPU/Jetson environments
+- DeepStream GStreamer elements accessible through gstreamer-rs
+- Configuration system for element properties
 - Foundation ready for implementing GStreamer pipeline functionality
 
 ### Business Value
@@ -25,9 +25,9 @@ Provides a modern, memory-safe implementation with Rust's safety guarantees whil
 ### Functional Requirements
 
 1. **Project Structure**: Establish modular Rust project architecture supporting DeepStream components
-2. **FFI Bindings**: Generate and integrate essential DeepStream SDK bindings
-3. **Build Configuration**: Support both x86 and Jetson platforms with appropriate CUDA versions
-4. **Type Safety**: Create safe Rust wrappers for core DeepStream types
+2. **Element Creation**: Use DeepStream GStreamer elements through gstreamer-rs
+3. **Configuration Parsing**: Load and apply DeepStream element configuration files
+4. **Platform Detection**: Support both x86 and Jetson platforms
 5. **Error Handling**: Implement comprehensive error handling framework
 
 ### Non-Functional Requirements
@@ -42,23 +42,17 @@ Based on analysis of the C implementation, the application uses GStreamer, NVIDI
 
 ### Documentation & References
 ```yaml
-- url: https://github.com/aosoft/nvidia-deepstream-rs
-  why: Existing DeepStream Rust bindings to build upon
-
 - url: https://github.com/GStreamer/gstreamer-rs
-  why: Official GStreamer Rust bindings documentation
+  why: Official GStreamer Rust bindings for element creation
 
 - url: https://docs.nvidia.com/metropolis/deepstream/dev-guide/
-  why: DeepStream SDK developer guide for API reference
+  why: DeepStream element properties and configuration
 
 - file: vendor\NVIDIA-AI-IOT--deepstream_reference_apps\runtime_source_add_delete\deepstream_test_rt_src_add_del.c
-  why: Original C implementation to reference
+  why: Original C implementation showing element usage
 
-- file: vendor\NVIDIA-AI-IOT--deepstream_reference_apps\runtime_source_add_delete\Makefile
-  why: Build configuration and library dependencies
-
-- url: https://github.com/rust-lang/rust-bindgen
-  why: Tool for generating FFI bindings from C headers
+- file: vendor\NVIDIA-AI-IOT--deepstream_reference_apps\runtime_source_add_delete\*.txt
+  why: DeepStream element configuration files to parse
 ```
 
 ### List of tasks to be completed to fulfill the PRP
@@ -66,23 +60,23 @@ Based on analysis of the C implementation, the application uses GStreamer, NVIDI
 ```yaml
 Task 1:
 MODIFY Cargo.toml:
-  - ADD nvidia-deepstream-rs dependency with git source
   - ADD gstreamer-app, gstreamer-video dependencies
-  - ADD build-dependencies for bindgen
+  - ADD serde, toml for config file parsing
+  - ADD thiserror for error handling
   - ADD platform-specific features for x86/jetson
 
 Task 2:
-CREATE build.rs:
-  - DETECT platform (x86 vs Jetson) via CUDA version
-  - SET library paths for DeepStream SDK
-  - CONFIGURE bindgen for required headers
-  - LINK required libraries (nvdsgst_meta, nvds_meta, cudart)
+CREATE src/elements/mod.rs:
+  - DEFINE DeepStreamElement trait
+  - CREATE factory functions for DeepStream elements
+  - IMPLEMENT element property setters
+  - HANDLE element creation errors
 
 Task 3:
-CREATE src/ffi/mod.rs:
-  - GENERATE bindings for nvdsmeta.h
-  - GENERATE bindings for gst-nvmessage.h
-  - WRAP unsafe functions with safe interfaces
+CREATE src/elements/factory.rs:
+  - WRAP gst::ElementFactory::make for DeepStream elements
+  - VALIDATE element availability
+  - PROVIDE typed element creation (nvstreammux, nvinfer, etc.)
 
 Task 4:
 CREATE src/error.rs:
@@ -94,9 +88,16 @@ Task 5:
 CREATE src/config/mod.rs:
   - DEFINE configuration structures
   - PARSE inference config files (pgie, sgie, tracker)
+  - APPLY properties to GStreamer elements
   - VALIDATE configuration parameters
 
 Task 6:
+CREATE src/platform.rs:
+  - DETECT Jetson vs x86 platform
+  - SET appropriate element properties
+  - HANDLE platform-specific variations
+
+Task 7:
 MODIFY src/lib.rs:
   - EXPORT public modules
   - SETUP module hierarchy
@@ -111,44 +112,44 @@ MODIFY src/lib.rs:
 
 ## Success Criteria
 
-- [ ] Project builds successfully on both x86 and Jetson platforms
-- [ ] FFI bindings compile without warnings
-- [ ] Basic DeepStream types accessible from Rust
+- [ ] Project builds successfully with gstreamer dependencies
+- [ ] DeepStream elements can be created through gstreamer-rs
+- [ ] Configuration files can be parsed and applied
 - [ ] Error handling framework in place
-- [ ] Build system detects and configures for target platform
+- [ ] Platform detection works correctly
 
 ## Dependencies
 
 ### Technical Dependencies
-- NVIDIA DeepStream SDK 6.0+
+- NVIDIA DeepStream SDK 6.0+ (installed with GStreamer plugins)
 - GStreamer 1.14+
-- CUDA Toolkit (10.2 for Jetson, 11.4+ for x86)
+- gstreamer-rs crate
 - Rust 1.70+ with cargo
 
 ### Knowledge Dependencies
-- Understanding of FFI and unsafe Rust
-- DeepStream SDK architecture
-- GStreamer fundamentals
+- GStreamer element creation and configuration
+- DeepStream element properties
+- Configuration file formats
 
 ## Risks and Mitigation
 
 | Risk | Probability | Impact | Mitigation Strategy |
 |------|------------|--------|-------------------|
-| Incomplete DeepStream bindings | Medium | High | Use nvidia-deepstream-rs as base, generate additional as needed |
-| Platform-specific build issues | Medium | Medium | Implement comprehensive build.rs detection logic |
-| Version compatibility issues | Low | High | Pin specific DeepStream/GStreamer versions |
+| DeepStream elements not available | Low | High | Check GST_PLUGIN_PATH, validate installation |
+| Configuration parsing errors | Medium | Medium | Validate configs, provide clear error messages |
+| Platform-specific property differences | Medium | Low | Abstract platform variations in dedicated module |
 
 ## Architecture Decisions
 
-### Decision: FFI Binding Strategy
+### Decision: DeepStream Integration Strategy
 **Options Considered:**
-1. Manual FFI bindings
-2. Use nvidia-deepstream-rs + custom bindgen
-3. Pure bindgen generation
+1. Create FFI bindings for DeepStream SDK
+2. Use DeepStream as GStreamer elements through gstreamer-rs
+3. Hybrid approach with custom bindings for metadata
 
-**Decision:** Option 2 - Leverage existing work and extend as needed
+**Decision:** Option 2 - Use GStreamer element interface
 
-**Rationale:** Balances development speed with control over critical bindings
+**Rationale:** Simplest approach, leverages existing gstreamer-rs functionality
 
 ### Decision: Error Handling Approach
 **Options Considered:**
@@ -162,14 +163,14 @@ MODIFY src/lib.rs:
 
 ## Validation Strategy
 
-- **Build Testing**: Verify compilation on both target platforms
-- **FFI Testing**: Validate binding correctness with simple DeepStream calls
-- **Integration Testing**: Basic GStreamer pipeline creation
+- **Element Testing**: Verify DeepStream elements can be created
+- **Configuration Testing**: Validate config file parsing
+- **Integration Testing**: Create simple pipeline with DeepStream elements
 
 ## Future Considerations
 
-- Adding more DeepStream plugin bindings as needed
-- Potential contribution back to nvidia-deepstream-rs
+- Creating helper crate for DeepStream element configuration
+- Adding more element wrapper types
 - Performance profiling and optimization opportunities
 
 ## References
@@ -186,4 +187,4 @@ MODIFY src/lib.rs:
 - **Created**: 2025-08-22
 - **Last Modified**: 2025-08-22
 - **Status**: Draft
-- **Confidence Level**: 8 - Strong foundation based on existing bindings and clear C reference
+- **Confidence Level**: 9 - Simplified approach using standard GStreamer API, well-documented path

@@ -1,6 +1,6 @@
 # TODO List
 
-Last Updated: 2025-08-23
+Last Updated: 2025-08-23 (Auto-scan)
 
 ## Critical Priority 🔴
 
@@ -10,6 +10,8 @@ Last Updated: 2025-08-23
   - `backend/cpu_vision/detector.rs`: Value::as_slice() method not available in current ort version
   - Status: ONNX model loading implemented (commit 79344d9) but API methods need updating
   - Action: Update to use ndarray::Array4 + Value::from_array and Value::try_extract_tensor()
+- [ ] **Complete ONNX detector implementation**
+  - `tests/cpu_backend_tests.rs:33`: TODO comment indicates ONNX Runtime integration pending
 
 ### DeepStream Integration (PRP-04)
 - [ ] **Implement NvDsMeta extraction with FFI bindings**
@@ -46,14 +48,12 @@ Last Updated: 2025-08-23
   - `integration_test.rs`: test_file_generation times out after 11 seconds
   
 ### Placeholder Implementation Resolution
-- [ ] **Complete DSL crate implementation**
-  - `dsl/src/lib.rs:8`: Currently has `todo!()` placeholder
-  - Consider removing if not needed for project goals
 - [ ] **Replace mock implementations**
   - `metadata/mod.rs:61,72`: Returns mock BatchMeta instead of actual metadata
   - `messages/mod.rs:182-184`: Returns mock stream ID (0)
   - `inference/config.rs:226`: from_deepstream_config returns mock ModelConfig
   - `inference/mod.rs:173`: load_from_file returns default LabelMap
+  - `backend/cpu_vision/elements.rs:94`: Pass-through implementation marked "for now"
 
 ## High Priority 🟡
 
@@ -82,7 +82,7 @@ Last Updated: 2025-08-23
 
 ### Configuration & Build Issues
 - [ ] **Fix workspace configuration**
-  - `ds-rs/Cargo.toml:3-4`: TODO comments indicate need to use workspace version/edition
+  - `crates/ds-rs/Cargo.toml:3-4`: TODO comments indicate need to use workspace version/edition
   - Currently hardcoded as "0.1.0" and "2024"
 - [ ] Fix deprecated rand API usage in timer implementations
   - Update to modern thread_rng() patterns
@@ -99,11 +99,17 @@ Last Updated: 2025-08-23
   - `source-videos/src/runtime/applicator.rs:72,81,88`: Partial implementation ("for now" comments)
 
 ### Code Cleanup
-- [ ] **Remove/implement unused parameter functions** (24+ occurrences)
+- [ ] **Remove/implement unused parameter functions** (40+ occurrences)
+  - Examples: `detection_app.rs:74,180,268` - Unused inference processor and callback parameters
+  - Tests: `pipeline_tests.rs:177` - Unused bus callback parameter
+  - Source videos: `file.rs:50,136`, `config/watcher.rs:13,34,66,108`, `rtsp/mod.rs:92`, `rtsp/factory.rs:68,109`
+  - Source management: `video_source.rs:66,181`, `synchronization.rs:22,127,138`, `manager.rs:46,210`, `controller.rs:154`
+  - CPU Vision: `backend/cpu_vision/elements.rs:86-88` - Unused tracker and buffer parameters
   - Inference: `inference/config.rs:226`, `inference/mod.rs:173`
-  - CPU Vision: `backend/cpu_vision/detector.rs:27,41,58,64`
-  - Source management: `source-videos/src/manager.rs:210`
-  - Message handling: `pipeline/bus.rs:46,214,223`
+  - Metadata: `metadata/mod.rs:123,125` - Unused extraction results
+  - Message handling: `pipeline/bus.rs:46,214,223,325,378`, `messages/mod.rs:193,317`
+  - Pipeline: `state.rs:196,291,292`
+  - Timers: `app/timers.rs:35` - Unused source ID
   - Various handler parameters with `_` prefix indicating incomplete implementations
 
 ### Testing & Examples
@@ -124,7 +130,7 @@ Last Updated: 2025-08-23
 ## Low Priority 🔵
 
 ### Dependency Preparation
-- [ ] **Enable commented dependencies when needed** (`ds-rs/Cargo.toml`)
+- [ ] **Enable commented dependencies when needed** (`crates/ds-rs/Cargo.toml`)
   - Line 36: ort (ONNX Runtime) - needed for CPU detector
   - Line 38: imageproc - needed for image processing  
   - Line 40: ndarray - needed for tensor operations
@@ -285,9 +291,9 @@ Last Updated: 2025-08-23
 - **Total TODO items**: ~45 active items
 - **Code Quality Issues**: 
   - **unwrap() calls**: 102 occurrences across 27 files in ds-rs/src
-  - **todo!() placeholders**: 1 in DSL crate  
-  - **Unused parameters**: 30+ underscore-prefixed variables indicating incomplete implementations
-  - **Mock implementations**: 4+ functions returning mock data
+  - **TODO/FIXME comments**: 3 found (Cargo.toml workspace config, ONNX integration)
+  - **Unused parameters**: 40+ underscore-prefixed variables indicating incomplete implementations
+  - **Mock/placeholder implementations**: 13+ functions with "for now" comments returning simplified data
   - **Build warnings**: 7 warnings (unused imports, variables, dead code)
 - **Test Coverage**: 119/122 tests passing (97.5%)
   - 2 ONNX detector tests fail (API compatibility issue)
@@ -329,15 +335,17 @@ Last Updated: 2025-08-23
 
 ### Key Technical Debt
 - **DeepStream FFI Bindings**: Critical metadata and message handling functions need implementation
-- **Mock Data Returns**: 8 functions return mock data marked with "for now" comments
+- **Mock/Placeholder Implementations**: 13+ functions return simplified data marked with "for now" comments
   - `inference/mod.rs:175`: Label map loading
   - `inference/config.rs:228`: DeepStream config parsing
   - `platform.rs:149`: GPU capabilities detection
   - `metadata/mod.rs:61`: Batch metadata extraction
   - `messages/mod.rs:175,182`: Stream EOS handling
   - `pipeline/bus.rs:217`: Stream-specific EOS detection
-  - `backend/standard.rs:108`: Tracker placeholder
-- **Unused Parameters**: ~24 underscore-prefixed variables indicate incomplete implementations
+  - `source-videos/src/manager.rs:215`: modify_source_config is placeholder
+  - `source-videos/src/runtime/applicator.rs:72,81,88`: Partial implementation for config changes
+  - `backend/cpu_vision/elements.rs:94`: Pass-through implementation in tracker
+- **Unused Parameters**: 40+ underscore-prefixed variables indicate incomplete implementations
 - **Test Limitations**: Mock backend cannot test uridecodebin-based functionality
 
 ### Priority Focus
@@ -347,10 +355,11 @@ Last Updated: 2025-08-23
 - **Code Quality**: Replace 237 unwrap() calls for production readiness
 
 ### Development Patterns Found
-- Mock implementations consistently marked with "for now" comments
-- Unused parameters prefixed with underscore (_) to avoid warnings
+- Mock implementations consistently marked with "for now" comments (13+ occurrences)
+- Unused parameters prefixed with underscore (_) to avoid warnings (40+ occurrences)
 - Placeholder logic returning simplified or hardcoded values
 - Standard backend uses fakesink/identity as placeholders
+- Test files marked with "placeholder" or "actual runtime" comments indicate incomplete testing
 
 ## Contributing
 
@@ -364,3 +373,9 @@ When working on any TODO item:
 ---
 
 **Status: Build fixed with conditional nalgebra; Priority on ONNX detector implementation and DeepStream FFI bindings**
+
+### Recent Findings (2025-08-23 Update)
+- ONNX Runtime API compatibility issues remain unresolved (detector.rs)
+- 40+ unused parameters across codebase indicate incomplete implementations
+- 13+ placeholder implementations marked with "for now" comments
+- Test coverage affected by Mock backend limitations with uridecodebin

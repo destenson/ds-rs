@@ -22,10 +22,10 @@ pub fn create_cpu_detector(name: Option<&str>, model_path: Option<&str>) -> Resu
     // Create queue for buffering - make it leaky to prevent blocking
     let queue = gst::ElementFactory::make("queue")
         .name("detector-queue")
-        .property("max-size-buffers", 1u32)  // Small buffer
-        .property("max-size-bytes", 0u32)    // No byte limit
-        .property("max-size-time", 0u64)     // No time limit
-        .property("leaky", 2i32)             // Leak downstream (drop old buffers)
+        .property("max-size-buffers", 1u32)         // Small buffer
+        .property("max-size-bytes", 0u32)           // No byte limit
+        .property("max-size-time", 0u64)            // No time limit
+        .property_from_str("leaky", "upstream")   // Leak downstream (drop old buffers)
         .build()
         .map_err(|_| DeepStreamError::ElementCreation {
             element: "queue".to_string(),

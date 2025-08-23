@@ -10,6 +10,7 @@ A Rust port of NVIDIA's DeepStream runtime source addition/deletion reference ap
 - **Dynamic Source Management**: Add and remove video sources at runtime without pipeline interruption
 - **Configuration System**: Support for DeepStream configuration files and TOML-based settings
 - **Pipeline Builder**: Fluent API for constructing complex GStreamer pipelines
+- **Comprehensive Test Infrastructure**: Self-contained testing with RTSP server and video generation
 
 ## Architecture
 
@@ -26,23 +27,40 @@ The project features a flexible backend system that automatically detects and us
 ```
 ds-rs/
 ├── crates/
-│   ├── ds-rs/          # Main library and application
+│   ├── ds-rs/              # Main library and application
 │   │   ├── src/
-│   │   │   ├── backend/        # Backend implementations and detection
-│   │   │   ├── config/         # Configuration parsing and management
-│   │   │   ├── elements/       # GStreamer element abstractions
-│   │   │   ├── pipeline/       # Pipeline builder and state management
-│   │   │   ├── source/         # Dynamic source management
-│   │   │   ├── error.rs        # Error handling
-│   │   │   ├── platform.rs     # Platform detection (Jetson/x86)
-│   │   │   ├── lib.rs          # Library entry point
-│   │   │   └── main.rs         # Application entry point
-│   │   ├── examples/           # Usage examples
-│   │   └── tests/              # Integration tests
-│   └── dsl/            # DeepStream Services Library (future)
-├── PRPs/               # Project planning documents
-├── vendor/             # Reference C implementation
-└── CLAUDE.md           # AI assistant guidance
+│   │   │   ├── backend/    # Backend implementations and detection
+│   │   │   ├── config/     # Configuration parsing and management
+│   │   │   ├── elements/   # GStreamer element abstractions
+│   │   │   ├── inference/  # AI inference processing
+│   │   │   ├── metadata/   # DeepStream metadata extraction
+│   │   │   ├── messages/   # Message handling and EOS tracking
+│   │   │   ├── pipeline/   # Pipeline builder and state management
+│   │   │   ├── source/     # Dynamic source management
+│   │   │   ├── tracking/   # Object tracking and trajectories
+│   │   │   ├── app/        # Main application implementation
+│   │   │   ├── error.rs    # Error handling
+│   │   │   ├── platform.rs # Platform detection (Jetson/x86)
+│   │   │   ├── lib.rs      # Library entry point
+│   │   │   └── main.rs     # Application entry point
+│   │   ├── examples/       # Usage examples
+│   │   └── tests/          # Integration tests
+│   ├── source-videos/      # Test video generation and RTSP server
+│   │   ├── src/
+│   │   │   ├── config.rs   # Video source configuration
+│   │   │   ├── file.rs     # File generation (MP4, MKV, WebM)
+│   │   │   ├── manager.rs  # Source management
+│   │   │   ├── patterns.rs # 25+ test patterns (SMPTE, ball, etc.)
+│   │   │   ├── pipeline/   # Pipeline builders
+│   │   │   ├── rtsp/       # RTSP server implementation
+│   │   │   └── main.rs     # CLI application
+│   │   └── tests/
+│   └── dsl/                # DeepStream Services Library (future)
+├── PRPs/                   # Project planning documents (15 total)
+├── vendor/                 # Reference C implementation
+├── TODO.md                 # Current task tracking
+├── codebase-review-report.md # Code quality assessment
+└── CLAUDE.md               # AI assistant guidance
 ```
 
 ## Installation
@@ -56,20 +74,24 @@ ds-rs/
 - GStreamer 1.14+
 
 #### For Standard GStreamer Support
-- GStreamer 1.14+ with base, good, and bad plugins
-- Rust 1.70+
+- GStreamer 1.14+ with base, good, bad, and rtspserver plugins
+- Rust 1.70+ (edition 2024 compatible)
 
 ### Building
 
 ```bash
 # Clone the repository
 git clone https://github.com/yourusername/ds-rs.git
-cd ds-rs/crates/ds-rs
+cd ds-rs
 
-# Build the project
+# Build all workspace members
 cargo build --release
 
-# Run tests (currently 67 tests)
+# Build specific crate
+cd crates/ds-rs
+cargo build --release
+
+# Run tests (95+ total tests)
 cargo test
 
 # Build with specific GStreamer version
@@ -104,10 +126,10 @@ cargo run --release --bin ds-app -- file:///path/to/video.mp4
 cargo run --release --bin ds-app -- rtsp://camera.local/stream
 
 # Run with debug output
-cargo run --release --bin ds-app -- --debug <video_uri>
+RUST_LOG=debug cargo run --release --bin ds-app -- <video_uri>
 
 # Force specific backend
-cargo run --release --bin ds-app -- --backend standard <video_uri>
+FORCE_BACKEND=standard cargo run --release --bin ds-app -- <video_uri>
 
 # Show help
 cargo run --release --bin ds-app -- --help
@@ -118,6 +140,33 @@ The demo application will:
 2. Automatically add a new source every 10 seconds (up to 4 sources)
 3. After reaching maximum sources, randomly remove sources every 10 seconds
 4. Continue until all sources are removed or interrupted with Ctrl+C
+
+### Test Video Generation and RTSP Server
+
+The `source-videos` crate provides comprehensive test infrastructure:
+
+```bash
+# Navigate to source-videos crate
+cd crates/source-videos
+
+# Start RTSP server with test patterns
+cargo run --release -- rtsp
+
+# Generate test video files
+cargo run --release -- file --output test.mp4 --pattern ball --duration 10
+
+# Start interactive mode
+cargo run --release -- interactive
+
+# List available patterns (25+ options)
+cargo run --release -- --help
+```
+
+Available test patterns include:
+- **Static**: SMPTE, EBU color bars, checkerboard, gradient
+- **Animated**: Ball (bouncing), circular, pinwheel
+- **Noise**: White noise, random, blink
+- **Solid colors**: Red, green, blue, white, black
 
 ### Cross-Platform Example
 
@@ -206,6 +255,7 @@ controller.enable_auto_remove_on_eos(true);
 
 ```rust
 use ds_rs::{Pipeline, PipelineBuilder, BackendType};
+use gstreamer_rs::prelude::*;
 
 // Build a pipeline using the fluent API
 let pipeline = Pipeline::builder("my-pipeline")
@@ -222,12 +272,10 @@ pipeline.play()?;
 // ... do processing ...
 pipeline.stop()?;
 
-// Set enum properties using strings
-let pipeline = PipelineBuilder::new("test")
-    .add_element("source", "videotestsrc")
-    .set_property_from_str("source", "pattern", "smpte")  // Enum property
-    .set_property("source", "num-buffers", 100i32)        // Regular property
-    .build()?;
+// Set properties using gstreamer-rs
+let source = pipeline.by_name("source").unwrap();
+source.set_property_from_str("pattern", "smpte");  // Enum property
+source.set_property("num-buffers", 100i32);        // Regular property
 ```
 
 ### Metadata Extraction and AI Inference
@@ -270,13 +318,6 @@ pad.add_probe(gst::PadProbeType::BUFFER, move |_pad, info| {
     }
     gst::PadProbeReturn::Ok
 });
-
-// Process inference results
-let processor = InferenceProcessor::default();
-let result = processor.process_detection("model", raw_output, frame_id, source_id)?;
-
-// Filter high-confidence detections
-let confident = result.filter_by_confidence(0.8);
 ```
 
 ## Configuration
@@ -318,35 +359,47 @@ The library can parse standard DeepStream configuration files:
 - **Hardware Abstraction** (PRP-06): Three-tier backend system with auto-detection
 - **Pipeline Management** (PRP-02): Builder pattern, state management, bus handling
 - **Source Control APIs** (PRP-03): Dynamic source addition/removal at runtime
-  - Thread-safe source registry with unique IDs
-  - VideoSource wrapper for uridecodebin elements
-  - Pad-added signal handling for dynamic linking
-  - Per-source EOS tracking and event system
-  - High-level SourceController API
-- **Main Application** (PRP-05): Full demo matching C reference
-  - CLI interface with argument parsing
-  - Timer-based source addition/removal
-  - Graceful shutdown with signal handling
-  - Backend-aware configuration
-- **DeepStream Metadata** (PRP-04): AI inference result extraction
-  - Complete metadata hierarchy (Batch, Frame, Object)
-  - Object detection and classification support
-  - Object tracking with trajectory management
-  - Stream-specific message handling
-  - Inference configuration system
+- **Main Application** (PRP-05): Full demo matching C reference implementation
+- **DeepStream Metadata** (PRP-04): AI inference result extraction and tracking
+- **Dynamic Video Sources** (PRP-07): Complete test infrastructure with RTSP server
+- **Code Quality Improvements** (PRP-08): Error handling enhancements
 - **Configuration System**: TOML and DeepStream format parsing
-- **Test Suite**: 95+ tests across all modules
+- **Test Suite**: 95+ tests with 88.8% pass rate
 
-### In Progress 🚧
-- **Dynamic Video Sources** (PRP-07): Test video generation infrastructure
+### Planned Enhancements 📋
 
-### Planned 📋
-- Integration tests with actual video files
-- Test RTSP source for better integration testing
-- Performance benchmarking
-- CI/CD pipeline with GitHub Actions
-- Documentation improvements
-- Additional examples
+#### Computer Vision & Object Detection (PRPs 10-13)
+- Ball Detection Integration with OpenCV
+- Real-time Bounding Box Rendering
+- Multi-Stream Detection Pipeline (4+ concurrent streams)
+- Detection Data Export (MQTT, RabbitMQ, databases)
+
+#### Backend Integration & Element Discovery (PRPs 14-15)
+- Enhanced backend integration (PRP-14)
+- Simplified GStreamer element discovery (PRP-15)
+- Leveraging gstreamer-rs existing capabilities
+- Compile-time element discovery for better backend detection
+
+#### Test Orchestration (PRP-09)
+- Cross-platform test orchestration scripts
+- End-to-end testing with configurable scenarios
+- CI/CD integration with GitHub Actions
+
+### Known Issues 🐛
+
+1. **Source Management Tests with Mock Backend**
+   - 10 tests fail when using Mock backend
+   - Reason: Mock backend doesn't support uridecodebin
+   - Workaround: Use Standard backend for full testing
+
+2. **Code Quality**
+   - 237 unwrap() calls need error handling improvements
+   - 2 panic!() calls in test code to be replaced
+   - Some GStreamer property type issues in source-videos
+
+3. **Build Configuration**
+   - Workspace manifest uses resolver "3" and edition "2024"
+   - Some unused workspace manifest keys
 
 ## Testing
 
@@ -365,9 +418,18 @@ cargo test --test source_management
 # Run specific test
 cargo test test_video_source_creation
 
+# Run tests for source-videos crate
+cd crates/source-videos
+cargo test
+
 # Note: Some source_management tests may fail with Mock backend
 # This is expected - use Standard backend for full testing
 ```
+
+### Test Coverage
+- **Total Tests**: 107+ across all modules
+- **Pass Rate**: 88.8% (95/107 passing)
+- **Known Failures**: 10 Mock backend limitations, 2 GStreamer property issues
 
 ## Environment Variables
 
@@ -401,9 +463,17 @@ cargo test test_video_source_creation
    - Use Standard backend for full source management testing
    - This is expected behavior
 
+5. **RTSP server issues**
+   - Ensure gstreamer1.0-rtsp-server is installed
+   - Check firewall settings for port 8554
+   - Verify with: `gst-inspect-1.0 | grep rtsp`
+
 ## Contributing
 
-See [PRPs/](PRPs/) directory for project planning documents and contribution guidelines.
+See [PRPs/](PRPs/) directory for project planning documents. Currently 15 PRPs available:
+- 7 completed (PRPs 01-07: Core infrastructure through test video generation)
+- 1 executed (PRP-08: Code Quality improvements)
+- 7 ready for implementation (PRPs 09-15: Test orchestration, computer vision, backend enhancements)
 
 When contributing:
 1. Create a feature branch
@@ -411,6 +481,11 @@ When contributing:
 3. Write tests for new functionality
 4. Update documentation as needed
 5. Mark complete in TODO.md when merged
+
+## Related Projects
+
+- **gstreamer-rs**: Located in `../gstreamer-rs`, provides excellent Rust bindings for GStreamer
+- **Original C implementation**: [NVIDIA-AI-IOT/deepstream_reference_apps](https://github.com/NVIDIA-AI-IOT/deepstream_reference_apps)
 
 ## License
 
@@ -423,6 +498,15 @@ This project is a port of NVIDIA's DeepStream reference applications. Please ref
 
 ## Project Status
 
-This is an active port of NVIDIA's DeepStream reference application to Rust. The core infrastructure, pipeline management, and dynamic source control are complete. The project emphasizes cross-platform compatibility, allowing development and testing without specialized hardware.
+This is an active port of NVIDIA's DeepStream reference application to Rust. The core functionality is complete with all 7 initial PRPs implemented:
 
-**Current Focus**: Implementing the main application demo (PRP-05) to showcase the complete functionality of dynamic source management in video analytics pipelines.
+- ✅ Dynamic source management working
+- ✅ Cross-platform backend abstraction operational
+- ✅ AI metadata extraction functional
+- ✅ Main demo application complete
+- ✅ Comprehensive test infrastructure with RTSP server
+- ✅ 95+ tests with 88.8% pass rate
+
+**Current Focus**: Code quality improvements and production readiness, with 7 new PRPs available for enhanced functionality including computer vision integration, test orchestration, and backend enhancements.
+
+**Version**: 0.1.0 (Pre-release)

@@ -59,20 +59,19 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         app.init()?;
         
         // Set up signal handler for graceful shutdown
-        let app_handle = Arc::new(app);
+        let app_handle = Arc::new(tokio::sync::Mutex::new(app));
         let app_for_signal = app_handle.clone();
         
         ctrlc::set_handler(move || {
             println!("\nReceived interrupt signal, shutting down...");
-            if let Err(e) = app_for_signal.stop() {
+            let app = app_for_signal.blocking_lock();
+            if let Err(e) = app.stop() {
                 eprintln!("Error during shutdown: {:?}", e);
             }
         })?;
         
         // Run the application
-        let mut app = Arc::try_unwrap(app_handle)
-            .map_err(|_| "Failed to unwrap app handle")?;
-        
+        let mut app = app_handle.lock().await;
         app.run().await?;
         
         Ok::<(), Box<dyn std::error::Error>>(())

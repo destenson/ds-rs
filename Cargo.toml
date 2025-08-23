@@ -4,11 +4,11 @@ members = [
     "crates/ds-rs",
     "crates/source-videos",
 ]
-resolver = "3"
+resolver = "3" # DO NOT CHANGE
 
 [workspace.package]
 version = "0.1.0"
-edition = "2024"
+edition = "2024" # DO NOT CHANGE
 description = "Powerful library to control nVidia DeepStream AI processing framework"
 
 [workspace.dependencies]

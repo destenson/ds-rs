@@ -12,7 +12,7 @@ gstreamer-app.workspace = true
 gstreamer-rtsp = "0.24.0"
 gstreamer-rtsp-server = "0.24.1"
 log = "0.4.27"
-notify = "8.2.0"
+notify = { version = "8.2.0", default-features = false, features = ["mio", "fsevent-sys", "crossbeam-channel", "flume"] }
 once_cell = "1.21.3"
 serde = { version = "1.0.219", features = ["derive"] }
 thiserror = "2.0.16"

@@ -177,6 +177,80 @@ impl VideoSourceManager {
             .unwrap_or(0)
     }
     
+    pub fn update_source(&self, id_or_name: &str, config: VideoSourceConfig) -> Result<()> {
+        let id = self.resolve_id(id_or_name)?;
+        
+        // Get the current source to preserve its state
+        let current_state = {
+            let sources = self.sources.read()
+                .map_err(|_| SourceVideoError::resource("Failed to acquire read lock on sources"))?;
+            
+            sources.get(&id)
+                .map(|s| s.get_state())
+                .ok_or_else(|| SourceVideoError::SourceNotFound(id_or_name.to_string()))?
+        };
+        
+        // Remove the old source
+        self.remove_source(&id)?;
+        
+        // Add the new source with updated config
+        let new_id = self.add_source(config)?;
+        
+        // Try to restore the previous state
+        match current_state {
+            SourceState::Paused => self.pause_source(&new_id)?,
+            SourceState::Stopped => self.stop_source(&new_id)?,
+            _ => {} // Playing state is default after add_source
+        }
+        
+        log::info!("Updated source '{}' configuration", id_or_name);
+        Ok(())
+    }
+    
+    pub fn modify_source_config<F>(&self, id_or_name: &str, modify_fn: F) -> Result<()>
+    where
+        F: FnOnce(&mut VideoSourceConfig) -> Result<()>,
+    {
+        // This would require storing the config with each source
+        // For now, this is a placeholder for future enhancement
+        log::warn!("modify_source_config not yet implemented - using update_source instead");
+        Err(SourceVideoError::config("In-place modification not yet supported"))
+    }
+    
+    pub fn batch_update(&self, updates: Vec<(String, VideoSourceConfig)>) -> Result<()> {
+        let mut errors = Vec::new();
+        
+        for (name, config) in updates {
+            if let Err(e) = self.update_source(&name, config) {
+                errors.push(format!("{}: {}", name, e));
+            }
+        }
+        
+        if !errors.is_empty() {
+            return Err(SourceVideoError::config(format!(
+                "Batch update failed for sources: {}",
+                errors.join(", ")
+            )));
+        }
+        
+        Ok(())
+    }
+    
+    pub fn get_source_configs(&self) -> Vec<(String, SourceState)> {
+        self.sources.read()
+            .map(|sources| {
+                sources.values()
+                    .map(|source| (source.get_name().to_string(), source.get_state()))
+                    .collect()
+            })
+            .unwrap_or_default()
+    }
+    
+    pub fn snapshot(&self) -> ManagerSnapshot {
+        let sources = self.list_sources();
+        ManagerSnapshot { sources }
+    }
+    
     fn resolve_id(&self, id_or_name: &str) -> Result<String> {
         if Uuid::parse_str(id_or_name).is_ok() {
             Ok(id_or_name.to_string())
@@ -209,6 +283,11 @@ pub struct SourceInfo {
     pub name: String,
     pub uri: String,
     pub state: SourceState,
+}
+
+#[derive(Debug, Clone)]
+pub struct ManagerSnapshot {
+    pub sources: Vec<SourceInfo>,
 }
 
 impl SourceInfo {

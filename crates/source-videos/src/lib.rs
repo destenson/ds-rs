@@ -5,14 +5,16 @@ pub mod manager;
 pub mod patterns;
 pub mod pipeline;
 pub mod rtsp;
+pub mod runtime;
 pub mod source;
 
 pub use config::{AppConfig, ServerConfig, VideoSourceConfig, VideoSourceType};
 pub use error::{Result, SourceVideoError};
 pub use file::{FileGenerator, BatchFileGenerator, generate_test_file};
-pub use manager::{VideoSourceManager, SourceInfo, SourceManagerBuilder};
+pub use manager::{VideoSourceManager, SourceInfo, SourceManagerBuilder, ManagerSnapshot};
 pub use patterns::{TestPattern, PatternRotator};
 pub use rtsp::{RtspServer, RtspServerBuilder, create_test_rtsp_server};
+pub use runtime::{RuntimeManager, events::ConfigurationEvent};
 pub use source::{VideoSource, SourceState};
 
 use once_cell::sync::OnceCell;

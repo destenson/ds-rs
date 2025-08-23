@@ -50,6 +50,12 @@ pub enum DeepStreamError {
     #[error("Timeout: {0}")]
     Timeout(String),
     
+    #[error("Initialization failed: {reason}")]
+    InitializationFailed { reason: String },
+    
+    #[error("Processing failed: {reason}")]
+    ProcessingFailed { reason: String },
+    
     #[error("Unknown error: {0}")]
     Unknown(String),
 }

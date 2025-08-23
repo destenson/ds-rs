@@ -363,6 +363,7 @@ The library can parse standard DeepStream configuration files:
 - **DeepStream Metadata** (PRP-04): AI inference result extraction and tracking
 - **Dynamic Video Sources** (PRP-07): Complete test infrastructure with RTSP server
 - **Code Quality Improvements** (PRP-08): Error handling enhancements
+- **CPU Vision Backend** (PRP-20): Foundation for CPU-based object detection and tracking
 - **Configuration System**: TOML and DeepStream format parsing
 - **Test Suite**: 95+ tests with 88.8% pass rate
 
@@ -507,6 +508,6 @@ This is an active port of NVIDIA's DeepStream reference application to Rust. The
 - ✅ Comprehensive test infrastructure with RTSP server
 - ✅ 95+ tests with 88.8% pass rate
 
-**Current Focus**: Code quality improvements and production readiness, with 7 new PRPs available for enhanced functionality including computer vision integration, test orchestration, and backend enhancements.
+**Current Focus**: Completed CPU Vision Backend foundation (PRP-20). Next priorities include full ONNX Runtime integration (PRP-21), enhanced tracking algorithms (PRP-22), and production readiness improvements.
 
 **Version**: 0.1.0 (Pre-release)

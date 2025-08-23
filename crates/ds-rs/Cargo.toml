@@ -32,6 +32,13 @@ thiserror = "2.0.16"
 tokio = { version = "1.47.1", features = ["full"] }
 toml = "0.9.5"
 
+# CPU Vision Backend dependencies (placeholders for future implementation)
+# ort = { version = "1.16.3", features = ["load-dynamic"] }  # TODO: Add when implementing ONNX
+image = "0.25"
+# imageproc = "0.25"  # TODO: Add when implementing image processing
+nalgebra = "0.34.0"
+# ndarray = "0.16"  # TODO: Add when implementing tensor operations
+
 [[bin]]
 name = "ds-app"
 path = "src/main.rs"

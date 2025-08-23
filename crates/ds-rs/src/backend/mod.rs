@@ -2,6 +2,7 @@ pub mod detector;
 pub mod deepstream;
 pub mod standard;
 pub mod mock;
+pub mod cpu_vision;
 
 use crate::error::Result;
 use crate::platform::PlatformInfo;

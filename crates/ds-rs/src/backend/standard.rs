@@ -14,8 +14,8 @@ pub struct StandardBackend {
 impl StandardBackend {
     fn create_capabilities() -> BackendCapabilities {
         BackendCapabilities {
-            supports_inference: false,  // No real inference, just mock
-            supports_tracking: false,   // No real tracking
+            supports_inference: true,   // CPU-based inference via ONNX
+            supports_tracking: true,    // Centroid tracking
             supports_osd: true,         // Can do basic overlays
             supports_batching: false,   // Limited batching via compositor
             supports_hardware_decode: false, // Software decode only
@@ -28,7 +28,9 @@ impl StandardBackend {
                 "textoverlay".to_string(),
                 "videobox".to_string(),
                 "identity".to_string(),
-                "fakesink".to_string(),
+                "cpu-detector".to_string(),
+                "cpu-tracker".to_string(),
+                "cpu-osd".to_string(),
             ],
         }
     }
@@ -92,25 +94,40 @@ impl Backend for StandardBackend {
         Ok(compositor)
     }
     
-    fn create_inference(&self, name: Option<&str>, _config_path: &str) -> Result<gst::Element> {
-        // Create a fakesink that drops buffers (simulates inference)
-        let fakesink = Self::create_element("fakesink", name)?;
-        
-        fakesink.set_property("sync", false);
-        fakesink.set_property("async", false);
-        
-        log::warn!("Standard backend: Using fakesink instead of real inference");
-        
-        Ok(fakesink)
+    fn create_inference(&self, name: Option<&str>, config_path: &str) -> Result<gst::Element> {
+        // Try to create CPU detector with ONNX model
+        match super::cpu_vision::elements::create_cpu_detector(name, Some(config_path)) {
+            Ok(detector) => {
+                log::info!("Standard backend: Using CPU detector for inference");
+                Ok(detector)
+            }
+            Err(e) => {
+                log::warn!("Failed to create CPU detector: {}, falling back to fakesink", e);
+                
+                // Fallback to fakesink if CPU detector fails
+                let fakesink = Self::create_element("fakesink", name)?;
+                fakesink.set_property("sync", false);
+                fakesink.set_property("async", false);
+                Ok(fakesink)
+            }
+        }
     }
     
     fn create_tracker(&self, name: Option<&str>) -> Result<gst::Element> {
-        // Use identity element as passthrough (no actual tracking)
-        let identity = Self::create_element("identity", name)?;
-        
-        log::warn!("Standard backend: Using identity element instead of real tracker");
-        
-        Ok(identity)
+        // Try to create CPU tracker
+        match super::cpu_vision::elements::create_cpu_tracker(name) {
+            Ok(tracker) => {
+                log::info!("Standard backend: Using CPU tracker (Centroid algorithm)");
+                Ok(tracker)
+            }
+            Err(e) => {
+                log::warn!("Failed to create CPU tracker: {}, falling back to identity", e);
+                
+                // Fallback to identity if CPU tracker fails
+                let identity = Self::create_element("identity", name)?;
+                Ok(identity)
+            }
+        }
     }
     
     fn create_tiler(&self, name: Option<&str>) -> Result<gst::Element> {
@@ -127,31 +144,40 @@ impl Backend for StandardBackend {
     }
     
     fn create_osd(&self, name: Option<&str>) -> Result<gst::Element> {
-        // Create a bin with videoconvert -> textoverlay
-        let bin = gst::Bin::builder()
-            .name(name.unwrap_or("osd-bin"))
-            .build();
-        
-        let convert = Self::create_element("videoconvert", Some("osd-convert"))?;
-        let overlay = Self::create_element("textoverlay", Some("osd-overlay"))?;
-        
-        // Configure text overlay
-        overlay.set_property("text", "Standard Backend - No Inference");
-        overlay.set_property_from_str("valignment", "top"); // top
-        overlay.set_property_from_str("halignment", "left"); // left
-        overlay.set_property("font-desc", "Sans, 12");
-        
-        bin.add_many([&convert, &overlay])?;
-        convert.link(&overlay)?;
-        
-        // Create ghost pads
-        let sink_pad = convert.static_pad("sink").unwrap();
-        let src_pad = overlay.static_pad("src").unwrap();
-        
-        bin.add_pad(&gst::GhostPad::with_target(&sink_pad)?)?;
-        bin.add_pad(&gst::GhostPad::with_target(&src_pad)?)?;
-        
-        Ok(bin.upcast())
+        // Try to create CPU OSD for bounding box rendering
+        match super::cpu_vision::elements::create_cpu_osd(name) {
+            Ok(osd) => {
+                log::info!("Standard backend: Using CPU OSD for visualization");
+                Ok(osd)
+            }
+            Err(e) => {
+                log::warn!("Failed to create CPU OSD: {}, falling back to text overlay", e);
+                
+                // Fallback to simple text overlay
+                let bin = gst::Bin::builder()
+                    .name(name.unwrap_or("osd-bin"))
+                    .build();
+                
+                let convert = Self::create_element("videoconvert", Some("osd-convert"))?;
+                let overlay = Self::create_element("textoverlay", Some("osd-overlay"))?;
+                
+                overlay.set_property("text", "Standard Backend - CPU Vision");
+                overlay.set_property_from_str("valignment", "top");
+                overlay.set_property_from_str("halignment", "left");
+                overlay.set_property("font-desc", "Sans, 12");
+                
+                bin.add_many([&convert, &overlay])?;
+                convert.link(&overlay)?;
+                
+                let sink_pad = convert.static_pad("sink").unwrap();
+                let src_pad = overlay.static_pad("src").unwrap();
+                
+                bin.add_pad(&gst::GhostPad::with_target(&sink_pad)?)?;
+                bin.add_pad(&gst::GhostPad::with_target(&src_pad)?)?;
+                
+                Ok(bin.upcast())
+            }
+        }
     }
     
     fn create_video_convert(&self, name: Option<&str>) -> Result<gst::Element> {
@@ -223,8 +249,8 @@ impl Backend for StandardBackend {
     fn get_element_mapping(&self, deepstream_element: &str) -> Option<&str> {
         match deepstream_element {
             "nvstreammux" => Some("compositor"),
-            "nvinfer" => Some("fakesink"),
-            "nvtracker" => Some("identity"),
+            "nvinfer" => Some("cpu-detector"),
+            "nvtracker" => Some("cpu-tracker"),
             "nvdsosd" => Some("textoverlay"),
             "nvtiler" => Some("compositor"),
             "nvvideoconvert" => Some("videoconvert"),

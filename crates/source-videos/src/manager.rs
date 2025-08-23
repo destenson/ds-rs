@@ -1,4 +1,4 @@
-use crate::config::VideoSourceConfig;
+use crate::config_types::VideoSourceConfig;
 use crate::error::{Result, SourceVideoError};
 use crate::source::{VideoSource, SourceState, create_source};
 use std::collections::HashMap;
@@ -207,7 +207,7 @@ impl VideoSourceManager {
         Ok(())
     }
     
-    pub fn modify_source_config<F>(&self, id_or_name: &str, modify_fn: F) -> Result<()>
+    pub fn modify_source_config<F>(&self, _id_or_name: &str, _modify_fn: F) -> Result<()>
     where
         F: FnOnce(&mut VideoSourceConfig) -> Result<()>,
     {

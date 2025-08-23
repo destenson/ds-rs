@@ -1,7 +1,6 @@
 use crate::error::{Result, SourceVideoError};
 use notify::{Config, Event, EventKind, RecommendedWatcher, RecursiveMode, Watcher};
 use std::path::{Path, PathBuf};
-use std::sync::Arc;
 use std::time::Duration;
 use tokio::sync::mpsc;
 use tokio::sync::watch;
@@ -58,11 +57,11 @@ impl ConfigWatcher {
                 }
             },
             Config::default(),
-        ).map_err(|e| SourceVideoError::io(format!("Failed to create watcher: {}", e)))?;
+        ).map_err(|e| SourceVideoError::config(format!("Failed to create watcher: {}", e)))?;
         
         // Watch the config file
         watcher.watch(&path, RecursiveMode::NonRecursive)
-            .map_err(|e| SourceVideoError::io(format!("Failed to watch path: {}", e)))?;
+            .map_err(|e| SourceVideoError::config(format!("Failed to watch path: {}", e)))?;
         
         self._watcher = Some(watcher);
         
@@ -124,7 +123,7 @@ impl ConfigBroadcaster {
     
     pub fn send(&self, event: ConfigEvent) -> Result<()> {
         self.tx.send(Some(event))
-            .map_err(|_| SourceVideoError::channel("Failed to broadcast config event"))
+            .map_err(|_| SourceVideoError::config("Failed to broadcast config event"))
     }
     
     pub fn subscribe(&self) -> watch::Receiver<Option<ConfigEvent>> {
@@ -153,7 +152,7 @@ mod tests {
         broadcaster.send(ConfigEvent::Modified(PathBuf::from("/test"))).unwrap();
         
         tokio::spawn(async move {
-            if let Ok(Some(event)) = timeout(Duration::from_secs(1), subscriber.changed()).await {
+            if let Ok(Ok(())) = timeout(Duration::from_secs(1), subscriber.changed()).await {
                 if let Some(ConfigEvent::Modified(path)) = subscriber.borrow().as_ref() {
                     assert_eq!(path, &PathBuf::from("/test"));
                 }

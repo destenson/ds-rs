@@ -1,5 +1,4 @@
 use crate::error::{Result, SourceVideoError};
-use std::sync::Arc;
 use tokio::sync::mpsc;
 
 #[derive(Debug, Clone)]
@@ -87,7 +86,7 @@ impl SignalHandler {
         }
         
         self.rx.take()
-            .ok_or_else(|| SourceVideoError::channel("Signal receiver already taken"))
+            .ok_or_else(|| SourceVideoError::resource("Signal receiver already taken"))
     }
     
     pub fn trigger_reload(&self) {
@@ -128,9 +127,13 @@ mod tests {
     #[tokio::test]
     async fn test_manual_trigger() {
         let handler = SignalHandler::new();
+        let tx_clone = handler.tx.clone();
         let mut rx = handler.start().await.unwrap();
         
-        handler.trigger_reload();
+        // Use the cloned tx to trigger reload
+        tokio::spawn(async move {
+            let _ = tx_clone.send(SignalEvent::Reload).await;
+        });
         
         let event = timeout(Duration::from_secs(1), rx.recv()).await
             .expect("Timeout")

@@ -3,7 +3,7 @@ pub mod differ;
 pub mod applicator;
 pub mod signal_handler;
 
-use crate::config::{AppConfig, VideoSourceConfig};
+use crate::config_types::{AppConfig, VideoSourceConfig};
 use crate::error::{Result, SourceVideoError};
 use crate::manager::VideoSourceManager;
 use events::{ConfigurationEvent, EventBus};

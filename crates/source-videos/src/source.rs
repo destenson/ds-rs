@@ -1,4 +1,4 @@
-use crate::config::{VideoSourceConfig, VideoSourceType};
+use crate::config_types::{VideoSourceConfig, VideoSourceType};
 use crate::error::{Result, SourceVideoError};
 use crate::pipeline::{self, PipelineFactory};
 use gstreamer as gst;

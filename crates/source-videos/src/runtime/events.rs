@@ -1,4 +1,3 @@
-use std::sync::Arc;
 use tokio::sync::broadcast;
 use serde::{Serialize, Deserialize};
 
@@ -133,18 +132,17 @@ impl EventLogger {
                 if self.persist {
                     if let Some(ref path) = self.log_path {
                         if let Ok(json) = serde_json::to_string(&event) {
-                            let _ = tokio::fs::OpenOptions::new()
-                                .create(true)
-                                .append(true)
-                                .open(path)
-                                .await
-                                .and_then(|mut file| {
-                                    use tokio::io::AsyncWriteExt;
-                                    async move {
-                                        file.write_all(json.as_bytes()).await?;
-                                        file.write_all(b"\n").await
-                                    }
-                                });
+                            let _ = async {
+                                use tokio::io::AsyncWriteExt;
+                                let mut file = tokio::fs::OpenOptions::new()
+                                    .create(true)
+                                    .append(true)
+                                    .open(path)
+                                    .await
+                                    .ok()?;
+                                file.write_all(json.as_bytes()).await.ok()?;
+                                file.write_all(b"\n").await.ok()
+                            }.await;
                         }
                     }
                 }

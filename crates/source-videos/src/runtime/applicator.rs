@@ -1,6 +1,6 @@
 use crate::error::{Result, SourceVideoError};
 use crate::manager::VideoSourceManager;
-use super::differ::{ConfigChange, ConfigDiffer, ChangePlan};
+use super::differ::{ConfigChange, ConfigDiffer};
 use std::sync::Arc;
 use std::time::Instant;
 

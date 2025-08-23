@@ -1,4 +1,4 @@
-use crate::config::{AppConfig, VideoSourceConfig};
+use crate::config_types::{AppConfig, VideoSourceConfig};
 use std::collections::{HashMap, HashSet};
 
 #[derive(Debug, Clone, PartialEq)]
@@ -182,7 +182,7 @@ impl ChangePlan {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::config::{VideoSourceType, Resolution, Framerate, VideoFormat};
+    use crate::config_types::{VideoSourceType, Resolution, Framerate, VideoFormat};
     
     #[test]
     fn test_no_changes() {
@@ -210,6 +210,7 @@ mod tests {
     fn test_source_removed() {
         let differ = ConfigDiffer::new();
         let mut old_config = AppConfig::default();
+        old_config.sources.clear();
         old_config.sources.push(VideoSourceConfig::test_pattern("test-source", "smpte"));
         
         let mut new_config = old_config.clone();

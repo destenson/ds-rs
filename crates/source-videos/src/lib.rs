@@ -1,4 +1,5 @@
 pub mod config;
+pub mod config_types;
 pub mod error;
 pub mod file;
 pub mod manager;
@@ -8,7 +9,7 @@ pub mod rtsp;
 pub mod runtime;
 pub mod source;
 
-pub use config::{AppConfig, ServerConfig, VideoSourceConfig, VideoSourceType};
+pub use config_types::{AppConfig, ServerConfig, VideoSourceConfig, VideoSourceType};
 pub use error::{Result, SourceVideoError};
 pub use file::{FileGenerator, BatchFileGenerator, generate_test_file};
 pub use manager::{VideoSourceManager, SourceInfo, SourceManagerBuilder, ManagerSnapshot};

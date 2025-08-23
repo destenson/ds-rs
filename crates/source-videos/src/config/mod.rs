@@ -2,8 +2,8 @@ pub mod watcher;
 pub mod loader;
 pub mod validator;
 
-// Re-export types from the parent config module
-pub use super::config::*;
+// Re-export types from the config_types module
+pub use crate::config_types::*;
 
 // Re-export commonly used types
 pub use watcher::{ConfigWatcher, ConfigEvent, ConfigBroadcaster};

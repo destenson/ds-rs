@@ -46,7 +46,7 @@ impl ConfigLoader for TomlConfigLoader {
             .map_err(|e| SourceVideoError::config(format!("Failed to parse partial TOML: {}", e)))?;
         
         // Serialize base config to toml::Value
-        let mut base_value = toml::to_value(base)
+        let mut base_value = toml::Value::try_from(base.clone())
             .map_err(|e| SourceVideoError::config(format!("Failed to serialize base config: {}", e)))?;
         
         // Merge partial into base

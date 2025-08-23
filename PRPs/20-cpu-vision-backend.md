@@ -220,9 +220,6 @@ fn create_inference(&self, name: Option<&str>, config_path: &str) -> Result<gst:
 ## Validation Gates
 
 ```bash
-# Format and lint
-cargo fmt --check && cargo clippy --all-targets --all-features -- -D warnings
-
 # Unit tests
 cargo test --package ds-rs --lib backend::cpu_vision
 

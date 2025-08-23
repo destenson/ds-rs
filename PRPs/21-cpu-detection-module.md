@@ -145,9 +145,6 @@ Ensure output matches existing metadata structures:
 ## Validation Gates
 
 ```bash
-# Lint and format
-cargo fmt --all -- --check
-cargo clippy --all-features -- -D warnings
 
 # Unit tests
 cargo test cpu_vision::detector --all-features

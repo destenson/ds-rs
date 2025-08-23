@@ -382,9 +382,9 @@ This project is part of the ds-rs codebase and follows the same licensing terms.
 ## Contributing
 
 1. Ensure all tests pass: `cargo test`
-2. Format code: `cargo fmt`
+2. Add appropriate tests for new features
 3. Run clippy: `cargo clippy`
-4. Add appropriate tests for new features
+4. Format code: `cargo fmt`
 
 ## Performance Notes
 

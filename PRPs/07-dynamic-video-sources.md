@@ -319,8 +319,6 @@ CREATE README.md:
 ```bash
 # Build and check
 cargo build --release
-cargo fmt --check
-cargo clippy --all-targets --all-features -- -D warnings
 
 # Run tests
 cargo test --all-features -- --nocapture

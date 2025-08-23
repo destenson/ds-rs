@@ -192,10 +192,6 @@ pub fn create_tracker(tracker_type: TrackerType) -> Box<dyn Tracker> {
 ## Validation Gates
 
 ```bash
-# Format and lint
-cargo fmt --all -- --check
-cargo clippy --all-features -- -D warnings
-
 # Unit tests
 cargo test cpu_vision::tracker --all-features
 

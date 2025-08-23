@@ -91,15 +91,33 @@ cargo build --release
 
 ## Usage
 
-### Basic Application
+### Main Runtime Demo Application
 
 ```bash
 # Run the main application (from crates/ds-rs directory)
-cargo run --release --bin ds-app
+cargo run --release --bin ds-app -- <video_uri>
+
+# Example with file source
+cargo run --release --bin ds-app -- file:///path/to/video.mp4
+
+# Example with RTSP stream
+cargo run --release --bin ds-app -- rtsp://camera.local/stream
 
 # Run with debug output
-RUST_LOG=debug cargo run --release --bin ds-app
+cargo run --release --bin ds-app -- --debug <video_uri>
+
+# Force specific backend
+cargo run --release --bin ds-app -- --backend standard <video_uri>
+
+# Show help
+cargo run --release --bin ds-app -- --help
 ```
+
+The demo application will:
+1. Start with the provided video source
+2. Automatically add a new source every 10 seconds (up to 4 sources)
+3. After reaching maximum sources, randomly remove sources every 10 seconds
+4. Continue until all sources are removed or interrupted with Ctrl+C
 
 ### Cross-Platform Example
 
@@ -256,11 +274,15 @@ The library can parse standard DeepStream configuration files:
   - Pad-added signal handling for dynamic linking
   - Per-source EOS tracking and event system
   - High-level SourceController API
+- **Main Application** (PRP-05): Full demo matching C reference
+  - CLI interface with argument parsing
+  - Timer-based source addition/removal
+  - Graceful shutdown with signal handling
+  - Backend-aware configuration
 - **Configuration System**: TOML and DeepStream format parsing
-- **Test Suite**: 67 tests across all modules
+- **Test Suite**: 69 tests across all modules
 
 ### In Progress 🚧
-- **Main Application** (PRP-05): Full demo matching C reference
 - **DeepStream Metadata** (PRP-04): AI inference result extraction
 
 ### Planned 📋

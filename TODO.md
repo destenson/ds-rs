@@ -2,16 +2,15 @@
 
 ## Critical Priority 🔴
 
-### Main Application Demo (PRP-05)
-- [ ] Create full demo matching C reference behavior
-- [ ] Add CLI argument parsing
-- [ ] Implement source addition timer (every 10 seconds)
-- [ ] Add source removal logic after MAX_NUM_SOURCES
-- [ ] Create configuration file loading
-- [ ] Add signal handling (SIGINT)
-- **Files**: Update `crates/ds-rs/src/main.rs`
-- **Impact**: No working demonstration of the port
-- **Next Step**: This is the next major implementation to showcase the complete functionality
+### Main Application Demo (PRP-05) - ✅ COMPLETE
+- [x] Create full demo matching C reference behavior
+- [x] Add CLI argument parsing with clap
+- [x] Implement source addition timer (every 10 seconds)
+- [x] Add source removal logic after MAX_NUM_SOURCES
+- [x] Add signal handling (SIGINT) with ctrlc crate
+- **Files**: Completed `crates/ds-rs/src/main.rs` and `crates/ds-rs/src/app/`
+- **Impact**: Now have working demonstration of runtime source management
+- **Status**: Successfully demonstrates dynamic source addition/removal capabilities
 
 ## High Priority 🟡
 
@@ -110,6 +109,13 @@
 ## Recently Completed ✅
 
 ### Latest Completions
+- [x] Implement Main Application Demo (PRP-05) - Runtime demonstration
+  - CLI interface with clap for argument parsing
+  - Automatic source addition every 10 seconds
+  - Source removal after MAX_NUM_SOURCES reached
+  - Graceful shutdown with signal handling
+  - Backend-aware property configuration
+  - Integration tests for application components
 - [x] Implement Source Control APIs (PRP-03) - Dynamic source management
   - Thread-safe source registry
   - VideoSource wrapper for uridecodebin

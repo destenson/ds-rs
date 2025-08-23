@@ -1,38 +1,83 @@
+use clap::Parser;
+use ds_rs::{init, app::Application};
+use std::sync::Arc;
+use tokio::runtime::Runtime;
 
-use ds_rs::{init, BackendManager, PlatformInfo};
+#[derive(Parser, Debug)]
+#[command(
+    name = "ds-runtime-demo",
+    about = "DeepStream Rust - Runtime Source Addition/Deletion Demo",
+    long_about = "Demonstrates dynamic video source management in AI-powered video analytics pipelines.\n\
+                  This application showcases the runtime source control APIs by automatically adding\n\
+                  sources every 10 seconds up to MAX_NUM_SOURCES, then removing them periodically."
+)]
+struct Args {
+    /// URI of the video source (file:///path/to/video.mp4 or rtsp://...)
+    #[arg(help = "Video source URI")]
+    uri: String,
+    
+    /// Enable debug logging
+    #[arg(short, long, help = "Enable debug output")]
+    debug: bool,
+    
+    /// Force a specific backend (mock, standard, deepstream)
+    #[arg(short, long, help = "Force backend selection")]
+    backend: Option<String>,
+}
 
-fn main() -> Result<(), i32> {
-    // Initialize the library
-    init()
-        .inspect_err(|e| eprintln!("Initialization error: {}", e))
-        .map_err(|_| 1)?;
+fn main() -> Result<(), Box<dyn std::error::Error>> {
+    let args = Args::parse();
     
-    println!("DeepStream Rust Application");
-    println!("===========================\n");
+    // Set logging level
+    if args.debug {
+        unsafe {
+            std::env::set_var("RUST_LOG", "debug");
+        }
+    }
     
-    // Detect platform
-    let platform = PlatformInfo::detect()
-        .inspect_err(|e| eprintln!("Platform detection error: {}", e))
-        .map_err(|_| 2)?;
-    println!("Platform: {:?}", platform.platform);
-    println!("CUDA Version: {:?}", platform.cuda_version);
-    println!("Has NVIDIA Hardware: {}\n", platform.has_nvidia_hardware());
+    // Force backend if specified
+    if let Some(backend) = args.backend {
+        unsafe {
+            std::env::set_var("FORCE_BACKEND", backend);
+        }
+    }
     
-    // Create backend manager
-    let manager = BackendManager::new()
-        .inspect_err(|e| eprintln!("Backend manager error: {}", e))
-        .map_err(|_| 3)?;
-    println!("Selected Backend: {}", manager.backend_type().name());
+    // Initialize GStreamer and the library
+    init()?;
     
-    let caps = manager.capabilities();
-    println!("Backend Capabilities:");
-    println!("  - Inference: {}", caps.supports_inference);
-    println!("  - Tracking: {}", caps.supports_tracking);
-    println!("  - OSD: {}", caps.supports_osd);
-    println!("  - Batching: {}", caps.supports_batching);
+    println!("DeepStream Rust - Runtime Source Addition/Deletion Demo");
+    println!("========================================================\n");
     
-    println!("\nApplication initialized successfully!");
-    println!("Run 'cargo run --example cross_platform' for a full demo.");
+    // Create the runtime for async operations
+    let runtime = Runtime::new()?;
     
+    // Create and run the application
+    runtime.block_on(async {
+        let mut app = Application::new(args.uri)?;
+        
+        // Initialize the pipeline
+        app.init()?;
+        
+        // Set up signal handler for graceful shutdown
+        let app_handle = Arc::new(app);
+        let app_for_signal = app_handle.clone();
+        
+        ctrlc::set_handler(move || {
+            println!("\nReceived interrupt signal, shutting down...");
+            if let Err(e) = app_for_signal.stop() {
+                eprintln!("Error during shutdown: {:?}", e);
+            }
+        })?;
+        
+        // Run the application
+        let mut app = Arc::try_unwrap(app_handle)
+            .map_err(|_| "Failed to unwrap app handle")?;
+        
+        app.run().await?;
+        
+        Ok::<(), Box<dyn std::error::Error>>(())
+    })?;
+    
+    println!("\nApplication exited successfully");
     Ok(())
 }

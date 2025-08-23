@@ -6,6 +6,7 @@ pub mod elements;
 pub mod config;
 pub mod pipeline;
 pub mod source;
+pub mod app;
 
 pub use error::{DeepStreamError, Result};
 pub use platform::{Platform, PlatformInfo};

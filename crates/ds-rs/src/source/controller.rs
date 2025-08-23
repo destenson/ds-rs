@@ -284,8 +284,8 @@ impl DynamicSourceScheduler {
                 if let Ok(sources) = controller.list_active_sources() {
                     if !sources.is_empty() {
                         use rand::Rng;
-                        let mut rng = rand::rng();
-                        let random_index = rng.random_range(0..sources.len());
+                        let mut rng = rand::thread_rng();
+                        let random_index = rng.gen_range(0..sources.len());
                         let (id, _, _) = sources[random_index];
                         
                         if let Ok(()) = controller.remove_source(id) {

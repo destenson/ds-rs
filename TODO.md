@@ -1,29 +1,18 @@
 # TODO List
 
-Last Updated: 2025-08-23 (Auto-scan)
+Last Updated: 2025-08-23 (Comprehensive scan after ONNX fix)
 
 ## Critical Priority 🔴
 
 ### CPU Vision Backend Implementation
 - [x] **Fix ONNX Runtime API compatibility issues** ✅ (2025-08-23 - PRP-24)
-  - `backend/cpu_vision/detector.rs`: Fixed OrtOwnedTensor::from_shape_vec - now uses Value::from_array
-  - `backend/cpu_vision/detector.rs`: Fixed Value::as_slice() - now uses try_extract() and view()
-  - Status: ONNX model loading now compiles and runs with ort v1.16.3
-  - Action completed: Updated to use ndarray 0.15.6 + Value::from_array with allocator
-  - **Supports YOLOv3 through YOLOv12 and YOLO-RD** with automatic version detection
-  - Model sources and key features:
-    - **YOLOv3-v5**: Classic architecture with objectness scores
-    - **YOLOv6**: MT-YOLOv6 variant (different lineage)
-    - **YOLOv7**: https://github.com/WongKinYiu/yolov7
-    - **YOLOv8-v11**: Ultralytics models without objectness, transposed output format
-    - **YOLOv10**: NMS-free design with one-to-one predictions
-    - **YOLOv11**: Optimized model with 22% fewer parameters than v8
-    - **YOLOv12**: Latest production model with best-in-class mAP (up to 55.2 for YOLO12x)
-    - **YOLO-RD**: Retriever-Dictionary variant for enhanced accuracy
-    - **Ultralytics models (v3-v12)**: https://docs.ultralytics.com/models/
-    - **Official YOLOv7/v9/RD**: https://github.com/WongKinYiu/YOLO (local: ../MultimediaTechLab--YOLO)
-- [ ] **Complete ONNX detector implementation**
-  - `tests/cpu_backend_tests.rs:33`: Integration tests with actual YOLO model pending
+  - Successfully fixed all ONNX Runtime v1.16.3 API issues
+  - Supports YOLOv3-v12 and YOLO-RD with automatic version detection
+  - Model files available from Ultralytics and official YOLO repos
+- [ ] **Complete ONNX detector integration tests**
+  - `tests/cpu_backend_tests.rs:33`: TODO comment - test with actual ONNX model file
+  - Need to download and test with real YOLOv5/v8/v12 models
+  - Validate inference performance matches expected FPS targets
 
 ### DeepStream Integration (PRP-04)
 - [ ] **Implement NvDsMeta extraction with FFI bindings**
@@ -37,7 +26,7 @@ Last Updated: 2025-08-23 (Auto-scan)
   - Need `gst_nvmessage_parse_stream_eos` binding
 
 ### Code Quality & Production Readiness  
-- [ ] Replace `unwrap()` calls in production code (102 occurrences across 27 files in ds-rs/src)
+- [ ] Replace `unwrap()` calls in production code (100 occurrences across 27 files in ds-rs/src)
   - **Highest priority files**: 
     - `backend/cpu_vision/elements.rs`: 16 instances
     - `source/mod.rs`: 9 instances
@@ -48,24 +37,34 @@ Last Updated: 2025-08-23 (Auto-scan)
 - [x] Fix build warnings ✅ (2025-08-23)
   - `backend/cpu_vision/detector.rs`: Fixed unused imports
   - `backend/cpu_vision/elements.rs`: Removed unused Arc, Mutex imports
-- [ ] Clean up unused placeholder parameters (30+ occurrences of `_variable` pattern)
-  - Multiple unused parameters in callbacks and handlers indicate incomplete implementations
+- [ ] Clean up unused parameters (25+ underscore-prefixed variables found)
+  - Callback handlers: `_bus`, `_pad`, `_info` in multiple probe callbacks
+  - Function parameters: `_path`, `_msg`, `_decodebin` indicating incomplete implementations
+  - Test/mock code appropriately uses underscore prefix
 
 ### Test Issues
-- [x] **Fix ONNX detector tests** ✅ (2025-08-23)
-  - Tests now pass without ort feature using mock detector
+- [x] **Fix ONNX detector compilation** ✅ (2025-08-23)
   - Compilation now succeeds with ort feature enabled
-  - Tests run successfully with proper API implementation
+  - Tests pass without ort feature using mock detector
+- [ ] **Add ONNX integration tests with real models**
+  - Download actual YOLO models for testing
+  - Validate inference accuracy and performance
+  - Test all supported YOLO versions (v3-v12)
 - [ ] **Fix source-videos file generation test**
   - `integration_test.rs`: test_file_generation times out after 11 seconds
   
 ### Placeholder Implementation Resolution
-- [ ] **Replace mock implementations**
-  - `metadata/mod.rs:61,72`: Returns mock BatchMeta instead of actual metadata
-  - `messages/mod.rs:182-184`: Returns mock stream ID (0)
-  - `inference/config.rs:226`: from_deepstream_config returns mock ModelConfig
-  - `inference/mod.rs:173`: load_from_file returns default LabelMap
-  - `backend/cpu_vision/elements.rs:94`: Pass-through implementation marked "for now"
+- [ ] **Replace stub implementations with actual functionality**
+  - `metadata/mod.rs:60`: "In a real implementation, this would call gst_buffer_get_nvds_batch_meta"
+  - `metadata/mod.rs:125`: `_batch_meta` unused - extraction not implemented
+  - `messages/mod.rs:174`: "In real DeepStream, this would call gst_nvmessage_is_stream_eos"
+  - `messages/mod.rs:181`: "In real DeepStream, this would call gst_nvmessage_parse_stream_eos"
+  - `inference/mod.rs:173-174`: "In a real implementation, this would parse a label file"
+  - `inference/mod.rs:214`: "This is simplified - real implementation would parse..."
+  - `inference/config.rs:226`: `from_deepstream_config` takes `_path` - returns mock config
+  - `backend/cpu_vision/elements.rs:41,43,88,172`: Multiple "In a real implementation" comments
+  - `pipeline/bus.rs:214`: `is_stream_eos` takes `_msg` - returns None (mock)
+  - `source/controller.rs:154`: `_event_handler` cloned but not used
 
 ## High Priority 🟡
 
@@ -94,7 +93,8 @@ Last Updated: 2025-08-23 (Auto-scan)
 
 ### Configuration & Build Issues
 - [ ] **Fix workspace configuration**
-  - `crates/ds-rs/Cargo.toml:3-4`: TODO comments indicate need to use workspace version/edition
+  - `Cargo.toml:3`: `# TODO: use the workspace version`
+  - `Cargo.toml:4`: `# TODO: use the workspace edition`
   - Currently hardcoded as "0.1.0" and "2024"
 - [ ] Fix deprecated rand API usage in timer implementations
   - Update to modern thread_rng() patterns
@@ -300,19 +300,19 @@ Last Updated: 2025-08-23 (Auto-scan)
 
 ## Statistics 📊
 
-- **Total TODO items**: ~45 active items
+- **Total TODO items**: ~40 active items
 - **Code Quality Issues**: 
-  - **unwrap() calls**: 102 occurrences across 27 files in ds-rs/src
-  - **TODO/FIXME comments**: 3 found (Cargo.toml workspace config, ONNX integration)
-  - **Unused parameters**: 40+ underscore-prefixed variables indicating incomplete implementations
-  - **Mock/placeholder implementations**: 13+ functions with "for now" comments returning simplified data
-  - **Build warnings**: 7 warnings (unused imports, variables, dead code)
-- **Test Coverage**: 119/122 tests passing (97.5%)
-  - 2 ONNX detector tests fail (API compatibility issue)
-  - 1 source-videos file generation test timeout
+  - **unwrap() calls**: 100 occurrences across 27 files
+  - **TODO comments**: 3 found (2 in Cargo.toml, 1 in cpu_backend_tests.rs)
+  - **"Real implementation" comments**: 9 occurrences indicating stubs
+  - **Unused parameters**: 25+ underscore-prefixed variables
+  - **Mock backend**: Extensive mock implementation for testing
+  - **Build warnings**: 1 warning (unused `create_mock_yolo_output` method)
+- **Test Coverage**: Tests pass with and without ort feature
 - **Codebase Size**: ~15,000+ lines across all crates
-- **Build Status**: ✅ SUCCESS both with and without ort feature
-- **PRP Progress**: 10/23 complete (43%), 3/23 in progress (13%), 10/23 not started (43%)
+- **Build Status**: ✅ SUCCESS with ort,ndarray features enabled
+- **YOLO Support**: v3-v12 + YOLO-RD with auto-detection
+- **PRP Progress**: 11/24 complete (46%), 2/24 in progress (8%), 11/24 not started (46%)
 
 ## New Feature Development 🚀
 

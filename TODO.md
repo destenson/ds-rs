@@ -2,27 +2,16 @@
 
 ## Critical Priority 🔴
 
-### Pipeline Management (PRP-02)
-- [x] Create `src/pipeline/` module structure
-- [x] Implement `PipelineBuilder` with fluent API
-- [x] Add pipeline state management (NULL → READY → PAUSED → PLAYING)
-- [x] Implement bus message handling
-- [x] Add EOS event handling
-- [x] Create pipeline element linking logic
-- [x] Add error recovery mechanisms
-- **Files**: Created `src/pipeline/mod.rs`, `src/pipeline/builder.rs`, `src/pipeline/state.rs`, `src/pipeline/bus.rs`
-- **Status**: ✅ COMPLETED
-
-### Source Control APIs (PRP-03)
-- [x] Create `src/source/` module structure
-- [x] Implement runtime source addition (`add_source`)
-- [x] Implement runtime source removal (`remove_source`)
-- [x] Add source bin creation with uridecodebin
-- [x] Implement pad-added signal handling
-- [x] Add source registry management
-- [x] Create thread-safe source operations
-- **Files**: Created `src/source/mod.rs`, `src/source/manager.rs`, `src/source/video_source.rs`, `src/source/removal.rs`, `src/source/events.rs`, `src/source/synchronization.rs`, `src/source/controller.rs`
-- **Status**: ✅ COMPLETED
+### Main Application Demo (PRP-05)
+- [ ] Create full demo matching C reference behavior
+- [ ] Add CLI argument parsing
+- [ ] Implement source addition timer (every 10 seconds)
+- [ ] Add source removal logic after MAX_NUM_SOURCES
+- [ ] Create configuration file loading
+- [ ] Add signal handling (SIGINT)
+- **Files**: Update `crates/ds-rs/src/main.rs`
+- **Impact**: No working demonstration of the port
+- **Next Step**: This is the next major implementation to showcase the complete functionality
 
 ## High Priority 🟡
 
@@ -33,36 +22,20 @@
 - [ ] Add classification metadata support
 - [ ] Implement stream-specific message handling
 - [ ] Add inference result callbacks
-- **Files**: Need to create `src/metadata/`, potentially `src/ffi/nvdsmeta.rs`
+- **Files**: Need to create `crates/ds-rs/src/metadata/`, potentially `crates/ds-rs/src/ffi/nvdsmeta.rs`
 - **Impact**: Cannot access AI inference results
 
-### Main Application Demo (PRP-05)
-- [ ] Create full demo matching C reference behavior
-- [ ] Add CLI argument parsing
-- [ ] Implement source addition timer (every 10 seconds)
-- [ ] Add source removal logic after MAX_NUM_SOURCES
-- [ ] Create configuration file loading
-- [ ] Add signal handling (SIGINT)
-- **Files**: Update `src/main.rs`
-- **Impact**: No working demonstration of the port
+### Code Quality Improvements
+- [ ] Fix workspace Cargo.toml configuration
+  - `crates/ds-rs/Cargo.toml:3`: Use workspace version instead of hardcoded "0.1.0"
+  - `crates/ds-rs/Cargo.toml:4`: Use workspace edition instead of hardcoded "2024"
+- [ ] Fix deprecated rand API usage
+  - `crates/ds-rs/src/source/controller.rs:287`: Replace `rand::thread_rng()` with `rand::rng()`
+  - `crates/ds-rs/src/source/controller.rs:288`: Replace `gen_range()` with `random_range()`
+- [ ] Remove dead code warnings
+  - `crates/ds-rs/src/source/mod.rs:54`: Remove unused field `next_id` in SourceManager
 
 ## Medium Priority 🟢
-
-### Code Quality Improvements
-- [ ] Replace `unwrap()` calls in non-test code (25 instances)
-  - `src/elements/factory.rs`: 3 instances
-  - `src/config/mod.rs`: 8 instances
-  - `src/platform.rs`: 2 instances
-  - `src/backend/standard.rs`: 2 instances
-  - `src/elements/abstracted.rs`: 3 instances
-  - `src/backend/detector.rs`: 1 instance
-  - `src/backend/mock.rs`: 6 instances
-- [ ] Remove dead code warnings
-  - Remove unused `platform` field in `StandardBackend` (src/backend/standard.rs:10)
-  - Remove unused `platform` field in `MockBackend` (src/backend/mock.rs:10)
-- [ ] Fix workspace Cargo.toml warnings
-  - Use workspace.version in main Cargo.toml:12
-  - Use workspace.edition in main Cargo.toml:13
 
 ### Testing & Examples
 - [ ] Create test RTSP source for better integration testing
@@ -70,18 +43,30 @@
   - Could use GStreamer test sources with RTSP server
 - [ ] Add integration tests with actual video files
 - [ ] Create example for each backend type
-- [ ] Add pipeline state transition tests
-- [ ] Create source addition/removal example
+- [ ] Create dedicated source addition/removal example
 - [ ] Add memory leak tests (valgrind)
 - [ ] Implement stress tests for rapid source changes
+- [ ] Fix source_management test failures with Mock backend
+  - 10 tests fail because Mock backend doesn't support uridecodebin
+  - Consider creating mock uridecodebin or skip tests for Mock backend
 
 ### Documentation
-- [x] ~~Create README.md~~ ✅ Completed
 - [ ] Add inline documentation for all public APIs
 - [ ] Create architecture diagrams
 - [ ] Write migration guide from C to Rust
 - [ ] Document backend selection logic
 - [ ] Add troubleshooting guide for common issues
+- [ ] Document source management architecture
+
+### Code Cleanup
+- [ ] Replace `unwrap()` calls in non-test code (estimated 25+ instances)
+  - `crates/ds-rs/src/elements/factory.rs`: 3 instances
+  - `crates/ds-rs/src/config/mod.rs`: 8 instances
+  - `crates/ds-rs/src/platform.rs`: 2 instances
+  - `crates/ds-rs/src/backend/standard.rs`: 2 instances
+  - `crates/ds-rs/src/elements/abstracted.rs`: 3 instances
+  - `crates/ds-rs/src/backend/detector.rs`: 1 instance
+  - `crates/ds-rs/src/backend/mock.rs`: 6 instances
 
 ## Low Priority 🔵
 
@@ -93,19 +78,19 @@
 - [ ] Set up dependency updates (dependabot)
 - [ ] Add benchmark suite
 
-### Temporary/Incomplete Implementations
-- [ ] Replace compute capability detection placeholder (`src/platform.rs:132`)
+### Incomplete Implementations
+- [ ] Replace compute capability detection placeholder (`crates/ds-rs/src/platform.rs:132`)
   - Currently returns hardcoded values based on platform
   - Should query actual GPU capabilities via nvidia-smi or CUDA API
 - [ ] Implement actual CPU-based inference in StandardBackend
-  - Currently using fakesink as placeholder (`src/backend/standard.rs:106`)
+  - Currently using fakesink as placeholder (`crates/ds-rs/src/backend/standard.rs:106`)
   - Could integrate ONNX Runtime or TensorFlow Lite
 - [ ] Complete DSL crate implementation (`crates/dsl/src/lib.rs:8`)
   - Currently has `todo!()` placeholder
   - Needs actual DeepStream Services Library functionality
 
 ### Future Enhancements
-- [ ] Add RTSP source support
+- [ ] Add native RTSP server support
 - [ ] Implement custom inference post-processing
 - [ ] Add performance profiling tools
 - [ ] Create Docker container for easy deployment
@@ -124,21 +109,31 @@
 
 ## Recently Completed ✅
 
+### Latest Completions
 - [x] Implement Source Control APIs (PRP-03) - Dynamic source management
+  - Thread-safe source registry
+  - VideoSource wrapper for uridecodebin
+  - Pad-added signal handling
+  - Per-source EOS tracking
+  - High-level SourceController API
+- [x] Updated README.md to reflect current project state
+- [x] Created comprehensive CLAUDE.md for AI assistant guidance
+
+### Previous Completions
 - [x] Implement Pipeline Management (PRP-02) - Complete pipeline module
-- [x] Fix compositor background property bug in StandardBackend
-- [x] Fix text overlay alignment properties 
-- [x] Create comprehensive README.md
 - [x] Implement core infrastructure (PRP-01)
 - [x] Implement hardware abstraction layer (PRP-06)
+- [x] Fix compositor background property bug in StandardBackend
+- [x] Fix text overlay alignment properties
 - [x] Create backend detection system
 - [x] Add configuration parsing system
 
 ## Known Issues 🐛
 
-1. **Cross-platform example** - ✅ FIXED
-   - ~~Runtime panic with compositor background property~~
-   - ~~File: `src/backend/standard.rs:80`~~
+1. **Source Management Tests with Mock Backend**
+   - 10 tests fail when using Mock backend
+   - Reason: Mock backend doesn't support uridecodebin
+   - Status: Expected behavior - use Standard backend for full testing
 
 2. **DeepStream Backend** - Not tested on actual NVIDIA hardware
    - Need validation on Jetson and x86 with GPU
@@ -146,11 +141,14 @@
 3. **Memory Management** - Need to verify no leaks
    - Particularly around dynamic source addition/removal
 
+4. **Workspace Configuration**
+   - Cargo.toml has TODOs for using workspace version/edition
+
 ## Notes
 
 - Priority based on blocking dependencies and user impact
-- PRP-02 (Pipeline) and PRP-03 (Sources) are most critical for basic functionality
-- Code quality improvements can be done incrementally
+- PRP-05 (Main Application) is now critical priority to demonstrate the complete functionality
+- Code quality improvements should be addressed before v1.0 release
 - CI/CD can wait until core functionality is complete
 
 ## Contributing
@@ -162,4 +160,4 @@ When working on any TODO item:
 4. Update documentation as needed
 5. Mark complete in TODO.md when merged
 
-Last Updated: 2025-08-22
+Last Updated: 2025-08-23

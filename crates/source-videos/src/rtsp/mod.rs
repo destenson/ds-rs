@@ -89,8 +89,7 @@ impl RtspServer {
     }
     
     pub fn start(&self) -> Result<()> {
-        let _id = self.server.attach(None);
-        // Note: attach returns Option<SourceId>, we'll assume it succeeded if no error is returned
+        let _source_id = self.server.attach(None);
         
         log::info!("RTSP server started on {}:{}", self.address, self.port);
         Ok(())
@@ -148,8 +147,8 @@ impl RtspServerBuilder {
         self
     }
     
-    pub fn add_test_pattern(mut self, name: &str, _pattern: &str) -> Self {
-        let config = VideoSourceConfig::rtsp(name, name);
+    pub fn add_test_pattern(mut self, name: &str, pattern: &str) -> Self {
+        let config = VideoSourceConfig::test_pattern(name, pattern);
         self.sources.push(config);
         self
     }

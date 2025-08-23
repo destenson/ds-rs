@@ -63,30 +63,43 @@ impl MediaFactoryBuilder {
     }
     
     fn create_launch_string(&self, config: &VideoSourceConfig) -> Result<String> {
-        // Validate pattern if it exists
-        if let crate::config::VideoSourceType::TestPattern { pattern } = &config.source_type {
-            let _pattern = TestPattern::from_str(pattern)?;
-        }
-        
-        let pattern_name = if let crate::config::VideoSourceType::TestPattern { pattern } = &config.source_type {
-            pattern
-        } else {
-            "smpte"
+        let launch = match &config.source_type {
+            crate::config::VideoSourceType::TestPattern { pattern } => {
+                let _pattern = TestPattern::from_str(pattern)?; // Validate pattern
+                format!(
+                    "( videotestsrc pattern={} is-live=true ! \
+                     video/x-raw,width={},height={},framerate={}/{},format={} ! \
+                     videoconvert ! \
+                     x264enc tune=zerolatency speed-preset=ultrafast bitrate=2000 ! \
+                     rtph264pay name=pay0 pt=96 config-interval=1 )",
+                    pattern,
+                    config.resolution.width,
+                    config.resolution.height,
+                    config.framerate.numerator,
+                    config.framerate.denominator,
+                    config.format.to_caps_string()
+                )
+            }
+            crate::config::VideoSourceType::File { path, .. } => {
+                format!(
+                    "( filesrc location=\"{}\" ! \
+                     decodebin ! \
+                     videoconvert ! \
+                     videoscale ! \
+                     video/x-raw,width={},height={} ! \
+                     x264enc tune=zerolatency speed-preset=ultrafast bitrate=2000 ! \
+                     rtph264pay name=pay0 pt=96 config-interval=1 )",
+                    path,
+                    config.resolution.width,
+                    config.resolution.height
+                )
+            }
+            crate::config::VideoSourceType::Rtsp { .. } => {
+                return Err(SourceVideoError::config(
+                    "RTSP sources cannot be served by RTSP server (would create loop)"
+                ));
+            }
         };
-        
-        let launch = format!(
-            "( videotestsrc pattern={} is-live=true ! \
-             video/x-raw,width={},height={},framerate={}/{},format={} ! \
-             videoconvert ! \
-             x264enc tune=zerolatency speed-preset=ultrafast bitrate=2000 ! \
-             rtph264pay name=pay0 pt=96 config-interval=1 )",
-            pattern_name,
-            config.resolution.width,
-            config.resolution.height,
-            config.framerate.numerator,
-            config.framerate.denominator,
-            config.format.to_caps_string()
-        );
         
         Ok(launch)
     }

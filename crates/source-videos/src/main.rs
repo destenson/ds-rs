@@ -7,6 +7,7 @@ use clap::{Parser, Subcommand};
 use std::path::PathBuf;
 use std::time::Duration;
 use tokio::signal;
+use gstreamer::glib::prelude::*;
 
 #[derive(Parser)]
 #[command(name = "source-videos")]
@@ -127,12 +128,34 @@ async fn serve_command(
         println!("Stream available at: {}", server.get_url(&mount));
     }
     
+    // Get the default main context for manual iteration
+    let main_context = gstreamer::glib::MainContext::default();
+    
     if let Some(duration) = duration {
         println!("Server will run for {} seconds", duration);
-        tokio::time::sleep(Duration::from_secs(duration)).await;
+        let end_time = std::time::Instant::now() + Duration::from_secs(duration);
+        
+        while std::time::Instant::now() < end_time {
+            // Iterate the GLib main context
+            main_context.iteration(false);
+            
+            // Small sleep to prevent busy waiting
+            tokio::time::sleep(Duration::from_millis(10)).await;
+        }
     } else {
         println!("Press Ctrl+C to stop the server");
-        signal::ctrl_c().await.expect("Failed to listen for Ctrl+C");
+        
+        tokio::select! {
+            _ = signal::ctrl_c() => {
+                println!("Received Ctrl+C, stopping...");
+            }
+            _ = async {
+                loop {
+                    main_context.iteration(false);
+                    tokio::time::sleep(Duration::from_millis(10)).await;
+                }
+            } => {}
+        }
     }
     
     println!("Server stopped");

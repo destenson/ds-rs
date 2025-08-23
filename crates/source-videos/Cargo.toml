@@ -1,0 +1,7 @@
+[package]
+name = "source-videos"
+version = "0.1.0"
+edition = "2024"
+description = "Provides source videos for testing ds-rs"
+
+[dependencies]

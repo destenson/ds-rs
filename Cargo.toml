@@ -2,6 +2,7 @@
 members = [
     "crates/dsl",
     "crates/ds-rs",
+    "crates/source-videos",
 ]
 resolver = "3"
 version = "0.1.0"

@@ -2,7 +2,7 @@ log_level = "info"
 
 [server]
 port = 8554
-address = "0.0.0.0"
+address = "127.0.0.1"
 max_connections = 100
 
 [[sources]]

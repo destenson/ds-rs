@@ -1,5 +1,7 @@
 # TODO List
 
+Last Updated: 2025-08-23
+
 ## Critical Priority 🔴
 
 ### CPU Vision Backend Implementation
@@ -7,7 +9,7 @@
   - `backend/cpu_vision/detector.rs:59`: Implement image preprocessing (resize, normalize, tensor conversion)
   - `backend/cpu_vision/detector.rs:65`: Implement YOLO postprocessing (parse outputs, NMS, coordinate conversion)
   - Status: Placeholder detector created, needs full ONNX Runtime integration
-  - Dependencies: Uncomment ort, imageproc, ndarray in Cargo.toml
+  - Dependencies: Need to enable/add ort, imageproc features when implementing
 
 ### DeepStream Integration (PRP-04)
 - [ ] **Implement NvDsMeta extraction with FFI bindings**
@@ -35,6 +37,11 @@
 - [ ] Remove panic!() calls from production code
   - `source/events.rs:280,283`: Replace with proper error handling
 
+### Test Issues
+- [ ] **Fix main_app_test failure**
+  - `tests/main_app_test.rs`: Property 'config-file-path' not found on GstBin
+  - Test trying to set invalid property on CPU detector bin
+  
 ### Placeholder Implementation Resolution
 - [ ] **Complete DSL crate implementation**
   - `dsl/src/lib.rs:8`: Currently has `todo!()` placeholder
@@ -67,8 +74,8 @@
 
 ### Configuration & Build Issues
 - [ ] **Fix workspace configuration**
-  - `ds-rs/Cargo.toml:3-4`: Use workspace version instead of "0.1.0", edition instead of "2024"
-  - Unused manifest keys: workspace.description, workspace.edition, workspace.version
+  - `ds-rs/Cargo.toml:3-4`: TODO comments indicate need to use workspace version/edition
+  - Currently hardcoded as "0.1.0" and "2024"
 - [ ] Fix deprecated rand API usage in timer implementations
   - Update to modern thread_rng() patterns
 
@@ -349,5 +356,4 @@ When working on any TODO item:
 
 ---
 
-**Last Updated: 2025-08-23**  
-**Status: Priority on completing ONNX detector for CPU-based detection; DeepStream FFI and code quality improvements needed**
+**Status: Build fixed with conditional nalgebra; Priority on ONNX detector implementation and DeepStream FFI bindings**

@@ -1,0 +1,242 @@
+# Test Orchestration Scenarios Configuration
+# This file defines all test scenarios for the ds-rs project
+
+[defaults]
+rust_log = "info"
+cargo_term_color = "always"
+test_threads = 4
+backtrace = "1"
+
+# Platform-specific settings
+[platforms.windows]
+shell = "powershell"
+path_separator = ";"
+executable_extension = ".exe"
+
+[platforms.linux]
+shell = "bash"
+path_separator = ":"
+executable_extension = ""
+
+[platforms.macos]
+shell = "bash"
+path_separator = ":"
+executable_extension = ""
+
+# Unit test scenario - fast, parallel execution
+[scenarios.unit]
+description = "Run unit tests for all crates"
+timeout = 300
+parallel = true
+
+[[scenarios.unit.steps]]
+name = "ds-rs unit tests"
+command = "cargo test --lib"
+cwd = "crates/ds-rs"
+expected_exit_code = 0
+retry_count = 0
+
+[[scenarios.unit.steps]]
+name = "source-videos unit tests"
+command = "cargo test --lib"
+cwd = "crates/source-videos"
+expected_exit_code = 0
+retry_count = 0
+
+# Integration test scenario - requires RTSP server
+[scenarios.integration]
+description = "Run integration tests with RTSP server"
+timeout = 600
+parallel = false
+
+[scenarios.integration.setup.rtsp_server]
+enabled = true
+command = "cargo run -- serve --port 8554"
+cwd = "crates/source-videos"
+startup_delay = 5
+
+[scenarios.integration.setup.rtsp_server.health_check]
+type = "tcp"
+host = "127.0.0.1"
+port = 8554
+timeout = 10
+
+[[scenarios.integration.steps]]
+name = "backend tests"
+command = "cargo test --test backend_tests"
+cwd = "crates/ds-rs"
+expected_exit_code = 0
+retry_count = 1
+
+[[scenarios.integration.steps]]
+name = "pipeline tests"
+command = "cargo test --test pipeline_tests"
+cwd = "crates/ds-rs"
+expected_exit_code = 0
+retry_count = 1
+
+[[scenarios.integration.steps]]
+name = "source management tests"
+command = "cargo test --test source_management"
+cwd = "crates/ds-rs"
+expected_exit_code = 0
+retry_count = 1
+env = { FORCE_BACKEND = "standard" }
+
+[[scenarios.integration.steps]]
+name = "source-videos integration"
+command = "cargo test --test integration_test"
+cwd = "crates/source-videos"
+expected_exit_code = 0
+retry_count = 2
+
+[scenarios.integration.cleanup]
+stop_rtsp_server = true
+
+# End-to-end test scenario
+[scenarios.e2e]
+description = "End-to-end testing with real video sources"
+timeout = 900
+parallel = false
+
+[scenarios.e2e.setup.rtsp_server]
+enabled = true
+command = "cargo run -- serve --port 8554 --patterns smpte,ball,circular"
+cwd = "crates/source-videos"
+startup_delay = 5
+
+[scenarios.e2e.setup.rtsp_server.health_check]
+type = "tcp"
+host = "127.0.0.1"
+port = 8554
+timeout = 10
+
+[scenarios.e2e.setup.test_files]
+enabled = true
+
+[[scenarios.e2e.setup.test_files.files]]
+pattern = "smpte"
+duration = 10
+output = "test_smpte.mp4"
+
+[[scenarios.e2e.setup.test_files.files]]
+pattern = "ball"
+duration = 10
+output = "test_ball.mp4"
+
+[[scenarios.e2e.steps]]
+name = "cross-platform example"
+command = "cargo run --example cross_platform"
+cwd = "crates/ds-rs"
+expected_exit_code = 0
+timeout = 30
+retry_count = 1
+
+[[scenarios.e2e.steps]]
+name = "ds-app with file source"
+command = "cargo run --bin ds-app -- file://test_smpte.mp4"
+cwd = "crates/ds-rs"
+expected_exit_code = 0
+timeout = 60
+retry_count = 1
+
+[[scenarios.e2e.steps]]
+name = "ds-app with RTSP source"
+command = "cargo run --bin ds-app -- rtsp://127.0.0.1:8554/test"
+cwd = "crates/ds-rs"
+expected_exit_code = 0
+timeout = 60
+retry_count = 2
+
+[scenarios.e2e.cleanup]
+stop_rtsp_server = true
+remove_test_files = true
+
+# Mock backend tests
+[scenarios.backend-mock]
+description = "Test with Mock backend"
+timeout = 300
+parallel = true
+env = { FORCE_BACKEND = "mock" }
+
+[[scenarios.backend-mock.steps]]
+name = "mock backend tests"
+command = "cargo test"
+cwd = "crates/ds-rs"
+expected_exit_code = 0
+retry_count = 0
+
+# Standard backend tests
+[scenarios.backend-standard]
+description = "Test with Standard backend"
+timeout = 300
+parallel = true
+env = { FORCE_BACKEND = "standard" }
+
+[[scenarios.backend-standard.steps]]
+name = "standard backend tests"
+command = "cargo test"
+cwd = "crates/ds-rs"
+expected_exit_code = 0
+retry_count = 0
+
+# DeepStream backend tests (requires NVIDIA hardware)
+[scenarios.backend-deepstream]
+description = "Test with DeepStream backend (requires NVIDIA hardware)"
+timeout = 300
+parallel = true
+env = { FORCE_BACKEND = "deepstream" }
+
+[scenarios.backend-deepstream.requirements]
+nvidia_gpu = true
+deepstream_sdk = true
+
+[[scenarios.backend-deepstream.steps]]
+name = "deepstream backend tests"
+command = "cargo test"
+cwd = "crates/ds-rs"
+expected_exit_code = 0
+retry_count = 0
+
+# Quick smoke test
+[scenarios.quick]
+description = "Quick smoke test"
+timeout = 120
+parallel = true
+
+[[scenarios.quick.steps]]
+name = "build check"
+command = "cargo check --all"
+cwd = "."
+expected_exit_code = 0
+retry_count = 0
+
+[[scenarios.quick.steps]]
+name = "clippy check"
+command = "cargo clippy --all -- -D warnings"
+cwd = "."
+expected_exit_code = 0
+retry_count = 0
+allow_failure = true
+
+[[scenarios.quick.steps]]
+name = "format check"
+command = "cargo fmt --all -- --check"
+cwd = "."
+expected_exit_code = 0
+retry_count = 0
+allow_failure = true
+
+# All tests scenario
+[scenarios.all]
+description = "Run all test scenarios"
+timeout = 1800
+parallel = false
+include_scenarios = [
+    "quick",
+    "unit",
+    "integration",
+    "e2e",
+    "backend-mock",
+    "backend-standard"
+]

@@ -404,6 +404,54 @@ The library can parse standard DeepStream configuration files:
 
 ## Testing
 
+### Automated Test Orchestration
+
+The project includes comprehensive test orchestration scripts for automated end-to-end testing:
+
+```bash
+# Validate environment (check all dependencies)
+python scripts/validate-environment.py
+
+# Run all tests with orchestration
+python scripts/test-orchestrator.py --scenario all
+
+# Run specific test scenarios
+python scripts/test-orchestrator.py --scenario unit        # Unit tests only
+python scripts/test-orchestrator.py --scenario integration  # Integration with RTSP
+python scripts/test-orchestrator.py --scenario e2e         # End-to-end tests
+python scripts/test-orchestrator.py --scenario quick       # Quick smoke tests
+
+# List available test scenarios
+python scripts/test-orchestrator.py --list
+
+# Platform-specific orchestrators
+./scripts/test-orchestrator.sh unit      # Linux/macOS
+.\scripts\test-orchestrator.ps1 -Scenario unit  # Windows PowerShell
+
+# Run with verbose output
+python scripts/test-orchestrator.py --scenario integration --verbose
+```
+
+#### Test Scenarios
+
+- **quick**: Fast smoke tests (format, clippy, build check)
+- **unit**: Unit tests for all crates
+- **integration**: Integration tests with RTSP server
+- **e2e**: End-to-end tests with real video sources
+- **backend-mock**: Tests using Mock backend
+- **backend-standard**: Tests using Standard GStreamer backend
+- **backend-deepstream**: Tests using NVIDIA DeepStream (requires hardware)
+- **all**: Run all applicable test scenarios
+
+The test orchestrator automatically:
+- Manages RTSP server lifecycle
+- Generates test video files
+- Handles backend selection
+- Provides detailed logging and reporting
+- Cleans up resources on completion
+
+### Manual Testing
+
 ```bash
 # Run all tests
 cargo test
@@ -469,12 +517,39 @@ cargo test
    - Check firewall settings for port 8554
    - Verify with: `gst-inspect-1.0 | grep rtsp`
 
+## CI/CD
+
+The project uses GitHub Actions for continuous integration and testing:
+
+### Automated Workflows
+
+- **Test Orchestration**: Runs on push and pull requests to main branches
+  - Quick checks (format, clippy, build)
+  - Unit tests on multiple platforms (Linux, Windows, macOS)
+  - Integration tests with RTSP server
+  - End-to-end tests with video sources
+  - Backend-specific testing
+
+### Running CI Locally
+
+```bash
+# Install act (GitHub Actions runner)
+# https://github.com/nektos/act
+
+# Run CI workflow locally
+act -j unit-tests
+act -j integration-tests
+
+# Run with specific event
+act pull_request
+```
+
 ## Contributing
 
-See [PRPs/](PRPs/) directory for project planning documents. Currently 15 PRPs available:
-- 7 completed (PRPs 01-07: Core infrastructure through test video generation)
-- 1 executed (PRP-08: Code Quality improvements)
-- 7 ready for implementation (PRPs 09-15: Test orchestration, computer vision, backend enhancements)
+See [PRPs/](PRPs/) directory for project planning documents. Currently 23 PRPs available:
+- 9 completed (PRPs 01-08, 14-16: Core infrastructure, test orchestration)
+- 3 in progress (PRPs 20-22: CPU Vision Backend)
+- 11 ready for implementation (Computer vision, detection, tracking)
 
 When contributing:
 1. Create a feature branch

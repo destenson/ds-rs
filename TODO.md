@@ -2,6 +2,17 @@
 
 ## Critical Priority 🔴
 
+### DeepStream Integration
+- [ ] **Implement NvDsMeta extraction with FFI bindings**
+  - `metadata/mod.rs:60-61`: Currently returns mock metadata
+  - Need to call `gst_buffer_get_nvds_batch_meta` 
+  - Related: PRP-04 from known limitations
+
+- [ ] **Implement stream-specific EOS messages**
+  - `messages/mod.rs:174-183`: Need proper stream EOS detection
+  - `pipeline/bus.rs:216-218`: Requires FFI for `gst_nvmessage_is_stream_eos`
+  - Need `gst_nvmessage_parse_stream_eos` binding
+
 ### Code Quality & Production Readiness  
 - [ ] Replace `unwrap()` calls in production code (237 occurrences across 39 files)
   - **Highest priority files**: 
@@ -18,15 +29,24 @@
   - `source/events.rs:280,283`: Replace with proper error handling
 
 ### Placeholder Implementation Resolution
-- [ ] Replace mock metadata with real DeepStream FFI when available
-  - `metadata/mod.rs:61,72`: Mock metadata creation for testing
-  - `messages/mod.rs:182`: Mock stream ID parsing
-- [ ] Implement actual CPU inference for Standard backend
-  - `backend/standard.rs:96-104`: Currently uses fakesink instead of inference
 - [ ] Complete DSL crate implementation
   - `dsl/src/lib.rs:8`: Currently has `todo!()` placeholder
 
 ## High Priority 🟡
+
+### Core Functionality 
+- [ ] **Complete main demo application**
+  - `tests/main_app_test.rs:23`: Test currently ignored, needs actual runtime
+  - Full application matching C reference implementation
+  - Related: PRP-05 from known limitations
+
+- [ ] **Implement DeepStream config file parsing**
+  - `inference/config.rs:226-229`: `from_deepstream_config` returns mock
+  - Need to parse actual .txt config format
+
+- [ ] **Implement label map file loading**
+  - `inference/mod.rs:173-176`: `load_from_file` returns default COCO labels
+  - Parse actual label files
 
 ### Testing & CI/CD Infrastructure  
 - [ ] Fix Source Management tests with Mock backend limitations
@@ -38,12 +58,32 @@
 - [ ] Add memory leak detection tests
 
 ### Configuration & Build Issues
-- [ ] Fix workspace Cargo.toml warnings
+- [ ] **Fix workspace configuration**
+  - `Cargo.toml:3-4`: Use workspace version and edition instead of hardcoded values
   - Unused manifest keys: workspace.description, workspace.edition, workspace.version
 - [ ] Fix deprecated rand API usage in timer implementations
   - Update to modern thread_rng() patterns
 
 ## Medium Priority 🟢
+
+### Platform Improvements
+- [ ] **Implement GPU capabilities detection**
+  - `platform.rs:148-150`: Currently returns common capabilities based on platform
+  - Need nvidia-smi or CUDA API calls for actual detection
+
+- [ ] **Improve Standard backend simulation**
+  - `backend/standard.rs:95-96,107-109`: Inference uses fakesink, tracker uses identity
+  - Implement actual CPU inference (ONNX, TensorFlow Lite)
+
+### Code Cleanup
+- [ ] **Remove unused variables with underscore prefixes**
+  - `app/timers.rs:35`: `_source_id`
+  - `messages/mod.rs:193`: `_element_msg`
+  - `metadata/mod.rs:125`: `_batch_meta`
+  - `source/controller.rs:154`: `_event_handler`
+  - `source/video_source.rs:66,181`: Handler parameters
+  - `pipeline/bus.rs`: Multiple handler parameters
+  - Various test/mock implementations
 
 ### Testing & Examples
 - [ ] Create test RTSP source for better integration testing
@@ -51,9 +91,6 @@
 - [ ] Create example for each backend type
 - [ ] Add memory leak tests (valgrind)
 - [ ] Implement stress tests for rapid source changes
-- [ ] Fix source_management test failures with Mock backend
-  - 10 tests fail because Mock backend doesn't support uridecodebin
-  - Consider creating mock uridecodebin or skip tests for Mock backend
 
 ### Documentation
 - [ ] Add inline documentation for all public APIs
@@ -62,20 +99,6 @@
 - [ ] Document backend selection logic
 - [ ] Add troubleshooting guide for common issues
 - [ ] Document metadata extraction architecture
-
-### Placeholder Implementations to Replace
-- [ ] Replace mock metadata extraction (`metadata/mod.rs:61`)
-  - Currently returns mock data, needs real DeepStream integration
-- [ ] Fix stream EOS detection (`messages/mod.rs:175`)
-  - Currently using simplified check
-- [ ] Implement proper stream ID parsing (`messages/mod.rs:182`)
-  - Currently returns mock stream ID
-- [ ] Load actual label files (`inference/mod.rs:175`)
-  - Currently returns default label map
-- [ ] Parse DeepStream config files (`inference/config.rs:228`)
-  - Currently returns mock configuration
-- [ ] Implement actual CPU inference (`backend/standard.rs:17,108`)
-  - Currently using identity element as passthrough
 
 ## Low Priority 🔵
 
@@ -87,16 +110,6 @@
 - [ ] Set up dependency updates (dependabot)
 - [ ] Add benchmark suite
 
-### Incomplete Implementations
-- [ ] Replace compute capability detection (`platform.rs:149`)
-  - Currently returns hardcoded values based on platform
-  - Should query actual GPU capabilities via nvidia-smi or CUDA API
-- [ ] Complete DSL crate implementation (`crates/dsl/src/lib.rs:8`)
-  - Currently has `todo!()` placeholder
-  - Needs actual DeepStream Services Library functionality
-- [ ] Implement simplified processing in inference (`inference/mod.rs:214-215`)
-  - Currently has simplified tensor output parsing
-
 ### Future Enhancements
 - [ ] Add native RTSP server support
 - [ ] Implement custom inference post-processing
@@ -105,8 +118,6 @@
 - [ ] Add WebRTC sink support
 - [ ] Implement cloud inference backend
 - [ ] Add Kubernetes deployment manifests
-- [ ] Add actual CPU inference support (ONNX, TensorFlow Lite)
-- [ ] Implement GPU capability detection via nvidia-ml or CUDA APIs
 
 ### Performance Optimizations
 - [ ] Profile and optimize hot paths
@@ -211,24 +222,36 @@
 
 ## Statistics 📊
 
-- **Total TODO items**: 57 (25 critical/high, 18 medium, 14 low priority)
-  - **New Items Added**: 16 (from PRPs 08-13)
+- **Total TODO items**: ~55 (organized by priority and category)
 - **Code Quality Issues**: 
   - **unwrap() calls**: 237 occurrences across 39 files (production reliability risk)
   - **panic!() calls**: 2 occurrences in source events (needs error handling)
   - **todo!() placeholders**: 1 in DSL crate
+  - **Unused variables**: ~15 underscore-prefixed variables indicating placeholders
+  - **Mock implementations**: 5+ functions returning mock data ("for now")
 - **Test Coverage**: 95/107 tests passing (88.8%)
-  - 12 failing tests (10 expected Mock backend limitations, 2 GStreamer property issues)
+  - 10 tests fail with Mock backend (expected - uridecodebin limitation)
+  - 2 GStreamer property type issues
 - **Codebase Size**: ~12,000+ lines across ds-rs + source-videos crates
 - **Build Status**: ✅ Clean builds with minor workspace warnings
 
 ## Notes
 
-- **13 PRPs Available**: 7 complete, 6 new PRPs ready for implementation
-- **Priority Focus**: Code quality (PRP-08) and production readiness for v1.0 release  
-- **New Capabilities**: Computer vision integration, multi-stream processing, data export
-- **Test Infrastructure**: source-videos crate with RTSP server working (test2 has bouncing ball)
-- **Production Readiness**: Main blocker is extensive unwrap() usage requiring error handling
+### Key Technical Debt
+- **DeepStream FFI Bindings**: Critical metadata and message handling functions need implementation
+- **Mock Data Returns**: 5+ functions return mock data marked with "for now" comments
+- **Unused Parameters**: ~15 underscore-prefixed variables indicate incomplete implementations
+- **Test Limitations**: Mock backend cannot test uridecodebin-based functionality
+
+### Priority Focus
+- **Critical**: DeepStream FFI integration for metadata extraction and stream EOS handling
+- **High**: Complete main demo app and config file parsing
+- **Code Quality**: Replace 237 unwrap() calls for production readiness
+
+### Development Patterns Found
+- Mock implementations consistently marked with "for now" comments
+- Unused parameters prefixed with underscore (_) to avoid warnings
+- Placeholder logic returning simplified or hardcoded values
 
 ## Contributing
 
@@ -242,4 +265,4 @@ When working on any TODO item:
 ---
 
 **Last Updated: 2025-08-23**  
-**Status: 7 PRPs Complete, 6 New PRPs Available - Focus on Production Readiness & New Features**
+**Status: DeepStream FFI integration and production readiness are critical priorities**

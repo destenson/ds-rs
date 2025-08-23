@@ -222,36 +222,73 @@
 
 ## Statistics 📊
 
-- **Total TODO items**: ~55 (organized by priority and category)
+- **Total TODO items**: ~60 (including 4 new CPU Vision PRPs)
 - **Code Quality Issues**: 
   - **unwrap() calls**: 237 occurrences across 39 files (production reliability risk)
   - **panic!() calls**: 2 occurrences in source events (needs error handling)
   - **todo!() placeholders**: 1 in DSL crate
-  - **Unused variables**: ~15 underscore-prefixed variables indicating placeholders
-  - **Mock implementations**: 5+ functions returning mock data ("for now")
+  - **Unused variables**: ~24 underscore-prefixed variables indicating placeholders
+  - **Mock implementations**: 8 functions returning mock data ("for now")
 - **Test Coverage**: 95/107 tests passing (88.8%)
   - 10 tests fail with Mock backend (expected - uridecodebin limitation)
   - 2 GStreamer property type issues
 - **Codebase Size**: ~12,000+ lines across ds-rs + source-videos crates
 - **Build Status**: ✅ Clean builds with minor workspace warnings
+- **New PRPs**: 4 PRPs (20-23) for CPU Vision Backend implementation
+
+## New Feature Development 🚀
+
+### CPU Vision Backend (PRPs 20-23) - NEW
+- [ ] **Implement CPU-Based Vision Backend (PRP-20)**
+  - Replace Standard backend placeholders with functional CV
+  - Integrate OpenCV DNN module for detection
+  - Implement lightweight tracking algorithms
+  - Target: 15+ FPS on integrated graphics
+  
+- [ ] **CPU Object Detection Module (PRP-21)**
+  - Integrate YOLOv5 Nano (1.9M parameters)
+  - Support MobileNet SSD as backup
+  - ONNX model loading and inference
+  - Target: 20+ FPS single stream
+  
+- [ ] **CPU Object Tracking Module (PRP-22)**
+  - Implement Centroid tracker (100+ FPS)
+  - Add Kalman filter tracker (50+ FPS)
+  - Implement SORT algorithm (30+ FPS)
+  - Configurable algorithm selection
+  
+- [ ] **GStreamer Plugin Integration (PRP-23)**
+  - Integrate hsvdetector for color-based detection
+  - Use colordetect for specific object tracking
+  - Leverage videocompare for motion detection
+  - Build hybrid detection pipelines
 
 ## Notes
 
 ### Key Technical Debt
 - **DeepStream FFI Bindings**: Critical metadata and message handling functions need implementation
-- **Mock Data Returns**: 5+ functions return mock data marked with "for now" comments
-- **Unused Parameters**: ~15 underscore-prefixed variables indicate incomplete implementations
+- **Mock Data Returns**: 8 functions return mock data marked with "for now" comments
+  - `inference/mod.rs:175`: Label map loading
+  - `inference/config.rs:228`: DeepStream config parsing
+  - `platform.rs:149`: GPU capabilities detection
+  - `metadata/mod.rs:61`: Batch metadata extraction
+  - `messages/mod.rs:175,182`: Stream EOS handling
+  - `pipeline/bus.rs:217`: Stream-specific EOS detection
+  - `backend/standard.rs:108`: Tracker placeholder
+- **Unused Parameters**: ~24 underscore-prefixed variables indicate incomplete implementations
 - **Test Limitations**: Mock backend cannot test uridecodebin-based functionality
 
 ### Priority Focus
 - **Critical**: DeepStream FFI integration for metadata extraction and stream EOS handling
 - **High**: Complete main demo app and config file parsing
+- **New**: CPU Vision Backend implementation for non-NVIDIA systems
 - **Code Quality**: Replace 237 unwrap() calls for production readiness
 
 ### Development Patterns Found
 - Mock implementations consistently marked with "for now" comments
 - Unused parameters prefixed with underscore (_) to avoid warnings
 - Placeholder logic returning simplified or hardcoded values
+- Standard backend uses fakesink/identity as placeholders
 
 ## Contributing
 
@@ -265,4 +302,4 @@ When working on any TODO item:
 ---
 
 **Last Updated: 2025-08-23**  
-**Status: DeepStream FFI integration and production readiness are critical priorities**
+**Status: CPU Vision Backend PRPs added; DeepStream FFI and production readiness remain critical**

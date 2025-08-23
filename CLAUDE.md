@@ -60,9 +60,6 @@ cargo check
 # Run clippy lints
 cargo clippy --all-targets --all-features -- -D warnings
 
-# Format code
-cargo fmt
-
 # Build documentation
 cargo doc --open
 

@@ -1,0 +1,32 @@
+[workspace]
+members = [
+    "crates/dsl",
+    ".",
+]
+resolver = "2"
+version = "0.1.0"
+edition = "2024"
+
+[package]
+name = "ds-rs"
+version = "0.1.0" # TODO: use the workspace version
+edition = "2024" # TODO: use the workspace edition
+description = "Powerful library to control nVidia DeepStream AI processing framework"
+
+[features]
+default = ["std"]
+std = []
+logging = ["gstreamer/log"]
+serde = ["gstreamer/serde"]
+gst_v1_16 = ["gstreamer/v1_16"]
+gst_v1_18 = ["gstreamer/v1_18"]
+gst_v1_20 = ["gstreamer/v1_20"]
+gst_v1_22 = ["gstreamer/v1_22"]
+gst_v1_24 = ["gstreamer/v1_24"]
+gst_v1_26 = ["gstreamer/v1_26"]
+gst_v1_28 = ["gstreamer/v1_28"]
+
+
+[dependencies]
+dsl = { path = "crates/dsl" }
+gstreamer = "0.24.1"

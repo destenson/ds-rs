@@ -9,3 +9,5 @@ version = "0.1.0"
 edition = "2024"
 description = "Powerful library to control nVidia DeepStream AI processing framework"
 
+[workspace.dependencies]
+rand = "0.8" # keep this 0.8

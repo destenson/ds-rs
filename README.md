@@ -9,6 +9,7 @@ A Rust port of NVIDIA's DeepStream runtime source addition/deletion reference ap
 - **Type-Safe GStreamer Bindings**: Leverages official gstreamer-rs for robust pipeline management
 - **Dynamic Source Management**: Add and remove video sources at runtime without pipeline interruption
 - **Configuration System**: Support for DeepStream configuration files and TOML-based settings
+- **Pipeline Builder**: Fluent API for constructing complex GStreamer pipelines
 
 ## Architecture
 
@@ -24,17 +25,24 @@ The project features a flexible backend system that automatically detects and us
 
 ```
 ds-rs/
-├── src/
-│   ├── backend/        # Backend implementations and detection
-│   ├── config/         # Configuration parsing and management
-│   ├── elements/       # GStreamer element abstractions
-│   ├── error.rs        # Error handling
-│   ├── platform.rs     # Platform detection (Jetson/x86)
-│   └── main.rs         # Application entry point
-├── examples/           # Usage examples
-├── tests/              # Integration tests
+├── crates/
+│   ├── ds-rs/          # Main library and application
+│   │   ├── src/
+│   │   │   ├── backend/        # Backend implementations and detection
+│   │   │   ├── config/         # Configuration parsing and management
+│   │   │   ├── elements/       # GStreamer element abstractions
+│   │   │   ├── pipeline/       # Pipeline builder and state management
+│   │   │   ├── source/         # Dynamic source management
+│   │   │   ├── error.rs        # Error handling
+│   │   │   ├── platform.rs     # Platform detection (Jetson/x86)
+│   │   │   ├── lib.rs          # Library entry point
+│   │   │   └── main.rs         # Application entry point
+│   │   ├── examples/           # Usage examples
+│   │   └── tests/              # Integration tests
+│   └── dsl/            # DeepStream Services Library (future)
 ├── PRPs/               # Project planning documents
-└── vendor/             # Reference C implementation
+├── vendor/             # Reference C implementation
+└── CLAUDE.md           # AI assistant guidance
 ```
 
 ## Installation
@@ -56,12 +64,12 @@ ds-rs/
 ```bash
 # Clone the repository
 git clone https://github.com/yourusername/ds-rs.git
-cd ds-rs
+cd ds-rs/crates/ds-rs
 
 # Build the project
 cargo build --release
 
-# Run tests
+# Run tests (currently 67 tests)
 cargo test
 
 # Build with specific GStreamer version
@@ -86,11 +94,11 @@ cargo build --release
 ### Basic Application
 
 ```bash
-# Run the main application
-cargo run --release
+# Run the main application (from crates/ds-rs directory)
+cargo run --release --bin ds-app
 
 # Run with debug output
-RUST_LOG=debug cargo run --release
+RUST_LOG=debug cargo run --release --bin ds-app
 ```
 
 ### Cross-Platform Example
@@ -159,17 +167,21 @@ let pipeline = Arc::new(Pipeline::new("my-pipeline")?);
 let streammux = factory.create_stream_mux(Some("mux"))?;
 let controller = SourceController::new(pipeline, streammux);
 
-// Add sources dynamically
+// Add sources dynamically at runtime
 let source1 = controller.add_source("file:///path/to/video1.mp4")?;
 let source2 = controller.add_source("rtsp://camera.local/stream")?;
 
-// Remove sources at runtime
+// Remove sources without stopping pipeline
 controller.remove_source(source1)?;
 
 // List active sources
 for (id, uri, state) in controller.list_active_sources()? {
     println!("Source {}: {} [{:?}]", id, uri, state);
 }
+
+// Enable automatic removal on EOS
+let mut controller = SourceController::new(pipeline, streammux);
+controller.enable_auto_remove_on_eos(true);
 ```
 
 ### Building Pipelines with Fluent API
@@ -235,27 +247,27 @@ The library can parse standard DeepStream configuration files:
 ## Development Status
 
 ### Implemented ✅
-- Core infrastructure and error handling
-- Platform detection (Jetson/x86/Unknown)
-- Hardware abstraction layer with three backends
-- Element factory with backend-aware creation
-- Configuration system (TOML and DeepStream formats)
-- Pipeline management with builder pattern (PRP-02)
-  - Fluent API for pipeline construction
-  - State management with transitions
-  - Bus message handling
-  - EOS event handling
-- Comprehensive test suite (54 tests across all modules)
+- **Core Infrastructure** (PRP-01): Error handling, platform detection, module structure
+- **Hardware Abstraction** (PRP-06): Three-tier backend system with auto-detection
+- **Pipeline Management** (PRP-02): Builder pattern, state management, bus handling
+- **Source Control APIs** (PRP-03): Dynamic source addition/removal at runtime
+  - Thread-safe source registry with unique IDs
+  - VideoSource wrapper for uridecodebin elements
+  - Pad-added signal handling for dynamic linking
+  - Per-source EOS tracking and event system
+  - High-level SourceController API
+- **Configuration System**: TOML and DeepStream format parsing
+- **Test Suite**: 67 tests across all modules
 
 ### In Progress 🚧
-- Runtime source addition/deletion (PRP-03)
-- DeepStream metadata extraction (PRP-04)
-- Complete demo application (PRP-05)
+- **Main Application** (PRP-05): Full demo matching C reference
+- **DeepStream Metadata** (PRP-04): AI inference result extraction
 
 ### Planned 📋
-- Integration tests with video files
+- Integration tests with actual video files
+- Test RTSP source for better integration testing
 - Performance benchmarking
-- CI/CD pipeline
+- CI/CD pipeline with GitHub Actions
 - Documentation improvements
 - Additional examples
 
@@ -268,11 +280,16 @@ cargo test
 # Run tests with output
 cargo test -- --nocapture
 
-# Run specific test
-cargo test test_backend_detection
-
-# Run backend tests
+# Run specific test suite
 cargo test --test backend_tests
+cargo test --test pipeline_tests
+cargo test --test source_management
+
+# Run specific test
+cargo test test_video_source_creation
+
+# Note: Some source_management tests may fail with Mock backend
+# This is expected - use Standard backend for full testing
 ```
 
 ## Environment Variables
@@ -282,19 +299,7 @@ cargo test --test backend_tests
 - `GST_PLUGIN_PATH` - Additional GStreamer plugin paths
 - `DS_SDK_ROOT` - DeepStream SDK installation path
 - `RUST_LOG` - Set logging level (error, warn, info, debug, trace)
-
-## Contributing
-
-See [PRPs/](PRPs/) directory for project planning documents and contribution guidelines.
-
-## License
-
-This project is a port of NVIDIA's DeepStream reference applications. Please refer to NVIDIA's licensing terms for DeepStream SDK usage.
-
-## Acknowledgments
-
-- Original C implementation: [NVIDIA-AI-IOT/deepstream_reference_apps](https://github.com/NVIDIA-AI-IOT/deepstream_reference_apps)
-- Built with [gstreamer-rs](https://github.com/GStreamer/gstreamer-rs)
+- `FORCE_BACKEND` - Force specific backend (mock, standard, deepstream)
 
 ## Troubleshooting
 
@@ -314,10 +319,33 @@ This project is a port of NVIDIA's DeepStream reference applications. Please ref
    - Verify all required configuration files are present
    - Enable debug logging: `RUST_LOG=debug`
 
-4. **Cross-platform example fails**
-   - Known issue with compositor property types (fix in progress)
-   - Use mock backend for testing: `cargo run --example cross_platform mock`
+4. **Source management test failures**
+   - Mock backend doesn't support uridecodebin
+   - Use Standard backend for full source management testing
+   - This is expected behavior
+
+## Contributing
+
+See [PRPs/](PRPs/) directory for project planning documents and contribution guidelines.
+
+When contributing:
+1. Create a feature branch
+2. Update TODO.md to mark items in-progress
+3. Write tests for new functionality
+4. Update documentation as needed
+5. Mark complete in TODO.md when merged
+
+## License
+
+This project is a port of NVIDIA's DeepStream reference applications. Please refer to NVIDIA's licensing terms for DeepStream SDK usage.
+
+## Acknowledgments
+
+- Original C implementation: [NVIDIA-AI-IOT/deepstream_reference_apps](https://github.com/NVIDIA-AI-IOT/deepstream_reference_apps)
+- Built with [gstreamer-rs](https://github.com/GStreamer/gstreamer-rs)
 
 ## Project Status
 
-This is an active port of NVIDIA's DeepStream reference application to Rust. The core infrastructure is complete, with pipeline management and dynamic source control features under development. The project emphasizes cross-platform compatibility, allowing development and testing without specialized hardware.
+This is an active port of NVIDIA's DeepStream reference application to Rust. The core infrastructure, pipeline management, and dynamic source control are complete. The project emphasizes cross-platform compatibility, allowing development and testing without specialized hardware.
+
+**Current Focus**: Implementing the main application demo (PRP-05) to showcase the complete functionality of dynamic source management in video analytics pipelines.

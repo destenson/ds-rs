@@ -1,3 +1,4 @@
+#![allow(unused)]
 use ds_rs::{init, BackendManager, BackendType, PlatformInfo};
 use ds_rs::backend::detector;
 use ds_rs::elements::factory::ElementFactory;

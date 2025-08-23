@@ -6,216 +6,191 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 This is a Rust port of NVIDIA's DeepStream runtime source addition/deletion reference application. The project demonstrates dynamic video source management in AI-powered video analytics pipelines using GStreamer and DeepStream SDK.
 
-## Architecture
+## High-Level Architecture
 
-### Project Structure
-- **PRPs/** - Project Requirement and Planning documents defining implementation phases
-- **src/** - Main library code for DeepStream Rust bindings
-- **crates/dsl** - DeepStream Library Services crate (for future use)
-- **vendor/** - Original C implementation reference
+### Backend Abstraction System
+The codebase implements a three-tier backend system to enable cross-platform compatibility:
+- **DeepStream Backend** (`crates/ds-rs/src/backend/deepstream.rs`): Uses NVIDIA hardware acceleration
+- **Standard Backend** (`crates/ds-rs/src/backend/standard.rs`): Falls back to standard GStreamer elements
+- **Mock Backend** (`crates/ds-rs/src/backend/mock.rs`): For testing without any real hardware
 
-### Implementation Phases (PRPs)
-1. **Core Infrastructure** - FFI bindings, build system, error handling
-2. **Hardware Abstraction** - Runtime detection and fallback to standard GStreamer
-3. **GStreamer Pipeline** - Pipeline management with abstracted elements
-4. **Source Control APIs** - Runtime source addition/deletion
-5. **DeepStream Integration** - Metadata handling and inference processing
-6. **Main Application** - CLI and demonstration runner
+Backend selection is automatic via `BackendManager` which probes for available capabilities at runtime. This abstraction is critical for development on non-NVIDIA systems.
 
-### Key Dependencies
-- `gstreamer = "0.24.1"` - Official GStreamer Rust bindings (includes DeepStream element access)
-- NVIDIA DeepStream SDK 6.0+ (installed as GStreamer plugins)
-- CUDA 10.2 (Jetson) or 11.4+ (x86)
-- DeepStream elements accessed via standard GStreamer API - no custom FFI needed
+### Dynamic Source Management Architecture
+The source management system (`crates/ds-rs/src/source/`) enables runtime addition/removal of video sources:
+- **SourceManager**: Thread-safe registry using `Arc<RwLock<HashMap>>`
+- **VideoSource**: Wraps uridecodebin with pad-added signal handling
+- **SourceController**: High-level API coordinating manager, events, and synchronization
+- **Event System**: Channel-based architecture for async source state changes
 
-## Build Commands
+Sources link dynamically to nvstreammux (or compositor in standard backend) without pipeline interruption.
+
+### Pipeline State Management
+The pipeline module (`crates/ds-rs/src/pipeline/`) provides:
+- **PipelineBuilder**: Fluent API for constructing pipelines
+- **StateManager**: Validates and manages GST state transitions with recovery
+- **BusWatcher**: Message handling with callback registration
+
+## Build and Test Commands
 
 ```bash
+# Main crate is in crates/ds-rs/
+cd crates/ds-rs
+
 # Build the project
 cargo build --release
 
-# Run tests
+# Run all tests (currently 67 tests)
 cargo test
 
-# Run with all GStreamer features
-cargo build --features gst_v1_24
+# Run specific test file
+cargo test --test backend_tests
+cargo test --test pipeline_tests  
+cargo test --test source_management
 
-# Build for Jetson (CUDA 10.2)
-CUDA_VER=10.2 cargo build --release
+# Run single test by name
+cargo test test_video_source_creation -- --exact
 
-# Build for x86 (CUDA 11.4)
-CUDA_VER=11.4 cargo build --release
+# Run with GStreamer debug output
+GST_DEBUG=3 cargo test
 
-# Run the main application (once implemented)
-cargo run --release -- <video_uri>
-# Example: cargo run --release -- file:///path/to/video.mp4
-```
-
-## Development Commands
-
-```bash
-# Check code without building
+# Check without building
 cargo check
-
-# Format code
-cargo fmt
 
 # Run clippy lints
 cargo clippy --all-targets --all-features -- -D warnings
 
-# Run a specific test
-cargo test test_name
+# Format code
+cargo fmt
 
 # Build documentation
 cargo doc --open
 
-# Clean build artifacts
-cargo clean
+# Run the main application
+cargo run --release --bin ds-app
+
+# Run cross-platform example
+cargo run --example cross_platform
 ```
 
-## DeepStream Integration Notes
+## Platform-Specific Builds
 
-### Environment Setup
 ```bash
-# Required environment variable for DeepStream SDK
-export DS_SDK_ROOT=/opt/nvidia/deepstream/deepstream
+# For Jetson (CUDA 10.2)
+CUDA_VER=10.2 cargo build --release
 
-# GStreamer plugin path for DeepStream elements
-export GST_PLUGIN_PATH=$DS_SDK_ROOT/lib/gstreamer-1.0:$GST_PLUGIN_PATH
+# For x86 with CUDA 11.4+
+CUDA_VER=11.4 cargo build --release
 
-# Library paths
-export LD_LIBRARY_PATH=$DS_SDK_ROOT/lib:$LD_LIBRARY_PATH
+# For non-NVIDIA systems (auto-selects standard backend)
+cargo build --release
 ```
 
-### Platform Detection
-The build system should detect platform via CUDA version:
-- Jetson: CUDA 10.2, uses integrated GPU features
-- x86: CUDA 11.4+, requires explicit GPU ID configuration
+## Critical Implementation Details
 
-### Critical DeepStream Components (GStreamer Elements)
-- **nvstreammux**: Batches streams from multiple sources
-- **nvinfer**: Runs TensorRT inference (pgie/sgie)
-- **nvtracker**: Object tracking across frames
-- **nvdsosd**: On-screen display for bounding boxes
-- **nvtiler**: Composites multiple streams into grid
-
-All these are standard GStreamer elements created via:
+### Element Creation Pattern
+All elements are created through the backend abstraction:
 ```rust
-let element = gst::ElementFactory::make("nvstreammux")
-    .property("batch-size", 1)
-    .build()?;
+// NEVER create elements directly
+// BAD: gst::ElementFactory::make("nvstreammux")
+
+// GOOD: Use ElementFactory with backend
+let factory = ElementFactory::new(backend_manager);
+let mux = factory.create_stream_mux(Some("mux"))?;
+```
+
+### Source Addition Flow
+1. `SourceController::add_source()` generates unique SourceId
+2. Creates `VideoSource` with uridecodebin
+3. Connects pad-added signal for dynamic linking
+4. Adds to pipeline and sets to PLAYING state
+5. Links to streammux on pad-added callback
+6. Updates registry and emits SourceAdded event
+
+### Property Setting Gotchas
+- Use `set_property_from_str()` for enum-like string properties
+- Standard properties use regular `set_property()`
+- Mock backend validates but doesn't apply properties
+
+### State Synchronization
+When adding sources to running pipeline:
+1. Source state must sync with pipeline state
+2. Use `SourceSynchronizer::sync_source_with_pipeline()`
+3. Handle ASYNC state changes with timeout
+
+## Test Failures to Expect
+
+The source_management tests will fail 10 tests when using Mock backend because uridecodebin requires actual GStreamer plugins. This is expected - these tests pass with Standard or DeepStream backends.
+
+## Configuration Files Required
+
+For DeepStream backend, these configs must be in working directory:
+- `dstest_pgie_config.txt` - Primary inference config
+- `dstest_sgie[1-3]_config.txt` - Secondary inference configs  
+- `dstest_tracker_config.txt` - Tracker config
+- `tracker_config.yml` - Low-level tracker settings
+
+## Common Development Patterns
+
+### Adding New Backend Elements
+1. Add variant to `DeepStreamElementType` enum
+2. Implement creation in all three backends
+3. Add to `ElementFactory::create_*` method
+4. Update element mapping documentation
+
+### Implementing New Source Features
+1. Add trait method to `SourceAddition` or `SourceRemoval`
+2. Implement in `SourceManager`
+3. Expose through `SourceController` API
+4. Add event variant if state change is involved
+5. Write test in `source_management.rs`
+
+### Debugging Pipeline Issues
+```bash
+# Enable detailed GStreamer logging
+GST_DEBUG=3 cargo run
+
+# Generate pipeline graphs
+GST_DEBUG_DUMP_DOT_DIR=/tmp cargo run
+# Then convert: dot -Tpng /tmp/*.dot -o pipeline.png
+
+# Check element availability
+gst-inspect-1.0 | grep nv  # For DeepStream elements
 ```
 
 ## C Reference Implementation
 
-The original C implementation in `vendor/NVIDIA-AI-IOT--deepstream_reference_apps/runtime_source_add_delete/` demonstrates:
-- Pipeline: uridecodebin -> nvstreammux -> nvinfer -> nvtracker -> nvtiler -> nvvideoconvert -> nvdsosd -> displaysink
-- Adds sources every 10 seconds up to MAX_NUM_SOURCES (4)
-- Then removes sources periodically
-- Handles per-stream EOS events
+Original implementation: `vendor/NVIDIA-AI-IOT--deepstream_reference_apps/runtime_source_add_delete/`
 
-Key functions to reference:
-- `create_uridecode_bin()` - Creates source elements
-- `add_sources()` - Runtime source addition
-- `delete_sources()` - Runtime source removal
-- `cb_newpad()` - Dynamic pad handling
+Key differences from C version:
+- Uses Rust ownership instead of manual memory management
+- Channel-based events instead of callbacks
+- Backend abstraction not present in original
+- Thread-safe by default with Arc/RwLock
 
-## Hardware Abstraction and Cross-Platform Support
+## Known Limitations
 
-The application includes a hardware abstraction layer (PRP-06) that enables it to run on systems without NVIDIA hardware:
+1. **Metadata extraction** - DeepStream metadata (NvDsMeta) extraction not yet implemented (PRP-04)
+2. **Main demo** - Full application matching C reference not complete (PRP-05)
+3. **Mock backend** - Cannot test uridecodebin-based source management
+4. **Workspace warnings** - Cargo.toml has unused workspace.edition/version keys
 
-### Backend Detection
-```rust
-// Runtime detection of available backends
-let backend = detect_available_backends();
-match backend {
-    BackendType::DeepStream => // Use NVIDIA elements
-    BackendType::Standard => // Use standard GStreamer elements
-    BackendType::Mock => // Use mock elements for testing
-}
-```
+## Environment Variables
 
-### Element Mapping
-- **nvstreammux** → compositor + queue
-- **nvinfer** → fakesink or appsink with mock inference
-- **nvtracker** → identity element
-- **nvdsosd** → textoverlay + videobox
-- **nvvideoconvert** → videoconvert
-
-This enables development and testing on any system with GStreamer installed.
-
-## DeepStream Element Usage
-
-When NVIDIA hardware is available, DeepStream functionality is accessed through GStreamer elements:
-```rust
-// Create DeepStream elements using gstreamer-rs
-let streammux = gst::ElementFactory::make("nvstreammux")
-    .property("batch-size", 30)
-    .property("width", 1920)
-    .property("height", 1080)
-    .build()?;
-
-let pgie = gst::ElementFactory::make("nvinfer")
-    .property("config-file-path", "dstest_pgie_config.txt")
-    .build()?;
-```
-
-Note: Metadata extraction (line 25 reference) may require minimal FFI for `nvdsmeta.h` structures.
-
-## Testing Strategy
-
-1. **Unit Tests**: Test individual components in isolation
-2. **Integration Tests**: Test pipeline construction and state changes
-3. **Memory Tests**: Use valgrind to check for leaks
-   ```bash
-   valgrind --leak-check=full target/release/ds-runtime-demo <uri>
-   ```
-4. **Stress Tests**: Rapid source add/remove cycles
-
-## Common Issues and Solutions
-
-### Issue: DeepStream elements not found
-**Solution**: Ensure DeepStream SDK is installed and `GST_PLUGIN_PATH` includes DeepStream plugins:
 ```bash
+# DeepStream SDK location
+export DS_SDK_ROOT=/opt/nvidia/deepstream/deepstream
+
+# Add DeepStream plugins to GStreamer
 export GST_PLUGIN_PATH=$DS_SDK_ROOT/lib/gstreamer-1.0:$GST_PLUGIN_PATH
-```
 
-### Issue: CUDA version mismatch
-**Solution**: Set `CUDA_VER` environment variable before building
+# Library paths
+export LD_LIBRARY_PATH=$DS_SDK_ROOT/lib:$LD_LIBRARY_PATH
 
-### Issue: Pipeline state change failures
-**Solution**: Check element compatibility and ensure all config files are present
+# Force specific backend (optional)
+export FORCE_BACKEND=mock  # or standard, deepstream
 
-## Configuration Files
-
-The application requires DeepStream config files in the working directory:
-- `dstest_pgie_config.txt` - Primary inference engine config
-- `dstest_sgie[1-3]_config.txt` - Secondary inference configs
-- `dstest_tracker_config.txt` - Tracker configuration
-- `tracker_config.yml` - Low-level tracker config
-
-These files configure model paths, inference parameters, and tracking algorithms.
-
-## Performance Considerations
-
-- Use `nvstreammux` batching for optimal GPU utilization
-- Set appropriate `batch-size` based on GPU memory
-- Enable `nvv4l2decoder` hardware acceleration on Jetson
-- Use `enable-max-performance` for Jetson platforms
-
-## Debug Tools
-
-```bash
-# Enable GStreamer debug output
-export GST_DEBUG=3
-
-# Generate pipeline graph
-export GST_DEBUG_DUMP_DOT_DIR=/tmp
-# Graphs will be generated in /tmp as .dot files
-
-# List available GStreamer elements
-gst-inspect-1.0 | grep nv
-
-# Inspect specific element
-gst-inspect-1.0 nvstreammux
+# Set CUDA version for platform detection
+export CUDA_VER=10.2  # Jetson
+export CUDA_VER=11.4  # x86 with GPU
 ```

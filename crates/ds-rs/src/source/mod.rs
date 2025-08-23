@@ -1,3 +1,4 @@
+#![allow(unused)]
 pub mod video_source;
 pub mod manager;
 pub mod removal;

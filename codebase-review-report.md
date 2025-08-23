@@ -20,7 +20,7 @@ The DeepStream Rust port has successfully completed core infrastructure (PRP-01)
 - **Main Application** - Basic structure exists, needs full implementation
 
 ### Missing ❌
-- **Source Manager** (`src/source/`) - Impact: Cannot add/remove sources dynamically
+- **Source Manager** (`crates/ds-rs/src/source/`) - Impact: Cannot add/remove sources dynamically
 - **DeepStream Metadata** - Impact: No access to AI inference results (PRP-04)
 - **Main Application Demo** - Impact: No working demo matching C reference (PRP-05)
 - **CI/CD Pipeline** - Impact: No automated testing in GitHub
@@ -48,7 +48,7 @@ The DeepStream Rust port has successfully completed core infrastructure (PRP-01)
    - 13 comprehensive tests covering all functionality
    
 3. **PRP-03: Source Control APIs** - ⏳ NEXT PRIORITY
-   - No `src/source/` module exists yet
+   - No `crates/ds-rs/src/source/` module exists yet
    - Required for dynamic source management
    
 4. **PRP-04: DeepStream Integration** - ❌ NOT STARTED
@@ -145,7 +145,7 @@ The DeepStream Rust port has successfully completed core infrastructure (PRP-01)
 ## Critical Path Forward
 
 1. **Immediate** (This Session):
-   - Begin PRP-03: Create `src/source/` module structure
+   - Begin PRP-03: Create `crates/ds-rs/src/source/` module structure
    - Implement VideoSource wrapper for uridecodebin
    - Add SourceManager with registry
 

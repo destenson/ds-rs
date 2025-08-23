@@ -90,6 +90,11 @@ impl Backend for StandardBackend {
         // Set up compositor for grid layout similar to nvstreammux
         // Use set_property_from_str for enum properties
         compositor.set_property_from_str("background", "black"); // Black background
+        
+        // Important: Set compositor to not wait for all pads
+        // This allows it to start outputting when any pad has data
+        compositor.set_property_from_str("start-time-selection", "first"); // Use first pad's timestamp
+        // Note: max-threads property may not exist on all compositor versions
 
         Ok(compositor)
     }

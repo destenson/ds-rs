@@ -7,6 +7,10 @@ pub mod config;
 pub mod pipeline;
 pub mod source;
 pub mod app;
+pub mod metadata;
+pub mod inference;
+pub mod tracking;
+pub mod messages;
 
 pub use error::{DeepStreamError, Result};
 pub use platform::{Platform, PlatformInfo};
@@ -18,6 +22,20 @@ pub use source::{
     SourceId, SourceState, SourceInfo, SourceManager, VideoSource,
     SourceAddition, SourceRemoval, SourceEvent, SourceEventHandler,
     SourceSynchronizer, SourceController
+};
+pub use metadata::{
+    MetadataExtractor, MetadataError, MetadataStats,
+    BatchMeta, FrameMeta, ObjectMeta, BoundingBox, ClassificationMeta
+};
+pub use inference::{
+    InferenceProcessor, DetectionResult, ClassificationResult, LabelMap,
+    InferenceConfig, ModelConfig
+};
+pub use tracking::{
+    ObjectTracker, TrackStatus, TrackerState, Trajectory, TrackingStats
+};
+pub use messages::{
+    DSMessageHandler, DSMessageType, StreamEosTracker
 };
 
 pub fn init() -> Result<()> {

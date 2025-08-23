@@ -230,6 +230,55 @@ let pipeline = PipelineBuilder::new("test")
     .build()?;
 ```
 
+### Metadata Extraction and AI Inference
+
+```rust
+use ds_rs::{MetadataExtractor, ObjectTracker, InferenceProcessor};
+use gstreamer::prelude::*;
+
+// Create metadata extractor
+let extractor = MetadataExtractor::new();
+let tracker = ObjectTracker::new(100, 30, 50);
+
+// Add probe to extract metadata from buffers
+let pad = element.static_pad("sink").unwrap();
+pad.add_probe(gst::PadProbeType::BUFFER, move |_pad, info| {
+    if let Some(buffer) = info.buffer() {
+        // Extract batch metadata
+        if let Ok(batch_meta) = extractor.extract_batch_meta(buffer) {
+            // Process each frame
+            for frame in batch_meta.frames() {
+                println!("Frame from source {}: {} objects detected", 
+                    frame.source_id, frame.num_objects());
+                
+                // Process detected objects
+                for object in frame.objects() {
+                    println!("  {} at ({:.0},{:.0}) confidence: {:.2}",
+                        object.class_name(),
+                        object.rect_params.left,
+                        object.rect_params.top,
+                        object.confidence
+                    );
+                    
+                    // Track object
+                    if object.is_tracked() {
+                        tracker.update_track(object.object_id, &object, timestamp)?;
+                    }
+                }
+            }
+        }
+    }
+    gst::PadProbeReturn::Ok
+});
+
+// Process inference results
+let processor = InferenceProcessor::default();
+let result = processor.process_detection("model", raw_output, frame_id, source_id)?;
+
+// Filter high-confidence detections
+let confident = result.filter_by_confidence(0.8);
+```
+
 ## Configuration
 
 The library supports both TOML configuration files and DeepStream's native configuration format:
@@ -279,11 +328,17 @@ The library can parse standard DeepStream configuration files:
   - Timer-based source addition/removal
   - Graceful shutdown with signal handling
   - Backend-aware configuration
+- **DeepStream Metadata** (PRP-04): AI inference result extraction
+  - Complete metadata hierarchy (Batch, Frame, Object)
+  - Object detection and classification support
+  - Object tracking with trajectory management
+  - Stream-specific message handling
+  - Inference configuration system
 - **Configuration System**: TOML and DeepStream format parsing
-- **Test Suite**: 69 tests across all modules
+- **Test Suite**: 95+ tests across all modules
 
 ### In Progress 🚧
-- **DeepStream Metadata** (PRP-04): AI inference result extraction
+- **Dynamic Video Sources** (PRP-07): Test video generation infrastructure
 
 ### Planned 📋
 - Integration tests with actual video files

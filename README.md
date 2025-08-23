@@ -148,6 +148,34 @@ let convert = factory.create_video_convert(Some("converter"))?;
 let sink = factory.create_video_sink(Some("display"))?;
 ```
 
+### Building Pipelines with Fluent API
+
+```rust
+use ds_rs::{Pipeline, PipelineBuilder, BackendType};
+
+// Build a pipeline using the fluent API
+let pipeline = Pipeline::builder("my-pipeline")
+    .backend(BackendType::Standard)  // or DeepStream, Mock
+    .add_test_source("source")
+    .add_queue("queue")
+    .add_element("convert", "videoconvert")
+    .add_auto_sink("sink")
+    .link_many(vec!["source", "queue", "convert", "sink"])
+    .build()?;
+
+// Control pipeline state
+pipeline.play()?;
+// ... do processing ...
+pipeline.stop()?;
+
+// Set enum properties using strings
+let pipeline = PipelineBuilder::new("test")
+    .add_element("source", "videotestsrc")
+    .set_property_from_str("source", "pattern", "smpte")  // Enum property
+    .set_property("source", "num-buffers", 100i32)        // Regular property
+    .build()?;
+```
+
 ## Configuration
 
 The library supports both TOML configuration files and DeepStream's native configuration format:
@@ -188,11 +216,14 @@ The library can parse standard DeepStream configuration files:
 - Hardware abstraction layer with three backends
 - Element factory with backend-aware creation
 - Configuration system (TOML and DeepStream formats)
-- Basic pipeline element creation
-- Comprehensive test suite (29 tests)
+- Pipeline management with builder pattern (PRP-02)
+  - Fluent API for pipeline construction
+  - State management with transitions
+  - Bus message handling
+  - EOS event handling
+- Comprehensive test suite (54 tests across all modules)
 
 ### In Progress 🚧
-- Pipeline builder pattern (PRP-02)
 - Runtime source addition/deletion (PRP-03)
 - DeepStream metadata extraction (PRP-04)
 - Complete demo application (PRP-05)

@@ -3,15 +3,15 @@
 ## Critical Priority 🔴
 
 ### Pipeline Management (PRP-02)
-- [ ] Create `src/pipeline/` module structure
-- [ ] Implement `PipelineBuilder` with fluent API
-- [ ] Add pipeline state management (NULL → READY → PAUSED → PLAYING)
-- [ ] Implement bus message handling
-- [ ] Add EOS event handling
-- [ ] Create pipeline element linking logic
-- [ ] Add error recovery mechanisms
-- **Files**: Need to create `src/pipeline/mod.rs`, `src/pipeline/builder.rs`
-- **Blocking**: All video processing functionality
+- [x] Create `src/pipeline/` module structure
+- [x] Implement `PipelineBuilder` with fluent API
+- [x] Add pipeline state management (NULL → READY → PAUSED → PLAYING)
+- [x] Implement bus message handling
+- [x] Add EOS event handling
+- [x] Create pipeline element linking logic
+- [x] Add error recovery mechanisms
+- **Files**: Created `src/pipeline/mod.rs`, `src/pipeline/builder.rs`, `src/pipeline/state.rs`, `src/pipeline/bus.rs`
+- **Status**: ✅ COMPLETED
 
 ### Source Control APIs (PRP-03)
 - [ ] Create `src/source/` module structure

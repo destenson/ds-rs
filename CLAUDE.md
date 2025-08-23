@@ -194,3 +194,22 @@ export FORCE_BACKEND=mock  # or standard, deepstream
 export CUDA_VER=10.2  # Jetson
 export CUDA_VER=11.4  # x86 with GPU
 ```
+
+## Gstreamer commands
+
+Learn about gstreamer elements using `gst-inspect-1.0 <element_name>`
+
+For example:
+```
+# list all elements
+gst-inspect-1.0
+
+# get info on videotestsrc
+gst-inspect-1.0 videotestsrc
+
+# get info on uridecodebin
+gst-inspect-1.0 uridecodebin
+```
+
+`gstreamer-rs` is the Rust bindings for GStreamer. See https://crates.io/crates/gstreamer for documentation and examples.
+The source code for `gstreamer-rs` is locally available in `../gstreamer-rs`.

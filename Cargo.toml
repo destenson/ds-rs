@@ -10,4 +10,7 @@ edition = "2024"
 description = "Powerful library to control nVidia DeepStream AI processing framework"
 
 [workspace.dependencies]
+gstreamer = "0.24.1"
+gstreamer-app = "0.24.0"
+gstreamer-video = "0.24.1"
 rand = "0.8" # keep this 0.8

@@ -5,13 +5,20 @@ Last Updated: 2025-08-23 (Auto-scan)
 ## Critical Priority 🔴
 
 ### CPU Vision Backend Implementation
-- [ ] **Fix ONNX Runtime API compatibility issues**
-  - `backend/cpu_vision/detector.rs`: OrtOwnedTensor::from_shape_vec method incompatible with ort v1.16.3
-  - `backend/cpu_vision/detector.rs`: Value::as_slice() method not available in current ort version
-  - Status: ONNX model loading implemented (commit 79344d9) but API methods need updating
-  - Action: Update to use ndarray::Array4 + Value::from_array and Value::try_extract_tensor()
+- [x] **Fix ONNX Runtime API compatibility issues** ✅ (2025-08-23 - PRP-24)
+  - `backend/cpu_vision/detector.rs`: Fixed OrtOwnedTensor::from_shape_vec - now uses Value::from_array
+  - `backend/cpu_vision/detector.rs`: Fixed Value::as_slice() - now uses try_extract() and view()
+  - Status: ONNX model loading now compiles and runs with ort v1.16.3
+  - Action completed: Updated to use ndarray 0.15.6 + Value::from_array with allocator
+  - **Supports YOLOv5, YOLOv7, YOLOv8, YOLOv9, and YOLO-RD** with automatic version detection
+  - Model sources:
+    - YOLOv5: https://github.com/ultralytics/yolov5/releases
+    - YOLOv7: https://github.com/WongKinYiu/yolov7 or official repo below
+    - YOLOv8: https://github.com/ultralytics/ultralytics (export with `yolo export model=yolov8n.pt format=onnx`)
+    - YOLOv9 & YOLO-RD (official): https://github.com/WongKinYiu/YOLO (local: ../MultimediaTechLab--YOLO)
+    - Latest implementations available at: ../MultimediaTechLab--YOLO
 - [ ] **Complete ONNX detector implementation**
-  - `tests/cpu_backend_tests.rs:33`: TODO comment indicates ONNX Runtime integration pending
+  - `tests/cpu_backend_tests.rs:33`: Integration tests with actual YOLO model pending
 
 ### DeepStream Integration (PRP-04)
 - [ ] **Implement NvDsMeta extraction with FFI bindings**
@@ -33,17 +40,17 @@ Last Updated: 2025-08-23 (Auto-scan)
     - `source/events.rs`: 8 instances
     - `source/video_source.rs`: 6 instances
     - `backend/mock.rs`: 4 instances
-- [ ] Fix build warnings
-  - `backend/cpu_vision/detector.rs`: Unused imports and variables (6 warnings)
-  - `tests/cpu_backend_tests.rs`: Unused import warning
+- [x] Fix build warnings ✅ (2025-08-23)
+  - `backend/cpu_vision/detector.rs`: Fixed unused imports
+  - `backend/cpu_vision/elements.rs`: Removed unused Arc, Mutex imports
 - [ ] Clean up unused placeholder parameters (30+ occurrences of `_variable` pattern)
   - Multiple unused parameters in callbacks and handlers indicate incomplete implementations
 
 ### Test Issues
-- [ ] **Fix ONNX detector tests**
-  - 2 tests fail without ort feature enabled
-  - Compilation fails with ort feature due to API incompatibility
-  - Need to update tests after fixing ONNX Runtime API issues
+- [x] **Fix ONNX detector tests** ✅ (2025-08-23)
+  - Tests now pass without ort feature using mock detector
+  - Compilation now succeeds with ort feature enabled
+  - Tests run successfully with proper API implementation
 - [ ] **Fix source-videos file generation test**
   - `integration_test.rs`: test_file_generation times out after 11 seconds
   
@@ -299,7 +306,7 @@ Last Updated: 2025-08-23 (Auto-scan)
   - 2 ONNX detector tests fail (API compatibility issue)
   - 1 source-videos file generation test timeout
 - **Codebase Size**: ~15,000+ lines across all crates
-- **Build Status**: ✅ SUCCESS without ort feature, ❌ FAILS with ort feature
+- **Build Status**: ✅ SUCCESS both with and without ort feature
 - **PRP Progress**: 10/23 complete (43%), 3/23 in progress (13%), 10/23 not started (43%)
 
 ## New Feature Development 🚀

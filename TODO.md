@@ -1,6 +1,6 @@
 # TODO List
 
-Last Updated: 2025-08-23 (Comprehensive scan after ONNX fix)
+Last Updated: 2025-08-23 (Comprehensive TODO/FIXME scan)
 
 ## Critical Priority 🔴
 
@@ -47,6 +47,7 @@ Last Updated: 2025-08-23 (Comprehensive scan after ONNX fix)
   - Compilation now succeeds with ort feature enabled
   - Tests pass without ort feature using mock detector
 - [ ] **Add ONNX integration tests with real models**
+  - `tests/cpu_backend_tests.rs:33`: TODO comment - test with actual ONNX model file
   - Download actual YOLO models for testing
   - Validate inference accuracy and performance
   - Test all supported YOLO versions (v3-v12)
@@ -304,8 +305,10 @@ Last Updated: 2025-08-23 (Comprehensive scan after ONNX fix)
 - **Code Quality Issues**: 
   - **unwrap() calls**: 100 occurrences across 27 files
   - **TODO comments**: 3 found (2 in Cargo.toml, 1 in cpu_backend_tests.rs)
+  - **NOTE comments**: 4 found (mostly technical notes about YOLO versions)
+  - **"For now" comments**: 11 occurrences indicating temporary implementations
   - **"Real implementation" comments**: 9 occurrences indicating stubs
-  - **Unused parameters**: 25+ underscore-prefixed variables
+  - **Unused parameters**: 40+ underscore-prefixed variables
   - **Mock backend**: Extensive mock implementation for testing
   - **Build warnings**: 1 warning (unused `create_mock_yolo_output` method)
 - **Test Coverage**: Tests pass with and without ort feature

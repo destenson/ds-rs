@@ -4,12 +4,14 @@ pub mod platform;
 pub mod backend;
 pub mod elements;
 pub mod config;
+pub mod pipeline;
 
 pub use error::{DeepStreamError, Result};
 pub use platform::{Platform, PlatformInfo};
 pub use backend::{Backend, BackendType, BackendCapabilities, BackendManager};
 pub use elements::{DeepStreamElement, DeepStreamElementType, ElementBuilder};
 pub use config::ApplicationConfig;
+pub use pipeline::{Pipeline, PipelineBuilder, PipelineState, StateManager, BusWatcher, MessageHandler};
 
 pub fn init() -> Result<()> {
     gstreamer::init().map_err(|e| DeepStreamError::GStreamer(e.into()))?;

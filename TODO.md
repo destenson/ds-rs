@@ -2,47 +2,48 @@
 
 ## Critical Priority 🔴
 
-### Main Application Demo (PRP-05) - ✅ COMPLETE
-- [x] Create full demo matching C reference behavior
-- [x] Add CLI argument parsing with clap
-- [x] Implement source addition timer (every 10 seconds)
-- [x] Add source removal logic after MAX_NUM_SOURCES
-- [x] Add signal handling (SIGINT) with ctrlc crate
-- **Files**: Completed `crates/ds-rs/src/main.rs` and `crates/ds-rs/src/app/`
-- **Impact**: Now have working demonstration of runtime source management
-- **Status**: Successfully demonstrates dynamic source addition/removal capabilities
+### Dynamic Video Sources Test Infrastructure (PRP-07)
+- [ ] Create test video generation crate (`source-videos`)
+- [ ] Implement RTSP server for test streams
+- [ ] Add configurable test pattern generation
+- [ ] Support multiple concurrent video streams
+- [ ] Enable self-contained testing without external files
+- **Impact**: Required for comprehensive testing and CI/CD
+- **Files**: Need to expand `crates/source-videos/`
 
 ## High Priority 🟡
 
-### DeepStream Integration (PRP-04) - ✅ COMPLETE
-- [x] Implement metadata extraction from buffers
-- [x] Add NvDsMeta FFI bindings (minimal set) - Simulated for Mock backend
-- [x] Create object detection metadata parsing
-- [x] Add classification metadata support
-- [x] Implement stream-specific message handling
-- [x] Add inference result callbacks
-- **Files**: Created `crates/ds-rs/src/metadata/`, `inference/`, `tracking/`, `messages/`
-- **Impact**: AI inference results now accessible through metadata extraction
+### Real DeepStream FFI Implementation
+- [ ] Implement actual FFI bindings when DeepStream SDK available
+- [ ] Replace mock metadata extraction with real `gst_buffer_get_nvds_batch_meta`
+- [ ] Add proper NvDsMeta structure bindings
+- [ ] Implement `gst_nvmessage_is_stream_eos` and related functions
+- **Current state**: Using simulated metadata for development
+- **Files**: `crates/ds-rs/src/metadata/mod.rs:60`, `messages/mod.rs:175,182`
 
 ### Code Quality Improvements
 - [ ] Fix workspace Cargo.toml configuration
   - `crates/ds-rs/Cargo.toml:3`: Use workspace version instead of hardcoded "0.1.0"
   - `crates/ds-rs/Cargo.toml:4`: Use workspace edition instead of hardcoded "2024"
 - [ ] Fix deprecated rand API usage
-  - `crates/ds-rs/src/source/controller.rs:287`: Replace `rand::thread_rng()` with `rand::rng()`
-  - `crates/ds-rs/src/source/controller.rs:288`: Replace `gen_range()` with `random_range()`
-- [ ] Remove dead code warnings
-  - `crates/ds-rs/src/source/mod.rs:54`: Remove unused field `next_id` in SourceManager
+  - `crates/ds-rs/src/source/controller.rs:287-288`: Update to modern rand API
+  - `crates/ds-rs/src/app/timers.rs:106-107`: Update to modern rand API
+- [ ] Replace `unwrap()` calls in non-test code (83 occurrences across 23 files)
+  - Highest priority files:
+    - `config/mod.rs`: 8 instances
+    - `source/mod.rs`: 9 instances  
+    - `backend/mock.rs`: 6 instances
+    - `source/video_source.rs`: 6 instances
+    - `pipeline/mod.rs`: 6 instances
+    - `app/timers.rs`: 5 instances
+    - `app/mod.rs`: 5 instances
 
 ## Medium Priority 🟢
 
 ### Testing & Examples
 - [ ] Create test RTSP source for better integration testing
-  - Would allow testing source management without relying on file URIs
-  - Could use GStreamer test sources with RTSP server
 - [ ] Add integration tests with actual video files
 - [ ] Create example for each backend type
-- [ ] Create dedicated source addition/removal example
 - [ ] Add memory leak tests (valgrind)
 - [ ] Implement stress tests for rapid source changes
 - [ ] Fix source_management test failures with Mock backend
@@ -55,38 +56,41 @@
 - [ ] Write migration guide from C to Rust
 - [ ] Document backend selection logic
 - [ ] Add troubleshooting guide for common issues
-- [ ] Document source management architecture
+- [ ] Document metadata extraction architecture
 
-### Code Cleanup
-- [ ] Replace `unwrap()` calls in non-test code (estimated 25+ instances)
-  - `crates/ds-rs/src/elements/factory.rs`: 3 instances
-  - `crates/ds-rs/src/config/mod.rs`: 8 instances
-  - `crates/ds-rs/src/platform.rs`: 2 instances
-  - `crates/ds-rs/src/backend/standard.rs`: 2 instances
-  - `crates/ds-rs/src/elements/abstracted.rs`: 3 instances
-  - `crates/ds-rs/src/backend/detector.rs`: 1 instance
-  - `crates/ds-rs/src/backend/mock.rs`: 6 instances
+### Placeholder Implementations to Replace
+- [ ] Replace mock metadata extraction (`metadata/mod.rs:61`)
+  - Currently returns mock data, needs real DeepStream integration
+- [ ] Fix stream EOS detection (`messages/mod.rs:175`)
+  - Currently using simplified check
+- [ ] Implement proper stream ID parsing (`messages/mod.rs:182`)
+  - Currently returns mock stream ID
+- [ ] Load actual label files (`inference/mod.rs:175`)
+  - Currently returns default label map
+- [ ] Parse DeepStream config files (`inference/config.rs:228`)
+  - Currently returns mock configuration
+- [ ] Implement actual CPU inference (`backend/standard.rs:17,108`)
+  - Currently using identity element as passthrough
 
 ## Low Priority 🔵
 
 ### CI/CD & Infrastructure
 - [ ] Set up GitHub Actions workflow
-- [ ] Add multi-platform CI testing (Linux, Windows)
+- [ ] Add multi-platform CI testing (Linux, Windows, macOS)
 - [ ] Configure automated releases
 - [ ] Add code coverage reporting
 - [ ] Set up dependency updates (dependabot)
 - [ ] Add benchmark suite
 
 ### Incomplete Implementations
-- [ ] Replace compute capability detection placeholder (`crates/ds-rs/src/platform.rs:132`)
+- [ ] Replace compute capability detection (`platform.rs:149`)
   - Currently returns hardcoded values based on platform
   - Should query actual GPU capabilities via nvidia-smi or CUDA API
-- [ ] Implement actual CPU-based inference in StandardBackend
-  - Currently using fakesink as placeholder (`crates/ds-rs/src/backend/standard.rs:106`)
-  - Could integrate ONNX Runtime or TensorFlow Lite
 - [ ] Complete DSL crate implementation (`crates/dsl/src/lib.rs:8`)
   - Currently has `todo!()` placeholder
   - Needs actual DeepStream Services Library functionality
+- [ ] Implement simplified processing in inference (`inference/mod.rs:214-215`)
+  - Currently has simplified tensor output parsing
 
 ### Future Enhancements
 - [ ] Add native RTSP server support
@@ -108,38 +112,24 @@
 
 ## Recently Completed ✅
 
-### Latest Completions
-- [x] Implement DeepStream Metadata Integration (PRP-04) - AI inference support
+### Latest Completions (2025-08-23)
+- [x] Implement DeepStream Metadata Integration (PRP-04)
   - Complete metadata extraction system with BatchMeta, FrameMeta, ObjectMeta
   - Inference result processing with detection and classification support
   - Object tracking with trajectory management
   - DeepStream message handling including stream-specific EOS
-  - Comprehensive test coverage (25+ new tests)
+  - Comprehensive test coverage (38 new tests)
   - Example detection application demonstrating metadata extraction
-- [x] Implement Main Application Demo (PRP-05) - Runtime demonstration
-  - CLI interface with clap for argument parsing
-  - Automatic source addition every 10 seconds
-  - Source removal after MAX_NUM_SOURCES reached
+- [x] Implement Main Application Demo (PRP-05)
+  - Full runtime demo matching C reference behavior
+  - CLI interface with timer-based source management
   - Graceful shutdown with signal handling
-  - Backend-aware property configuration
-  - Integration tests for application components
-- [x] Implement Source Control APIs (PRP-03) - Dynamic source management
-  - Thread-safe source registry
-  - VideoSource wrapper for uridecodebin
-  - Pad-added signal handling
-  - Per-source EOS tracking
-  - High-level SourceController API
-- [x] Updated README.md to reflect current project state
-- [x] Created comprehensive CLAUDE.md for AI assistant guidance
 
 ### Previous Completions
-- [x] Implement Pipeline Management (PRP-02) - Complete pipeline module
+- [x] Implement Source Control APIs (PRP-03)
+- [x] Implement Pipeline Management (PRP-02)
 - [x] Implement core infrastructure (PRP-01)
 - [x] Implement hardware abstraction layer (PRP-06)
-- [x] Fix compositor background property bug in StandardBackend
-- [x] Fix text overlay alignment properties
-- [x] Create backend detection system
-- [x] Add configuration parsing system
 
 ## Known Issues 🐛
 
@@ -148,21 +138,32 @@
    - Reason: Mock backend doesn't support uridecodebin
    - Status: Expected behavior - use Standard backend for full testing
 
-2. **DeepStream Backend** - Not tested on actual NVIDIA hardware
+2. **Build Warnings**
+   - Unused imports after linter added `#![allow(unused)]`
+   - Non-snake-case field `bInferDone` (kept for DeepStream compatibility)
+   - Unused workspace manifest keys
+
+3. **DeepStream Backend** 
+   - Not tested on actual NVIDIA hardware
    - Need validation on Jetson and x86 with GPU
 
-3. **Memory Management** - Need to verify no leaks
-   - Particularly around dynamic source addition/removal
+4. **Memory Management**
+   - Need to verify no leaks, particularly around dynamic source addition/removal
 
-4. **Workspace Configuration**
-   - Cargo.toml has TODOs for using workspace version/edition
+## Statistics 📊
+
+- **Total TODO items**: 52 (8 critical/high, 15 medium, 29 low)
+- **Code with `unwrap()`**: 83 occurrences across 23 files
+- **Placeholder implementations**: 7 locations marked with "for now" comments
+- **Test coverage**: 97/107 tests passing (90.7%)
+- **Lines of code**: ~12,000 (excluding tests)
 
 ## Notes
 
 - Priority based on blocking dependencies and user impact
-- PRP-05 (Main Application) is now critical priority to demonstrate the complete functionality
+- PRP-07 (Dynamic Video Sources) is next critical priority for testing infrastructure
+- Real DeepStream FFI needed when SDK is available
 - Code quality improvements should be addressed before v1.0 release
-- CI/CD can wait until core functionality is complete
 
 ## Contributing
 

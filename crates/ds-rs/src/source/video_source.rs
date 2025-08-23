@@ -28,9 +28,19 @@ impl VideoSource {
     pub fn new(source_id: SourceId, uri: &str) -> Result<Self> {
         let bin_name = format!("source-bin-{:02}", source_id.0);
         
+        // Fix Windows file URI format
+        let fixed_uri = if cfg!(target_os = "windows") && uri.starts_with("file://") {
+            // Convert file://C:\... to file:///C:/...
+            let path = uri.strip_prefix("file://").unwrap_or(uri);
+            let path = path.replace('\\', "/");
+            format!("file:///{}", path)
+        } else {
+            uri.to_string()
+        };
+        
         let source_bin = gst::ElementFactory::make("uridecodebin")
             .name(&bin_name)
-            .property("uri", uri)
+            .property("uri", &fixed_uri)
             .build()
             .map_err(|_| DeepStreamError::ElementCreation {
                 element: format!("uridecodebin for source {}", source_id)
@@ -39,7 +49,7 @@ impl VideoSource {
         Ok(Self {
             source_bin,
             source_id,
-            uri: uri.to_string(),
+            uri: fixed_uri,
             state: Arc::new(Mutex::new(SourceState::Idle)),
             pad_added_handler: None,
         })
@@ -76,16 +86,28 @@ impl VideoSource {
             if name.starts_with("video/") || name.starts_with("image/") {
                 let pad_name = format!("sink_{}", source_id.0);
                 
-                match mux.request_pad_simple(&pad_name) {
-                    Some(sinkpad) => {
-                        match pad.link(&sinkpad) {
-                            Ok(_) => println!("Linked source {} to streammux", source_id),
-                            Err(e) => eprintln!("Failed to link source {} to streammux: {:?}", source_id, e),
+                // Check if the pad already exists
+                let sinkpad = if let Some(existing_pad) = mux.static_pad(&pad_name) {
+                    // Pad already exists, check if it's linked
+                    if existing_pad.is_linked() {
+                        println!("Pad {} already linked, skipping", pad_name);
+                        return;
+                    }
+                    existing_pad
+                } else {
+                    // Request new pad
+                    match mux.request_pad_simple(&pad_name) {
+                        Some(pad) => pad,
+                        None => {
+                            eprintln!("Failed to get request pad {} from streammux", pad_name);
+                            return;
                         }
                     }
-                    None => {
-                        eprintln!("Failed to get request pad {} from streammux", pad_name);
-                    }
+                };
+                
+                match pad.link(&sinkpad) {
+                    Ok(_) => println!("Linked source {} to streammux", source_id),
+                    Err(e) => eprintln!("Failed to link source {} to streammux: {:?}", source_id, e),
                 }
             }
         })

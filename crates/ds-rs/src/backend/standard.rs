@@ -232,6 +232,12 @@ impl Backend for StandardBackend {
     
     fn configure_element(&self, element: &gst::Element, config: &HashMap<String, String>) -> Result<()> {
         for (key, value) in config {
+            // Skip config-file-path as it's already handled during element creation
+            // The CPU detector bin doesn't have this property
+            if key == "config-file-path" {
+                continue;
+            }
+            
             // Parse and set properties based on type
             if let Ok(int_val) = value.parse::<i32>() {
                 element.set_property_from_str(key, &int_val.to_string());

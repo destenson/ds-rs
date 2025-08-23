@@ -115,9 +115,60 @@
 - [ ] Add frame skipping for overloaded systems
 - [ ] Optimize backend detection caching
 
+## New Feature Development 🚀
+
+### Computer Vision & Object Detection (PRPs 10-13)
+- [ ] **Ball Detection Integration (PRP-10)**
+  - Implement OpenCV-based circle detection for bouncing balls
+  - Add HSV color thresholding for improved accuracy
+  - Integrate with existing DetectionResult infrastructure
+  - Target: Real-time performance (>15 FPS)
+  
+- [ ] **Real-time Bounding Box Rendering (PRP-11)**
+  - Connect detection results to OSD pipeline
+  - Implement dynamic bounding box visualization
+  - Add configurable visual appearance (colors, thickness)
+  - Ensure frame-synchronized rendering
+  
+- [ ] **Multi-Stream Detection Pipeline (PRP-12)**
+  - Scale to 4+ concurrent RTSP streams
+  - Implement resource scheduling and load balancing
+  - Add stream isolation and error handling
+  - Target: >15 FPS per stream with detection
+  
+- [ ] **Detection Data Export (PRP-13)**
+  - Export detection data to MQTT, RabbitMQ
+  - Add database persistence (PostgreSQL, MongoDB)
+  - Implement file-based export with rotation
+  - Support configurable serialization formats
+
+### Test Orchestration (PRP-09)
+- [ ] **Integration Test Scripts**
+  - Create PowerShell orchestration scripts for Windows
+  - Implement Python cross-platform test runner
+  - Add shell scripts for Linux/macOS
+  - Setup automated RTSP server management
+  
+- [ ] **End-to-End Testing**
+  - Configure test scenarios in JSON
+  - Implement backend-specific test suites
+  - Add performance benchmarking
+  - Create CI/CD integration with GitHub Actions
+
 ## Recently Completed ✅
 
 ### Latest Completions (2025-08-23)
+- [x] **Created 5 New PRPs for Enhanced Functionality**
+  - PRP-08: Code Quality and Production Readiness
+  - PRP-09: Test Orchestration Scripts  
+  - PRP-10: Ball Detection Integration with OpenCV
+  - PRP-11: Real-time Bounding Box Rendering
+  - PRP-12: Multi-Stream Detection Pipeline
+  - PRP-13: Detection Data Export and Streaming
+- [x] **Fixed RTSP Server Issues in source-videos**
+  - Fixed GLib main loop integration for RTSP server
+  - Corrected test pattern configuration issues
+  - Resolved property type mismatches
 - [x] **Complete Dynamic Video Sources Test Infrastructure (PRP-07)**
   - Full source-videos crate with 1,200+ lines of code and 24 tests
   - RTSP server serving multiple concurrent test streams  
@@ -160,7 +211,8 @@
 
 ## Statistics 📊
 
-- **Total TODO items**: 41 (19 critical/high, 12 medium, 10 low priority)
+- **Total TODO items**: 57 (25 critical/high, 18 medium, 14 low priority)
+  - **New Items Added**: 16 (from PRPs 08-13)
 - **Code Quality Issues**: 
   - **unwrap() calls**: 237 occurrences across 39 files (production reliability risk)
   - **panic!() calls**: 2 occurrences in source events (needs error handling)
@@ -172,9 +224,10 @@
 
 ## Notes
 
-- **All 7 PRPs Complete**: Project has achieved full feature parity with C implementation
-- **Priority Focus**: Code quality and production readiness for v1.0 release  
-- **Test Infrastructure**: source-videos crate enables comprehensive self-contained testing
+- **13 PRPs Available**: 7 complete, 6 new PRPs ready for implementation
+- **Priority Focus**: Code quality (PRP-08) and production readiness for v1.0 release  
+- **New Capabilities**: Computer vision integration, multi-stream processing, data export
+- **Test Infrastructure**: source-videos crate with RTSP server working (test2 has bouncing ball)
 - **Production Readiness**: Main blocker is extensive unwrap() usage requiring error handling
 
 ## Contributing
@@ -189,4 +242,4 @@ When working on any TODO item:
 ---
 
 **Last Updated: 2025-08-23**  
-**Status: All PRPs Complete - Focus on Production Readiness**
+**Status: 7 PRPs Complete, 6 New PRPs Available - Focus on Production Readiness & New Features**

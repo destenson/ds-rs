@@ -2,15 +2,22 @@
 
 ## Critical Priority 🔴
 
-### DeepStream Integration
+### CPU Vision Backend Implementation
+- [ ] **Complete ONNX detector implementation** 
+  - `backend/cpu_vision/detector.rs:59`: Implement image preprocessing (resize, normalize, tensor conversion)
+  - `backend/cpu_vision/detector.rs:65`: Implement YOLO postprocessing (parse outputs, NMS, coordinate conversion)
+  - Status: Placeholder detector created, needs full ONNX Runtime integration
+  - Dependencies: Uncomment ort, imageproc, ndarray in Cargo.toml
+
+### DeepStream Integration (PRP-04)
 - [ ] **Implement NvDsMeta extraction with FFI bindings**
-  - `metadata/mod.rs:60-61`: Currently returns mock metadata
+  - `metadata/mod.rs:61`: Currently returns mock metadata ("for now" comment)
   - Need to call `gst_buffer_get_nvds_batch_meta` 
-  - Related: PRP-04 from known limitations
+  - Related: Known limitation from CLAUDE.md
 
 - [ ] **Implement stream-specific EOS messages**
-  - `messages/mod.rs:174-183`: Need proper stream EOS detection
-  - `pipeline/bus.rs:216-218`: Requires FFI for `gst_nvmessage_is_stream_eos`
+  - `messages/mod.rs:175,182`: Need proper stream EOS detection ("for now" comments)
+  - `pipeline/bus.rs:217`: Requires FFI for `gst_nvmessage_is_stream_eos`
   - Need `gst_nvmessage_parse_stream_eos` binding
 
 ### Code Quality & Production Readiness  
@@ -29,23 +36,24 @@
   - `source/events.rs:280,283`: Replace with proper error handling
 
 ### Placeholder Implementation Resolution
-- [ ] Complete DSL crate implementation
+- [ ] **Complete DSL crate implementation**
   - `dsl/src/lib.rs:8`: Currently has `todo!()` placeholder
+  - Consider removing if not needed for project goals
 
 ## High Priority 🟡
 
 ### Core Functionality 
-- [ ] **Complete main demo application**
-  - `tests/main_app_test.rs:23`: Test currently ignored, needs actual runtime
-  - Full application matching C reference implementation
-  - Related: PRP-05 from known limitations
+- [ ] **Complete main demo application (PRP-05)**
+  - `tests/main_app_test.rs:23`: Test marked as ignored due to runtime requirements
+  - Full application matching C reference implementation needed
+  - Related: Known limitation from CLAUDE.md
 
 - [ ] **Implement DeepStream config file parsing**
-  - `inference/config.rs:226-229`: `from_deepstream_config` returns mock
+  - `inference/config.rs:228`: `from_deepstream_config()` returns mock ("for now" comment)
   - Need to parse actual .txt config format
 
 - [ ] **Implement label map file loading**
-  - `inference/mod.rs:173-176`: `load_from_file` returns default COCO labels
+  - `inference/mod.rs:175`: `load_from_file()` returns default map ("for now" comment)
   - Parse actual label files
 
 ### Testing & CI/CD Infrastructure  
@@ -59,7 +67,7 @@
 
 ### Configuration & Build Issues
 - [ ] **Fix workspace configuration**
-  - `Cargo.toml:3-4`: Use workspace version and edition instead of hardcoded values
+  - `ds-rs/Cargo.toml:3-4`: Use workspace version instead of "0.1.0", edition instead of "2024"
   - Unused manifest keys: workspace.description, workspace.edition, workspace.version
 - [ ] Fix deprecated rand API usage in timer implementations
   - Update to modern thread_rng() patterns
@@ -68,22 +76,20 @@
 
 ### Platform Improvements
 - [ ] **Implement GPU capabilities detection**
-  - `platform.rs:148-150`: Currently returns common capabilities based on platform
+  - `platform.rs:149`: Currently returns common capabilities ("for now" comment)
   - Need nvidia-smi or CUDA API calls for actual detection
 
-- [ ] **Improve Standard backend simulation**
-  - `backend/standard.rs:95-96,107-109`: Inference uses fakesink, tracker uses identity
-  - Implement actual CPU inference (ONNX, TensorFlow Lite)
+- [ ] **Runtime configuration enhancements**
+  - `source-videos/src/manager.rs:215`: `modify_source_config()` is placeholder ("for now" comment)
+  - `source-videos/src/runtime/applicator.rs:72,81,88`: Partial implementation ("for now" comments)
 
 ### Code Cleanup
-- [ ] **Remove unused variables with underscore prefixes**
-  - `app/timers.rs:35`: `_source_id`
-  - `messages/mod.rs:193`: `_element_msg`
-  - `metadata/mod.rs:125`: `_batch_meta`
-  - `source/controller.rs:154`: `_event_handler`
-  - `source/video_source.rs:66,181`: Handler parameters
-  - `pipeline/bus.rs`: Multiple handler parameters
-  - Various test/mock implementations
+- [ ] **Remove/implement unused parameter functions** (24+ occurrences)
+  - Inference: `inference/config.rs:226`, `inference/mod.rs:173`
+  - CPU Vision: `backend/cpu_vision/detector.rs:27,41,58,64`
+  - Source management: `source-videos/src/manager.rs:210`
+  - Message handling: `pipeline/bus.rs:46,214,223`
+  - Various handler parameters with `_` prefix indicating incomplete implementations
 
 ### Testing & Examples
 - [ ] Create test RTSP source for better integration testing
@@ -101,6 +107,12 @@
 - [ ] Document metadata extraction architecture
 
 ## Low Priority 🔵
+
+### Dependency Preparation
+- [ ] **Enable commented dependencies when needed** (`ds-rs/Cargo.toml`)
+  - Line 36: ort (ONNX Runtime) - needed for CPU detector
+  - Line 38: imageproc - needed for image processing  
+  - Line 40: ndarray - needed for tensor operations
 
 ### CI/CD & Infrastructure
 - [ ] Set up GitHub Actions workflow
@@ -166,14 +178,43 @@
   - Add performance benchmarking
   - Create CI/CD integration with GitHub Actions
 
+## Completed PRPs ✅
+- PRP-01: Core Infrastructure
+- PRP-02: GStreamer Pipeline
+- PRP-03: Source Control APIs
+- PRP-06: Hardware Abstraction
+- PRP-07: Dynamic Video Sources
+- PRP-08: Code Quality
+- PRP-14: Backend Integration
+- PRP-15: Element Discovery
+- PRP-16: Runtime Configuration Management
+
+## In Progress PRPs 🔄
+- PRP-20: CPU Vision Backend (partial - detector/tracker stubs exist)
+- PRP-21: CPU Detection Module (stub implementation)
+- PRP-22: CPU Tracking Module (stub implementation)
+
+## Not Started PRPs ⏳
+- PRP-04: DeepStream Integration (metadata extraction needed)
+- PRP-05: Main Application (demo incomplete)
+- PRP-09: Test Orchestration Scripts
+- PRP-10: Ball Detection Integration
+- PRP-11: Realtime Bounding Box Rendering
+- PRP-12: Multistream Detection Pipeline
+- PRP-13: Detection Data Export/Streaming
+- PRP-17: Control API WebSocket
+- PRP-18: Dynamic Source Properties
+- PRP-19: Network Simulation
+- PRP-23: GST Plugins Integration
+
 ## Recently Completed ✅
 
 ### Latest Completions (2025-08-23)
-- [x] **CPU Vision Backend Foundation (PRP-20)**
-  - Implemented cpu_vision module with detector, tracker, and elements
-  - Replaced Standard backend placeholders with functional (mock) implementations
-  - Added comprehensive unit tests for detection and tracking
-  - Integrated GStreamer element wrappers for vision pipeline
+- [x] **CPU Vision Backend Foundation (PRP-20 partial)**
+  - Created cpu_vision module structure with detector, tracker, elements
+  - Placeholder ONNX detector needs full implementation
+  - Centroid tracker with trajectory history implemented
+  - GStreamer element wrappers for detection/tracking/OSD created
 - [x] **Created 5 New PRPs for Enhanced Functionality**
   - PRP-08: Code Quality and Production Readiness
   - PRP-09: Test Orchestration Scripts  
@@ -309,4 +350,4 @@ When working on any TODO item:
 ---
 
 **Last Updated: 2025-08-23**  
-**Status: CPU Vision Backend PRPs added; DeepStream FFI and production readiness remain critical**
+**Status: Priority on completing ONNX detector for CPU-based detection; DeepStream FFI and code quality improvements needed**

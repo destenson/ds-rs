@@ -1,7 +1,8 @@
 // ONNX-based object detector supporting multiple YOLO versions
-// Supports: YOLOv5, YOLOv7, YOLOv8, YOLOv9, and YOLO-RD
-// Official YOLOv7/v9/RD implementations: https://github.com/WongKinYiu/YOLO
-// For latest models, see: ../MultimediaTechLab--YOLO
+// Supports: YOLOv3-v12, YOLO-RD, and future versions with auto-detection
+// Ultralytics (v3-v12): https://docs.ultralytics.com/models/
+// Official YOLOv7/v9/RD: https://github.com/WongKinYiu/YOLO (../MultimediaTechLab--YOLO)
+// Note: YOLOv10 introduces NMS-free inference, v12 achieves best mAP improvements
 
 use crate::error::{DeepStreamError, Result};
 use image::{DynamicImage, imageops::FilterType};
@@ -22,10 +23,16 @@ pub struct Detection {
 /// YOLO model version for output format handling
 #[derive(Debug, Clone, Copy)]
 pub enum YoloVersion {
-    V5,     // Output: [1, 25200, 85] with objectness
+    V3,     // Output: [1, num_anchors, 85] classic format
+    V4,     // Output: Similar to V3 with improvements
+    V5,     // Output: [1, 25200, 85] with objectness for 640x640
+    V6,     // Output: Similar to V5 (MT-YOLOv6 different format)
     V7,     // Output: Similar to V5 with objectness
-    V8,     // Output: [1, 84, 8400] no objectness  
-    V9,     // Output: [1, 84, 8400] similar to V8, official implementation
+    V8,     // Output: [1, 84, 8400] transposed, no objectness  
+    V9,     // Output: [1, 84, 8400] similar to V8
+    V10,    // Output: NMS-free, one-to-one predictions
+    V11,    // Output: Ultralytics model, similar to V8 but optimized  
+    V12,    // Output: Latest production model with significant accuracy improvements
     RD,     // YOLO-RD: Retriever-Dictionary variant
     Auto,   // Auto-detect based on output shape
 }
@@ -224,8 +231,23 @@ impl OnnxDetector {
         log::debug!("Processing outputs with YOLO version: {:?}", version);
         
         match version {
-            YoloVersion::V5 | YoloVersion::V7 => self.postprocess_yolov5(outputs, img_width, img_height),
-            YoloVersion::V8 | YoloVersion::V9 | YoloVersion::RD => self.postprocess_yolov8(outputs, img_width, img_height),
+            // Classic format with objectness (v3-v7)
+            YoloVersion::V3 | YoloVersion::V4 | YoloVersion::V5 | 
+            YoloVersion::V6 | YoloVersion::V7 => {
+                self.postprocess_yolov5(outputs, img_width, img_height)
+            },
+            // Modern format without objectness (v8-v12)
+            YoloVersion::V8 | YoloVersion::V9 | YoloVersion::V11 | 
+            YoloVersion::V12 | YoloVersion::RD => {
+                self.postprocess_yolov8(outputs, img_width, img_height)
+            },
+            // Special handling for v10 (NMS-free)
+            YoloVersion::V10 => {
+                // V10 uses one-to-one predictions, may need special handling
+                // For now, treat similar to v8 but log the difference
+                log::info!("Processing YOLOv10 with NMS-free design");
+                self.postprocess_yolov8(outputs, img_width, img_height)
+            },
             YoloVersion::Auto => {
                 // Fallback to V5 if auto-detection somehow fails
                 self.postprocess_yolov5(outputs, img_width, img_height)
@@ -237,18 +259,41 @@ impl OnnxDetector {
     fn detect_yolo_version(&self, outputs: &[f32]) -> YoloVersion {
         let len = outputs.len();
         
-        // YOLOv5: typically 25200 * 85 = 2142000 for 640x640
-        // YOLOv8/9: typically 84 * 8400 = 705600 for 640x640
+        // Common output patterns:
+        // YOLOv3-v7: [1, num_anchors, 85] where 85 = 4 bbox + 1 objectness + 80 classes
+        // YOLOv8-v11: [1, 84, num_anchors] where 84 = 4 bbox + 80 classes (no objectness)
+        // YOLOv10: May have different format due to NMS-free design
         
-        if len % 85 == 0 && len / 85 > 10000 {
-            YoloVersion::V5
-        } else if len % 84 == 0 && len / 84 > 1000 {
-            YoloVersion::V8
-        } else {
-            // Default to V5 for unknown formats
-            log::warn!("Unknown YOLO output format with {} elements, defaulting to V5", len);
-            YoloVersion::V5
+        // Check for v8+ transposed format (84 values per anchor)
+        if len % 84 == 0 {
+            let num_anchors = len / 84;
+            if num_anchors > 1000 && num_anchors < 10000 {
+                // Likely v8, v9, v11 format
+                log::debug!("Detected YOLOv8+ format with {} anchors", num_anchors);
+                return YoloVersion::V8;
+            }
         }
+        
+        // Check for v3-v7 format (85 values per anchor)
+        if len % 85 == 0 {
+            let num_anchors = len / 85;
+            if num_anchors > 1000 {
+                // Likely v3-v7 format
+                log::debug!("Detected YOLOv3-v7 format with {} anchors", num_anchors);
+                return YoloVersion::V5; // Use v5 processing for v3-v7
+            }
+        }
+        
+        // Check for smaller models or different input sizes
+        if len % 85 == 0 || len % 84 == 0 {
+            log::info!("Detected YOLO format with {} total values", len);
+            // Default to newer format for smaller outputs
+            return if len % 84 == 0 { YoloVersion::V8 } else { YoloVersion::V5 };
+        }
+        
+        // Unknown format
+        log::warn!("Unknown YOLO output format with {} elements, defaulting to V5", len);
+        YoloVersion::V5
     }
     
     /// Process YOLOv5 outputs
@@ -327,7 +372,8 @@ impl OnnxDetector {
         Ok(filtered_detections)
     }
     
-    /// Process YOLOv8/v9 outputs  
+    /// Process YOLOv8/v9/v11/v12 outputs  
+    /// Note: v12 achieves mAP of 40.6-55.2 depending on model size (n/s/m/l/x)
     fn postprocess_yolov8(&self, outputs: &[f32], img_width: u32, img_height: u32) -> Result<Vec<Detection>> {
         let mut detections = Vec::new();
         

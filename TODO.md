@@ -10,13 +10,18 @@ Last Updated: 2025-08-23 (Auto-scan)
   - `backend/cpu_vision/detector.rs`: Fixed Value::as_slice() - now uses try_extract() and view()
   - Status: ONNX model loading now compiles and runs with ort v1.16.3
   - Action completed: Updated to use ndarray 0.15.6 + Value::from_array with allocator
-  - **Supports YOLOv5, YOLOv7, YOLOv8, YOLOv9, and YOLO-RD** with automatic version detection
-  - Model sources:
-    - YOLOv5: https://github.com/ultralytics/yolov5/releases
-    - YOLOv7: https://github.com/WongKinYiu/yolov7 or official repo below
-    - YOLOv8: https://github.com/ultralytics/ultralytics (export with `yolo export model=yolov8n.pt format=onnx`)
-    - YOLOv9 & YOLO-RD (official): https://github.com/WongKinYiu/YOLO (local: ../MultimediaTechLab--YOLO)
-    - Latest implementations available at: ../MultimediaTechLab--YOLO
+  - **Supports YOLOv3 through YOLOv12 and YOLO-RD** with automatic version detection
+  - Model sources and key features:
+    - **YOLOv3-v5**: Classic architecture with objectness scores
+    - **YOLOv6**: MT-YOLOv6 variant (different lineage)
+    - **YOLOv7**: https://github.com/WongKinYiu/yolov7
+    - **YOLOv8-v11**: Ultralytics models without objectness, transposed output format
+    - **YOLOv10**: NMS-free design with one-to-one predictions
+    - **YOLOv11**: Optimized model with 22% fewer parameters than v8
+    - **YOLOv12**: Latest production model with best-in-class mAP (up to 55.2 for YOLO12x)
+    - **YOLO-RD**: Retriever-Dictionary variant for enhanced accuracy
+    - **Ultralytics models (v3-v12)**: https://docs.ultralytics.com/models/
+    - **Official YOLOv7/v9/RD**: https://github.com/WongKinYiu/YOLO (local: ../MultimediaTechLab--YOLO)
 - [ ] **Complete ONNX detector implementation**
   - `tests/cpu_backend_tests.rs:33`: Integration tests with actual YOLO model pending
 

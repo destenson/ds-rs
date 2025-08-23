@@ -14,15 +14,15 @@
 - **Status**: ✅ COMPLETED
 
 ### Source Control APIs (PRP-03)
-- [ ] Create `src/source/` module structure
-- [ ] Implement runtime source addition (`add_source`)
-- [ ] Implement runtime source removal (`remove_source`)
-- [ ] Add source bin creation with uridecodebin
-- [ ] Implement pad-added signal handling
-- [ ] Add source registry management
-- [ ] Create thread-safe source operations
-- **Files**: Need to create `src/source/mod.rs`, `src/source/manager.rs`
-- **Blocking**: Dynamic source management feature
+- [x] Create `src/source/` module structure
+- [x] Implement runtime source addition (`add_source`)
+- [x] Implement runtime source removal (`remove_source`)
+- [x] Add source bin creation with uridecodebin
+- [x] Implement pad-added signal handling
+- [x] Add source registry management
+- [x] Create thread-safe source operations
+- **Files**: Created `src/source/mod.rs`, `src/source/manager.rs`, `src/source/video_source.rs`, `src/source/removal.rs`, `src/source/events.rs`, `src/source/synchronization.rs`, `src/source/controller.rs`
+- **Status**: ✅ COMPLETED
 
 ## High Priority 🟡
 
@@ -65,6 +65,9 @@
   - Use workspace.edition in main Cargo.toml:13
 
 ### Testing & Examples
+- [ ] Create test RTSP source for better integration testing
+  - Would allow testing source management without relying on file URIs
+  - Could use GStreamer test sources with RTSP server
 - [ ] Add integration tests with actual video files
 - [ ] Create example for each backend type
 - [ ] Add pipeline state transition tests
@@ -121,6 +124,8 @@
 
 ## Recently Completed ✅
 
+- [x] Implement Source Control APIs (PRP-03) - Dynamic source management
+- [x] Implement Pipeline Management (PRP-02) - Complete pipeline module
 - [x] Fix compositor background property bug in StandardBackend
 - [x] Fix text overlay alignment properties 
 - [x] Create comprehensive README.md
@@ -157,4 +162,4 @@ When working on any TODO item:
 4. Update documentation as needed
 5. Mark complete in TODO.md when merged
 
-Last Updated: 2024-01-23
+Last Updated: 2025-08-22

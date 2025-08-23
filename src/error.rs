@@ -41,6 +41,15 @@ pub enum DeepStreamError {
     #[error("TOML parsing error: {0}")]
     TomlParse(#[from] toml::de::Error),
     
+    #[error("Invalid input: {0}")]
+    InvalidInput(String),
+    
+    #[error("Not initialized: {0}")]
+    NotInitialized(String),
+    
+    #[error("Timeout: {0}")]
+    Timeout(String),
+    
     #[error("Unknown error: {0}")]
     Unknown(String),
 }

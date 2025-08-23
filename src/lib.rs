@@ -5,6 +5,7 @@ pub mod backend;
 pub mod elements;
 pub mod config;
 pub mod pipeline;
+pub mod source;
 
 pub use error::{DeepStreamError, Result};
 pub use platform::{Platform, PlatformInfo};
@@ -12,6 +13,11 @@ pub use backend::{Backend, BackendType, BackendCapabilities, BackendManager};
 pub use elements::{DeepStreamElement, DeepStreamElementType, ElementBuilder};
 pub use config::ApplicationConfig;
 pub use pipeline::{Pipeline, PipelineBuilder, PipelineState, StateManager, BusWatcher, MessageHandler};
+pub use source::{
+    SourceId, SourceState, SourceInfo, SourceManager, VideoSource,
+    SourceAddition, SourceRemoval, SourceEvent, SourceEventHandler,
+    SourceSynchronizer, SourceController
+};
 
 pub fn init() -> Result<()> {
     gstreamer::init().map_err(|e| DeepStreamError::GStreamer(e.into()))?;

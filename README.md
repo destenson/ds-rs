@@ -7,7 +7,7 @@ A Rust port of NVIDIA's DeepStream runtime source addition/deletion reference ap
 - **Cross-Platform Support**: Run on NVIDIA hardware with DeepStream or any system with standard GStreamer
 - **Hardware Abstraction**: Automatic backend detection and fallback mechanisms
 - **Type-Safe GStreamer Bindings**: Leverages official gstreamer-rs for robust pipeline management
-- **Dynamic Source Management**: Add and remove video sources at runtime (in development)
+- **Dynamic Source Management**: Add and remove video sources at runtime without pipeline interruption
 - **Configuration System**: Support for DeepStream configuration files and TOML-based settings
 
 ## Architecture
@@ -146,6 +146,30 @@ let factory = ElementFactory::new(manager);
 let mux = factory.create_stream_mux(Some("muxer"))?;
 let convert = factory.create_video_convert(Some("converter"))?;
 let sink = factory.create_video_sink(Some("display"))?;
+```
+
+### Dynamic Source Management
+
+```rust
+use ds_rs::{Pipeline, SourceController};
+use std::sync::Arc;
+
+// Create pipeline and source controller
+let pipeline = Arc::new(Pipeline::new("my-pipeline")?);
+let streammux = factory.create_stream_mux(Some("mux"))?;
+let controller = SourceController::new(pipeline, streammux);
+
+// Add sources dynamically
+let source1 = controller.add_source("file:///path/to/video1.mp4")?;
+let source2 = controller.add_source("rtsp://camera.local/stream")?;
+
+// Remove sources at runtime
+controller.remove_source(source1)?;
+
+// List active sources
+for (id, uri, state) in controller.list_active_sources()? {
+    println!("Source {}: {} [{:?}]", id, uri, state);
+}
 ```
 
 ### Building Pipelines with Fluent API

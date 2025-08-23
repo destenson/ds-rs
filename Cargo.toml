@@ -3,7 +3,8 @@ members = [
     "crates/dsl",
     "crates/ds-rs",
 ]
-resolver = "2"
+resolver = "3"
 version = "0.1.0"
 edition = "2024"
+description = "Powerful library to control nVidia DeepStream AI processing framework"
 

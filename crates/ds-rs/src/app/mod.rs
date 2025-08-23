@@ -85,7 +85,10 @@ impl Application {
         // Only add tracker if backend supports it
         if caps.supports_tracking {
             let tracker = factory.create_tracker(Some("nvtracker"))?;
-            tracker.set_property_from_str("tracker-config-file", config::TRACKER_CONFIG_FILE);
+            // Only set tracker-config-file for DeepStream backend
+            if self.backend_manager.backend_type() == crate::backend::BackendType::DeepStream {
+                tracker.set_property_from_str("tracker-config-file", config::TRACKER_CONFIG_FILE);
+            }
             elements.push(tracker);
         }
         

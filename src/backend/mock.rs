@@ -1,3 +1,4 @@
+#![allow(unused)]
 use super::{Backend, BackendCapabilities, BackendType};
 use crate::error::{DeepStreamError, Result};
 use crate::platform::PlatformInfo;

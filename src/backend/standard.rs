@@ -1,3 +1,4 @@
+#![allow(unused)]
 use super::{Backend, BackendCapabilities, BackendType};
 use crate::error::{DeepStreamError, Result};
 use crate::platform::PlatformInfo;
@@ -75,10 +76,19 @@ impl Backend for StandardBackend {
     fn create_stream_mux(&self, name: Option<&str>) -> Result<gst::Element> {
         // Use compositor as a batching replacement for nvstreammux
         let compositor = Self::create_element("compositor", name)?;
-        
+        /*
+            background          : Background type
+                                flags: readable, writable
+                                Enum "GstCompositorBackground" Default: 0, "checker"
+                                    (0): checker          - Checker pattern
+                                    (1): black            - Black
+                                    (2): white            - White
+                                    (3): transparent      - Transparent Background to enable further compositing
+         */
         // Set up compositor for grid layout similar to nvstreammux
-        compositor.set_property("background", 0u32); // Black background
-        
+        // Use set_property_from_str for enum properties
+        compositor.set_property_from_str("background", "black"); // Black background
+
         Ok(compositor)
     }
     
@@ -108,7 +118,8 @@ impl Backend for StandardBackend {
         let compositor = Self::create_element("compositor", name)?;
         
         // Configure for 2x2 grid
-        compositor.set_property("background", 0u32);
+        // Use set_property_from_str for enum properties
+        compositor.set_property_from_str("background", "checker");
         
         log::info!("Standard backend: Using compositor for tiling");
         
@@ -126,8 +137,8 @@ impl Backend for StandardBackend {
         
         // Configure text overlay
         overlay.set_property("text", "Standard Backend - No Inference");
-        overlay.set_property("valignment", 2i32); // top
-        overlay.set_property("halignment", 0i32); // left
+        overlay.set_property_from_str("valignment", "top"); // top
+        overlay.set_property_from_str("halignment", "left"); // left
         overlay.set_property("font-desc", "Sans, 12");
         
         bin.add_many([&convert, &overlay])?;

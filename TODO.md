@@ -5,47 +5,55 @@ Last Updated: 2025-08-23
 ## Critical Priority 🔴
 
 ### CPU Vision Backend Implementation
-- [ ] **Complete ONNX detector implementation** 
-  - `backend/cpu_vision/detector.rs:59`: Implement image preprocessing (resize, normalize, tensor conversion)
-  - `backend/cpu_vision/detector.rs:65`: Implement YOLO postprocessing (parse outputs, NMS, coordinate conversion)
-  - Status: Placeholder detector created, needs full ONNX Runtime integration
-  - Dependencies: Need to enable/add ort, imageproc features when implementing
+- [ ] **Fix ONNX Runtime API compatibility issues**
+  - `backend/cpu_vision/detector.rs`: OrtOwnedTensor::from_shape_vec method incompatible with ort v1.16.3
+  - `backend/cpu_vision/detector.rs`: Value::as_slice() method not available in current ort version
+  - Status: ONNX model loading implemented (commit 79344d9) but API methods need updating
+  - Action: Update to use ndarray::Array4 + Value::from_array and Value::try_extract_tensor()
 
 ### DeepStream Integration (PRP-04)
 - [ ] **Implement NvDsMeta extraction with FFI bindings**
-  - `metadata/mod.rs:61`: Currently returns mock metadata ("for now" comment)
-  - Need to call `gst_buffer_get_nvds_batch_meta` 
+  - `metadata/mod.rs:61,72`: Currently returns mock metadata
+  - Need to implement actual `gst_buffer_get_nvds_batch_meta` FFI binding
   - Related: Known limitation from CLAUDE.md
 
 - [ ] **Implement stream-specific EOS messages**
-  - `messages/mod.rs:175,182`: Need proper stream EOS detection ("for now" comments)
-  - `pipeline/bus.rs:217`: Requires FFI for `gst_nvmessage_is_stream_eos`
+  - `messages/mod.rs:182-184`: Returns mock stream ID (0)
+  - `pipeline/bus.rs:216`: Requires FFI for `gst_nvmessage_is_stream_eos`
   - Need `gst_nvmessage_parse_stream_eos` binding
 
 ### Code Quality & Production Readiness  
-- [ ] Replace `unwrap()` calls in production code (237 occurrences across 39 files)
+- [ ] Replace `unwrap()` calls in production code (102 occurrences across 27 files in ds-rs/src)
   - **Highest priority files**: 
-    - `manager.rs`: 15 instances (source-videos)
-    - `source/mod.rs`: 9 instances (ds-rs)
-    - `config/mod.rs`: 8 instances (ds-rs)  
-    - `source/events.rs`: 8 instances (ds-rs)
-    - `source/video_source.rs`: 6 instances (ds-rs)
-    - `backend/mock.rs`: 6 instances (ds-rs)
-- [ ] Fix GStreamer property type issues in source-videos
-  - `file.rs:110`: x264enc 'speed-preset' property type mismatch
-  - `rtsp/factory.rs`: Enum property handling for encoders
-- [ ] Remove panic!() calls from production code
-  - `source/events.rs:280,283`: Replace with proper error handling
+    - `backend/cpu_vision/elements.rs`: 16 instances
+    - `source/mod.rs`: 9 instances
+    - `config/mod.rs`: 8 instances  
+    - `source/events.rs`: 8 instances
+    - `source/video_source.rs`: 6 instances
+    - `backend/mock.rs`: 4 instances
+- [ ] Fix build warnings
+  - `backend/cpu_vision/detector.rs`: Unused imports and variables (6 warnings)
+  - `tests/cpu_backend_tests.rs`: Unused import warning
+- [ ] Clean up unused placeholder parameters (30+ occurrences of `_variable` pattern)
+  - Multiple unused parameters in callbacks and handlers indicate incomplete implementations
 
 ### Test Issues
-- [ ] **Fix main_app_test failure**
-  - `tests/main_app_test.rs`: Property 'config-file-path' not found on GstBin
-  - Test trying to set invalid property on CPU detector bin
+- [ ] **Fix ONNX detector tests**
+  - 2 tests fail without ort feature enabled
+  - Compilation fails with ort feature due to API incompatibility
+  - Need to update tests after fixing ONNX Runtime API issues
+- [ ] **Fix source-videos file generation test**
+  - `integration_test.rs`: test_file_generation times out after 11 seconds
   
 ### Placeholder Implementation Resolution
 - [ ] **Complete DSL crate implementation**
   - `dsl/src/lib.rs:8`: Currently has `todo!()` placeholder
   - Consider removing if not needed for project goals
+- [ ] **Replace mock implementations**
+  - `metadata/mod.rs:61,72`: Returns mock BatchMeta instead of actual metadata
+  - `messages/mod.rs:182-184`: Returns mock stream ID (0)
+  - `inference/config.rs:226`: from_deepstream_config returns mock ModelConfig
+  - `inference/mod.rs:173`: load_from_file returns default LabelMap
 
 ## High Priority 🟡
 
@@ -217,18 +225,17 @@ Last Updated: 2025-08-23
 ## Recently Completed ✅
 
 ### Latest Completions (2025-08-23)
+- [x] **Test Orchestration Scripts (PRP-09) ✅**
+  - Created Python/PowerShell/Shell test orchestrators for all platforms
+  - Implemented 8 test scenarios with TOML configuration
+  - Added automated RTSP server management and test file generation
+  - Created GitHub Actions CI/CD workflow
+  - Added environment validation script
 - [x] **CPU Vision Backend Foundation (PRP-20 partial)**
   - Created cpu_vision module structure with detector, tracker, elements
-  - Placeholder ONNX detector needs full implementation
+  - Implemented ONNX model loading (needs API compatibility fixes)
   - Centroid tracker with trajectory history implemented
   - GStreamer element wrappers for detection/tracking/OSD created
-- [x] **Created 5 New PRPs for Enhanced Functionality**
-  - PRP-08: Code Quality and Production Readiness
-  - PRP-09: Test Orchestration Scripts  
-  - PRP-10: Ball Detection Integration with OpenCV
-  - PRP-11: Real-time Bounding Box Rendering
-  - PRP-12: Multi-Stream Detection Pipeline
-  - PRP-13: Detection Data Export and Streaming
 - [x] **Fixed RTSP Server Issues in source-videos**
   - Fixed GLib main loop integration for RTSP server
   - Corrected test pattern configuration issues
@@ -275,19 +282,19 @@ Last Updated: 2025-08-23
 
 ## Statistics 📊
 
-- **Total TODO items**: ~60 (including 4 new CPU Vision PRPs)
+- **Total TODO items**: ~45 active items
 - **Code Quality Issues**: 
-  - **unwrap() calls**: 237 occurrences across 39 files (production reliability risk)
-  - **panic!() calls**: 2 occurrences in source events (needs error handling)
-  - **todo!() placeholders**: 1 in DSL crate
-  - **Unused variables**: ~24 underscore-prefixed variables indicating placeholders
-  - **Mock implementations**: 8 functions returning mock data ("for now")
-- **Test Coverage**: 95/107 tests passing (88.8%)
-  - 10 tests fail with Mock backend (expected - uridecodebin limitation)
-  - 2 GStreamer property type issues
-- **Codebase Size**: ~12,000+ lines across ds-rs + source-videos crates
-- **Build Status**: ✅ Clean builds with minor workspace warnings
-- **New PRPs**: 4 PRPs (20-23) for CPU Vision Backend implementation
+  - **unwrap() calls**: 102 occurrences across 27 files in ds-rs/src
+  - **todo!() placeholders**: 1 in DSL crate  
+  - **Unused parameters**: 30+ underscore-prefixed variables indicating incomplete implementations
+  - **Mock implementations**: 4+ functions returning mock data
+  - **Build warnings**: 7 warnings (unused imports, variables, dead code)
+- **Test Coverage**: 119/122 tests passing (97.5%)
+  - 2 ONNX detector tests fail (API compatibility issue)
+  - 1 source-videos file generation test timeout
+- **Codebase Size**: ~15,000+ lines across all crates
+- **Build Status**: ✅ SUCCESS without ort feature, ❌ FAILS with ort feature
+- **PRP Progress**: 10/23 complete (43%), 3/23 in progress (13%), 10/23 not started (43%)
 
 ## New Feature Development 🚀
 

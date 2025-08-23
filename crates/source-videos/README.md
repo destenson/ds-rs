@@ -135,6 +135,98 @@ Then run with configuration:
 cargo run -- serve --config config.toml
 ```
 
+## Runtime Configuration Management
+
+The crate now supports dynamic configuration updates without restart:
+
+### File Monitoring
+
+Automatically detect and apply configuration changes:
+
+```rust
+use source_videos::{RuntimeManager, config::ConfigWatcher};
+
+// Set up file watcher
+let mut watcher = ConfigWatcher::new("config.toml")?
+    .with_debounce(Duration::from_millis(500));
+watcher.start().await?;
+
+// Handle configuration changes
+while let Some(event) = watcher.recv().await {
+    match event {
+        ConfigEvent::Modified(path) => {
+            let new_config = AppConfig::from_file(&path)?;
+            runtime.apply_config(new_config).await?;
+        }
+        _ => {}
+    }
+}
+```
+
+### Runtime Updates
+
+Apply configuration changes dynamically:
+
+```rust
+use source_videos::{RuntimeManager, VideoSourceManager};
+use std::sync::Arc;
+
+let manager = Arc::new(VideoSourceManager::new());
+let runtime = RuntimeManager::new(manager, initial_config);
+
+// Subscribe to events
+let mut events = runtime.subscribe_events();
+
+// Apply new configuration
+let new_config = AppConfig::from_file("updated.toml")?;
+runtime.apply_config(new_config).await?;
+
+// Update individual sources
+runtime.update_source("test1", new_source_config).await?;
+
+// Rollback if needed
+runtime.rollback().await?;
+```
+
+### Signal Handling
+
+On Unix systems, reload configuration with SIGHUP:
+
+```bash
+# Send reload signal
+kill -HUP <pid>
+```
+
+In code:
+
+```rust
+use source_videos::runtime::signal_handler::setup_signal_handlers;
+
+let mut signals = setup_signal_handlers().await?;
+while let Some(signal) = signals.recv().await {
+    match signal {
+        SignalEvent::Reload => {
+            // Reload configuration
+            let config = AppConfig::from_file("config.toml")?;
+            runtime.apply_config(config).await?;
+        }
+        SignalEvent::Shutdown => break,
+    }
+}
+```
+
+### Configuration Validation
+
+All configuration changes are validated before applying:
+
+- Resolution constraints: 160x120 to 7680x4320 (8K)
+- Framerate limits: 1-120 fps
+- Source name uniqueness
+- RTSP mount point conflicts
+- Pattern validity checking
+
+Invalid configurations are rejected without affecting the running system.
+
 ## API Reference
 
 ### VideoSourceManager

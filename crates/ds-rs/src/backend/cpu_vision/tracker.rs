@@ -1,3 +1,5 @@
+#![cfg(feature = "nalgebra")]
+
 use super::detector::Detection;
 use nalgebra::Point2;
 use std::collections::HashMap;

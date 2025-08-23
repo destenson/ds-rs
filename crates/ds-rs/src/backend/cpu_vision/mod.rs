@@ -1,4 +1,5 @@
 pub mod detector;
+#[cfg(feature = "nalgebra")]
 pub mod tracker;
 pub mod elements;
 
@@ -8,6 +9,7 @@ use crate::error::Result;
 /// Uses ONNX Runtime for inference and pure Rust tracking algorithms
 pub struct CpuVisionBackend {
     detector: Option<detector::OnnxDetector>,
+    #[cfg(feature = "nalgebra")]
     tracker: tracker::CentroidTracker,
 }
 
@@ -15,6 +17,7 @@ impl CpuVisionBackend {
     pub fn new() -> Result<Self> {
         Ok(Self {
             detector: None,
+            #[cfg(feature = "nalgebra")]
             tracker: tracker::CentroidTracker::new(50.0, 30),
         })
     }
@@ -28,6 +31,7 @@ impl CpuVisionBackend {
         self.detector.as_ref()
     }
     
+    #[cfg(feature = "nalgebra")]
     pub fn tracker_mut(&mut self) -> &mut tracker::CentroidTracker {
         &mut self.tracker
     }

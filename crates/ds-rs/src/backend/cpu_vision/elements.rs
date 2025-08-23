@@ -2,6 +2,7 @@ use crate::error::{DeepStreamError, Result};
 use gstreamer as gst;
 use gstreamer::prelude::*;
 use std::sync::{Arc, Mutex};
+#[cfg(feature = "nalgebra")]
 use super::tracker::CentroidTracker;
 
 /// Create a CPU detector element that performs object detection
@@ -55,6 +56,7 @@ pub fn create_cpu_detector(name: Option<&str>, model_path: Option<&str>) -> Resu
 }
 
 /// Create a CPU tracker element that tracks detected objects
+#[cfg(feature = "nalgebra")]
 pub fn create_cpu_tracker(name: Option<&str>) -> Result<gst::Element> {
     let bin = gst::Bin::builder()
         .name(name.unwrap_or("cpu-tracker"))
@@ -98,6 +100,22 @@ pub fn create_cpu_tracker(name: Option<&str>) -> Result<gst::Element> {
     log::info!("CPU tracker initialized with Centroid algorithm");
     
     Ok(bin.upcast())
+}
+
+/// Create a CPU tracker element that tracks detected objects (fallback without nalgebra)
+#[cfg(not(feature = "nalgebra"))]
+pub fn create_cpu_tracker(name: Option<&str>) -> Result<gst::Element> {
+    // Return a simple passthrough identity element when nalgebra is not available
+    let identity = gst::ElementFactory::make("identity")
+        .name(name.unwrap_or("cpu-tracker-passthrough"))
+        .build()
+        .map_err(|_| DeepStreamError::ElementCreation {
+            element: "identity".to_string(),
+        })?;
+    
+    log::warn!("CPU tracker not available: nalgebra feature not enabled. Using passthrough.");
+    
+    Ok(identity)
 }
 
 /// Create a CPU OSD (On-Screen Display) element for drawing bounding boxes

@@ -46,16 +46,16 @@ impl SourceRemoval for SourceManager {
         
         match state_result {
             gst::StateChangeSuccess::Success => {
-                println!("Source {} state change to NULL: SUCCESS", id);
+                println!("[{:.3}] Source {} state change to NULL: SUCCESS", crate::timestamp(), id);
                 perform_source_cleanup(&pipeline, streammux, id, source)?;
             }
             gst::StateChangeSuccess::Async => {
-                println!("Source {} state change to NULL: ASYNC", id);
+                println!("[{:.3}] Source {} state change to NULL: ASYNC", crate::timestamp(), id);
                 thread::sleep(Duration::from_millis(100));
                 perform_source_cleanup(&pipeline, streammux, id, source)?;
             }
             gst::StateChangeSuccess::NoPreroll => {
-                println!("Source {} state change to NULL: NO PREROLL", id);
+                println!("[{:.3}] Source {} state change to NULL: NO PREROLL", crate::timestamp(), id);
                 perform_source_cleanup(&pipeline, streammux, id, source)?;
             }
         }

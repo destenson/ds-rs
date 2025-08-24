@@ -287,7 +287,8 @@ fn setup_bus_watch(
             gst::MessageView::StateChanged(state_changed) => {
                 if state_changed.src().map(|s| s == msg.src().unwrap()).unwrap_or(false) {
                     println!(
-                        "Pipeline state changed from {:?} to {:?}",
+                        "[{:.3}] Pipeline state changed from {:?} to {:?}",
+                        ds_rs::timestamp(),
                         state_changed.old(),
                         state_changed.current()
                     );

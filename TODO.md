@@ -67,32 +67,34 @@ Last Updated: 2025-08-24 (Updated after comprehensive scan of current state)
   - `integration_test.rs`: test_file_generation times out after 11 seconds
   
 ### Placeholder Implementation Resolution
+- [ ] **Complete metadata attachment in CPU detector**
+  - `backend/cpu_vision/cpudetector/imp.rs:167-168`: TODO comment about attaching custom metadata to buffer
+  - Currently just passes through without attaching detection metadata
 - [ ] **Replace stub implementations with actual functionality**
   - `metadata/mod.rs:60`: "In a real implementation, this would call gst_buffer_get_nvds_batch_meta"
   - `metadata/mod.rs:125`: `_batch_meta` unused - extraction not implemented
   - `messages/mod.rs:174`: "In real DeepStream, this would call gst_nvmessage_is_stream_eos"
   - `messages/mod.rs:181`: "In real DeepStream, this would call gst_nvmessage_parse_stream_eos"
-  - `inference/mod.rs:173-174`: "In a real implementation, this would parse a label file"
-  - `inference/mod.rs:214`: "This is simplified - real implementation would parse..."
-  - `inference/config.rs:226`: `from_deepstream_config` takes `_path` - returns mock config ("for now" comment)
-  - `backend/cpu_vision/elements.rs:41,43,88,172`: Multiple "In a real implementation" comments
-  - `backend/cpu_vision/elements.rs:90`: CPU tracker currently just passes through ("For now" comment)
+  - `inference/mod.rs:174-175`: "In a real implementation, this would parse a label file" ("for now" comment)
+  - `inference/config.rs:227-228`: `from_deepstream_config` takes `_path` - returns mock config ("for now" comment)
+  - `backend/cpu_vision/elements.rs:108-109`: Detection metadata attachment placeholder ("For now" comment)
+  - `backend/cpu_vision/elements.rs:145-146`: Image creation placeholder ("For now" comment) 
+  - `backend/cpu_vision/elements.rs:235`: CPU tracker currently just passes through ("For now" comment)
+  - `cpuinfer/detector.rs:417`: YOLOv10 NMS-free design handling placeholder ("For now" comment)
   - `pipeline/bus.rs:214`: `is_stream_eos` takes `_msg` - returns None (mock)
   - `source/controller.rs:154`: `_event_handler` cloned but not used
   - `backend/standard.rs`: Tiler comment says "actual tiling is done by the compositor"
   - `platform.rs:149`: GPU capabilities returns common capabilities ("for now" comment)
 
-### Build Configuration - UPDATED
+### Build Configuration
 - [ ] **Fix workspace configuration**
   - `crates/ds-rs/Cargo.toml:3`: `# TODO: use the workspace version`
   - `crates/ds-rs/Cargo.toml:4`: `# TODO: use the workspace edition`
   - Currently hardcoded as "0.1.0" and "2024"
 - [ ] **Review tokio dependency usage**
-  - `crates/ds-rs/Cargo.toml:43`: TODO comment - should not use tokio (async is ok though)
+  - `crates/ds-rs/Cargo.toml:48`: TODO comment - should not use tokio (async is ok though)
   - `crates/source-videos/Cargo.toml:20`: Similar tokio dependency with TODO comment
   - Consider replacing with async-std or futures-lite where possible
-- [ ] **Complete DSL crate implementation**
-  - `crates/dsl/src/lib.rs:8`: Contains `todo!()` macro - needs implementation
 
 ## High Priority 🟡
 
@@ -339,9 +341,8 @@ Last Updated: 2025-08-24 (Updated after comprehensive scan of current state)
 - **Critical Bugs**: 2 ACTIVE (shutdown, video freeze) - MUST FIX
 - **Code Quality Issues**: 
   - **unwrap() calls**: 100+ occurrences across 27 files in ds-rs/src
-  - **TODO comments**: 5 found (4 in Cargo.toml files, 1 in cpu_backend_tests.rs)
-  - **FIXME comments**: 1 found (GStreamer basesink warning in BUGS.md)
-  - **todo!() macros**: 1 found (dsl crate lib.rs)
+  - **TODO comments**: 4 found (3 in Cargo.toml files, 1 in cpu_backend_tests.rs)
+  - **todo!() macros**: Not found in current scan
   - **"For now" comments**: 11 occurrences indicating temporary implementations
   - **"Real implementation" comments**: 9+ occurrences indicating stubs
   - **"actual" comments**: 2+ occurrences (test comments, tiling)  
@@ -430,13 +431,13 @@ When working on any TODO item:
 
 **Status: CRITICAL BUGS - Shutdown and video playback issues need immediate attention**
 
-### Recent Findings (2025-08-23 Update)
+### Recent Findings (2025-08-24 Update)
 - **CRITICAL**: 2 active bugs make application unusable (shutdown, video freeze)
-- 5 TODO comments: 4 in Cargo.toml files (workspace config, tokio usage), 1 in tests about ONNX models
-- 1 FIXME comment in BUGS.md about GStreamer basesink 
-- 1 todo!() macro in dsl crate requiring implementation
-- 11 "for now" placeholder implementations across codebase
-- 9+ "real implementation" stub comments indicating incomplete functionality
+- 4 TODO comments: 3 in Cargo.toml files (workspace config, tokio usage), 1 in tests about ONNX models
+- No FIXME/HACK/XXX/NOTE comments found in active code
+- No todo!() macros found in current scan
+- 15+ "for now" placeholder implementations across codebase
+- Multiple "actual", "real implementation" and "temporary" references indicating incomplete functionality
 - 40+ unused parameters (underscore-prefixed) indicating incomplete implementations
 - Multiple references to "later", "temporary", "actual" indicating pending work
 - Test coverage: 67 tests pass, Mock backend limitations expected with uridecodebin

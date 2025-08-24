@@ -41,11 +41,11 @@ impl SourceAddition for SourceManager {
         let state_result = video_source.set_state(gst::State::Playing)?;
         match state_result {
             gst::StateChangeSuccess::Success => {
-                println!("Source {} state change SUCCESS", id);
+                println!("[{:.3}] Source {} state change SUCCESS", crate::timestamp(), id);
                 video_source.update_state(SourceState::Playing)?;
             }
             gst::StateChangeSuccess::Async => {
-                println!("Source {} state change ASYNC", id);
+                println!("[{:.3}] Source {} state change ASYNC", crate::timestamp(), id);
                 let (result, _current, _pending) = video_source.get_state(gst::ClockTime::from_nseconds(0))?;
                 match result {
                     gst::StateChangeSuccess::Success => {
@@ -59,7 +59,7 @@ impl SourceAddition for SourceManager {
                 }
             }
             gst::StateChangeSuccess::NoPreroll => {
-                println!("Source {} state change NO PREROLL", id);
+                println!("[{:.3}] Source {} state change NO PREROLL", crate::timestamp(), id);
                 video_source.update_state(SourceState::Playing)?;
             }
         }

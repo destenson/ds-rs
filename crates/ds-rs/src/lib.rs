@@ -38,6 +38,16 @@ pub use messages::{
     DSMessageHandler, DSMessageType, StreamEosTracker
 };
 
+/// Get current timestamp in seconds since Unix epoch
+/// Used for consistent timestamp formatting in log messages
+#[inline]
+pub fn timestamp() -> f64 {
+    std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .unwrap_or_default()
+        .as_secs_f64()
+}
+
 pub fn init() -> Result<()> {
     gstreamer::init().map_err(|e| DeepStreamError::GStreamer(e.into()))?;
     

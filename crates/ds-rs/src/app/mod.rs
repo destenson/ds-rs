@@ -20,12 +20,10 @@ pub struct Application {
     initial_uri: String,
 }
 
+// Use the common timestamp function from lib.rs
 #[inline]
 pub(crate) fn now() -> f64 {
-    std::time::SystemTime::now()
-        .duration_since(std::time::UNIX_EPOCH)
-        .unwrap_or_default()
-        .as_secs_f64()
+    crate::timestamp()
 }
 
 impl Application {

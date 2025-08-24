@@ -10,8 +10,6 @@ use crate::elements::factory::ElementFactory;
 use gstreamer as gst;
 use gstreamer::prelude::*;
 use std::sync::{Arc, Mutex};
-use std::sync::atomic::{AtomicBool, Ordering};
-use tokio::sync::mpsc;
 
 /// Main application demonstrating runtime source addition/deletion
 pub struct Application {
@@ -20,15 +18,11 @@ pub struct Application {
     backend_manager: Arc<BackendManager>,
     initial_uri: String,
     running: Arc<Mutex<bool>>,
-    shutdown_tx: mpsc::Sender<()>,
-    shutdown_rx: Option<mpsc::Receiver<()>>,
-    shutdown_flag: Option<Arc<AtomicBool>>,
 }
 
 impl Application {
     pub fn new(uri: String) -> Result<Self> {
         let backend_manager = Arc::new(BackendManager::new()?);
-        let (shutdown_tx, shutdown_rx) = mpsc::channel(1);
         
         Ok(Self {
             pipeline: Arc::new(Pipeline::new("ds-runtime-demo")?),
@@ -39,14 +33,11 @@ impl Application {
             backend_manager,
             initial_uri: uri,
             running: Arc::new(Mutex::new(false)),
-            shutdown_tx,
-            shutdown_rx: Some(shutdown_rx),
-            shutdown_flag: None,
         })
     }
     
-    pub fn set_shutdown_flag(&mut self, flag: Arc<AtomicBool>) {
-        self.shutdown_flag = Some(flag);
+    pub fn get_running_flag(&self) -> Arc<Mutex<bool>> {
+        self.running.clone()
     }
     
     pub fn init(&mut self) -> Result<()> {
@@ -67,6 +58,7 @@ impl Application {
         } else if self.backend_manager.backend_type() == crate::backend::BackendType::Standard {
             // For standard backend (compositor), set different properties
             streammux.set_property_from_str("background", "black");
+            // Compositor doesn't have width/height properties - those are set on pads or with caps
         }
         
         // Create processing elements based on backend capabilities
@@ -74,29 +66,32 @@ impl Application {
         
         let mut elements = vec![streammux.clone()];
         
-        // Only add inference if backend supports it
-        if caps.supports_inference {
-            let pgie = factory.create_inference(Some("primary-nvinference-engine"), config::PGIE_CONFIG_FILE)?;
-            elements.push(pgie);
-            
-            let sgie1 = factory.create_inference(Some("secondary-nvinference-engine1"), config::SGIE1_CONFIG_FILE)?;
-            elements.push(sgie1);
-            
-            let sgie2 = factory.create_inference(Some("secondary-nvinference-engine2"), config::SGIE2_CONFIG_FILE)?;
-            elements.push(sgie2);
-            
-            let sgie3 = factory.create_inference(Some("secondary-nvinference-engine3"), config::SGIE3_CONFIG_FILE)?;
-            elements.push(sgie3);
-        }
-        
-        // Only add tracker if backend supports it
-        if caps.supports_tracking {
-            let tracker = factory.create_tracker(Some("nvtracker"))?;
-            // Only set tracker-config-file for DeepStream backend
-            if self.backend_manager.backend_type() == crate::backend::BackendType::DeepStream {
-                tracker.set_property_from_str("tracker-config-file", config::TRACKER_CONFIG_FILE);
+        // Skip inference for Standard backend since it's causing issues
+        if self.backend_manager.backend_type() != crate::backend::BackendType::Standard {
+            // Only add inference if backend supports it
+            if caps.supports_inference {
+                let pgie = factory.create_inference(Some("primary-nvinference-engine"), config::PGIE_CONFIG_FILE)?;
+                elements.push(pgie);
+                
+                let sgie1 = factory.create_inference(Some("secondary-nvinference-engine1"), config::SGIE1_CONFIG_FILE)?;
+                elements.push(sgie1);
+                
+                let sgie2 = factory.create_inference(Some("secondary-nvinference-engine2"), config::SGIE2_CONFIG_FILE)?;
+                elements.push(sgie2);
+                
+                let sgie3 = factory.create_inference(Some("secondary-nvinference-engine3"), config::SGIE3_CONFIG_FILE)?;
+                elements.push(sgie3);
             }
-            elements.push(tracker);
+            
+            // Only add tracker if backend supports it
+            if caps.supports_tracking {
+                let tracker = factory.create_tracker(Some("nvtracker"))?;
+                // Only set tracker-config-file for DeepStream backend
+                if self.backend_manager.backend_type() == crate::backend::BackendType::DeepStream {
+                    tracker.set_property_from_str("tracker-config-file", config::TRACKER_CONFIG_FILE);
+                }
+                elements.push(tracker);
+            }
         }
         
         // Add tiler for multi-source display
@@ -107,14 +102,13 @@ impl Application {
             tiler.set_property("width", config::TILED_OUTPUT_WIDTH as u32);
             tiler.set_property("height", config::TILED_OUTPUT_HEIGHT as u32);
         }
-        // Compositor doesn't have these properties, it uses pads for positioning
         elements.push(tiler);
         
         // Add conversion and output
         let convert = factory.create_video_convert(Some("nvvideo-converter"))?;
         elements.push(convert);
         
-        if caps.supports_osd {
+        if caps.supports_osd && self.backend_manager.backend_type() != crate::backend::BackendType::Standard {
             let osd = factory.create_osd(Some("nv-onscreendisplay"))?;
             elements.push(osd);
         }
@@ -169,35 +163,28 @@ impl Application {
         
         println!("Now playing: {}", self.initial_uri);
         println!("Pipeline running...");
-        println!("Sources will be automatically added every {} seconds", config::SOURCE_ADD_INTERVAL_SECS);
         
-        // Start source addition timer
-        let source_controller = self.source_controller.clone();
+        // Simple loop with mutex check
         let running = self.running.clone();
-        let initial_uri = self.initial_uri.clone();
-        
-        let add_sources_handle = tokio::spawn(async move {
-            timers::source_addition_timer(source_controller, running, initial_uri).await
-        });
-        
-        // Run main event loop with shutdown monitoring
-        let shutdown_rx = self.shutdown_rx.take().unwrap();
-        let shutdown_flag = self.shutdown_flag.clone();
-        
-        // Monitor both shutdown channel and shutdown flag
-        tokio::select! {
-            result = runner::run_main_loop(self.pipeline.clone(), shutdown_rx) => {
-                result?;
-            }
-            _ = async {
-                if let Some(flag) = shutdown_flag {
-                    while !flag.load(Ordering::Relaxed) {
-                        tokio::time::sleep(tokio::time::Duration::from_millis(100)).await;
+        while *running.lock().unwrap() {
+            // Check for messages on the bus
+            let bus = self.pipeline.bus().unwrap();
+            if let Some(msg) = bus.timed_pop(gst::ClockTime::from_mseconds(100)) {
+                match msg.view() {
+                    gst::MessageView::Eos(..) => {
+                        println!("End of stream");
+                        break;
                     }
+                    gst::MessageView::Error(err) => {
+                        eprintln!("Error: {}", err.error());
+                        break;
+                    }
+                    _ => {}
                 }
-            } => {
-                println!("Shutdown requested");
             }
+            
+            // Let async runtime do other work
+            tokio::time::sleep(tokio::time::Duration::from_millis(10)).await;
         }
         
         self.cleanup()?;
@@ -207,8 +194,6 @@ impl Application {
     pub fn stop(&self) -> Result<()> {
         let mut running = self.running.lock().unwrap();
         *running = false;
-        
-        let _ = self.shutdown_tx.try_send(());
         Ok(())
     }
     

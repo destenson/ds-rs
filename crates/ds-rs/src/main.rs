@@ -59,18 +59,15 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         // Initialize the pipeline
         app.init()?;
         
-        // Create a separate shutdown channel for the signal handler
-        let shutdown_requested = std::sync::Arc::new(std::sync::atomic::AtomicBool::new(false));
-        let shutdown_clone = shutdown_requested.clone();
+        // Get the running flag for the signal handler
+        let running_flag = app.get_running_flag();
         
         // Set up signal handler for graceful shutdown
         ctrlc::set_handler(move || {
             println!("\nReceived interrupt signal, shutting down...");
-            shutdown_clone.store(true, std::sync::atomic::Ordering::Relaxed);
+            let mut running = running_flag.lock().unwrap();
+            *running = false;
         })?;
-        
-        // Pass the shutdown flag to the application
-        app.set_shutdown_flag(shutdown_requested.clone());
         
         // Run the application
         app.run().await?;

@@ -13,25 +13,6 @@
 //! - Efficient tensor operations using ndarray
 //! - Thread-safe inference with configurable parallelism
 //! 
-//! # Example
-//! 
-//! ```rust,no_run
-//! use ds_rs::backend::cpu_vision::detector::{OnnxDetector, DetectorConfig};
-//! use image::DynamicImage;
-//! 
-//! // Create detector with configuration
-//! let config = DetectorConfig {
-//!     model_path: Some("yolov5n.onnx".to_string()),
-//!     confidence_threshold: 0.5,
-//!     nms_threshold: 0.4,
-//!     ..Default::default()
-//! };
-//! 
-//! let detector = OnnxDetector::new_with_config(config).unwrap();
-//! let image = DynamicImage::new_rgb8(640, 640);
-//! let detections = detector.detect(&image).unwrap();
-//! ```
-//! 
 //! # Supported Models
 //! 
 //! - YOLOv3-v12 (Ultralytics): https://docs.ultralytics.com/models/
@@ -264,65 +245,55 @@ impl OnnxDetector {
         
         use ort::tensor::TensorElementDataType::{Float16, Bfloat16};
         
-        // Create the input tensor based on model's expected type
-        // We need to keep the array alive for the duration of the inference
-        #[cfg(feature = "half")]
-        let (inputs, _array_holder) = if matches!(session.inputs[0].input_type, Float16 | Bfloat16) {
-            // Convert f32 to f16 and create input tensor
-            use half::f16;
-            let f16_tensor: Vec<f16> = input_tensor.iter()
-                .map(|&f| f16::from_f32(f))
-                .collect();
-            
-            let array = Array::from_shape_vec(shape.clone(), f16_tensor)
-                .map_err(|e| DetectorError::Configuration(
-                    format!("Failed to create f16 ndarray: {}", e)
-                ))?;
-            let array_dyn = array.into_dyn();
-            
-            let value = Value::from_array(session.allocator(), &array_dyn)
-                .map_err(|e| DetectorError::Configuration(
-                    format!("Failed to create f16 ORT value: {}", e)
-                ))?;
-            
-            (vec![value], Box::new(array_dyn) as Box<dyn std::any::Any>)
-        } else {
-            // Use f32 input
-            let array = Array::from_shape_vec(shape.clone(), input_tensor)
-                .map_err(|e| DetectorError::Configuration(
-                    format!("Failed to create f32 ndarray: {}", e)
-                ))?;
-            let array_dyn = array.into_dyn();
-            
-            let value = Value::from_array(session.allocator(), &array_dyn)
-                .map_err(|e| DetectorError::Configuration(
-                    format!("Failed to create f32 ORT value: {}", e)
-                ))?;
-            
-            (vec![value], Box::new(array_dyn) as Box<dyn std::any::Any>)
-        };
+        // Check if model expects float16 input
+        let is_f16_input = matches!(session.inputs[0].input_type, Float16 | Bfloat16);
         
-        #[cfg(not(feature = "half"))]
-        let (inputs, _array_holder) = {
-            if matches!(session.inputs[0].input_type, Float16 | Bfloat16) {
+        // Declare arrays outside the conditional blocks so they stay alive
+        #[cfg(feature = "half")]
+        let f16_array: CowArray<half::f16, IxDyn>;
+        let f32_array: CowArray<f32, IxDyn>;
+        
+        let inputs = if is_f16_input {
+            // Convert f32 to f16 and create input tensor
+            #[cfg(feature = "half")]
+            {
+                use half::f16;
+                let f16_tensor: Vec<f16> = input_tensor.iter()
+                    .map(|&f| f16::from_f32(f))
+                    .collect();
+                
+                // Create and store the array
+                f16_array = Array::from_shape_vec(shape.clone(), f16_tensor)
+                    .map_err(|e| DetectorError::Configuration(
+                        format!("Failed to create f16 ndarray: {}", e)
+                    ))?
+                    .into_dyn()
+                    .into();
+                
+                vec![Value::from_array(session.allocator(), &f16_array)
+                    .map_err(|e| DetectorError::Configuration(
+                        format!("Failed to create f16 ORT value: {}", e)
+                    ))?]
+            }
+            #[cfg(not(feature = "half"))]
+            {
                 return Err(DetectorError::Configuration(
                     "Model requires float16 but half feature is not enabled".to_string()
                 ));
             }
-            
+        } else {
             // Use f32 input
-            let array = Array::from_shape_vec(shape.clone(), input_tensor)
+            f32_array = Array::from_shape_vec(shape.clone(), input_tensor)
                 .map_err(|e| DetectorError::Configuration(
                     format!("Failed to create f32 ndarray: {}", e)
-                ))?;
-            let array_dyn = array.into_dyn();
+                ))?
+                .into_dyn()
+                .into();
             
-            let value = Value::from_array(session.allocator(), &array_dyn)
+            vec![Value::from_array(session.allocator(), &f32_array)
                 .map_err(|e| DetectorError::Configuration(
                     format!("Failed to create f32 ORT value: {}", e)
-                ))?;
-            
-            (vec![value], Box::new(array_dyn) as Box<dyn std::any::Any>)
+                ))?]
         };
         
         // Run the model

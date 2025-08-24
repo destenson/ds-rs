@@ -184,7 +184,14 @@ impl Application {
                     glib::ControlFlow::Continue
                 }
                 MessageView::StateChanged(state) => {
-                    println!("State changed: {:?} -> {:?}", state.old(), state.current());
+                    println!("State changed: {:?} -> {:?} ({})", 
+                        state.old(), 
+                        state.current(),
+                        state.src().map(|s| s.name()).unwrap_or_else(|| "unknown".into())
+                    );
+                    if state.current() == gst::State::Playing {
+                        println!("🎬 Pipeline is now PLAYING!");
+                    }
                     glib::ControlFlow::Continue
                 }
                 _ => glib::ControlFlow::Continue,
@@ -218,7 +225,20 @@ impl Application {
         // Start the pipeline
         self.pipeline.set_state(gst::State::Paused)?;
         self.add_initial_source()?;
-        self.pipeline.set_state(gst::State::Playing)?;
+        println!("Setting pipeline to PLAYING state...");
+        let state_change_result = self.pipeline.set_state(gst::State::Playing)?;
+        println!("Pipeline state change result: {:?}", state_change_result);
+        
+        // Wait for the pipeline to reach playing state
+        println!("Waiting for pipeline to reach PLAYING state...");
+        match self.pipeline.get_state(Some(std::time::Duration::from_secs(5))) {
+            Ok((result, current, pending)) => {
+                println!("Final state: {:?} (current: {:?}, pending: {:?})", result, current, pending);
+            }
+            Err(err) => {
+                eprintln!("Failed to get final state: {:?}", err);
+            }
+        }
         
         println!("Now playing: {}", self.initial_uri);
         println!("Pipeline running... Press Ctrl+C to exit");

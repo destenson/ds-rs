@@ -11,10 +11,11 @@ Last Updated: 2025-08-24 (Updated after comprehensive scan of current state)
   - FIXED: Race conditions eliminated with GLib MainLoop integration
   - Solution: GLib's unix_signal_add + MainLoop.run() pattern
   
-- [ ] **Fix video playback freezing**
-  - Video gets stuck after first/last frame
-  - H264 parser warning: "VUI framerate 15360.0 exceeds allowed maximum 32.8"
-  - Caps/framerate handling needs investigation
+- [x] **Fix video playback freezing** ✅ (2025-08-24 - COMPLETED)
+  - FIXED: Added videorate and capsfilter elements for framerate normalization
+  - FIXED: Videos now play smoothly without freezing
+  - FIXED: No more H264 parser warnings about excessive framerate
+  - Solution: Pipeline flow now: uridecodebin → videorate → capsfilter(30fps) → compositor
 
 ### CPU Vision Backend Implementation
 - [x] **Fix ONNX Runtime API compatibility issues** ✅ (2025-08-23 - PRP-24)
@@ -434,7 +435,7 @@ When working on any TODO item:
 
 ---
 
-**Status: CRITICAL BUGS - Shutdown and video playback issues need immediate attention**
+**Status: ALL CRITICAL BUGS RESOLVED - Ready for feature development**
 
 ### New PRPs Added (2025-08-24)
 - **PRP-27: Multi-Backend Detector Trait Architecture** - Foundation for pluggable detection backends

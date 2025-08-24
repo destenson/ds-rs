@@ -1,20 +1,23 @@
 # Current Bugs
 
-## ✅ FIXED: Cannot shutdown (PRP-25 completed)
+## ⚠️ PARTIALLY FIXED: Shutdown Issues (PRP-25 in progress)
 
-**Status**: RESOLVED as of 2025-08-23 via PRP-25 implementation
+**Status**: PARTIALLY RESOLVED as of 2025-08-23 via PRP-25 implementation
 
-**Solution**: Replaced mixed event systems (Tokio + ctrlc + GStreamer) with proper GLib MainContext manual iteration pattern:
-- Removed Tokio runtime from main.rs
-- Replaced Application::run async method with run_with_main_context()  
-- Used AtomicBool + ctrlc signal handler + glib::MainContext::default().wakeup()
-- Replaced bus polling with bus.add_watch() callback pattern
-- Manual main_context.iteration(true) loop that checks AtomicBool shutdown flag
+**Current State**:
+- ✅ Ctrl+C works when pressed after pipeline starts
+- ❌ Race condition: Ctrl+C before pipeline start causes video to appear but never exit
+- ❌ Pipeline starts but video doesn't display properly (window appears behind others)
 
-**Validation**: 
-- Shutdown tests now pass: `cargo test --test shutdown_test`
-- Application runs for expected duration and exits cleanly with timeout
-- No more repeated "Received interrupt signal, shutting down..." messages
+**Solution Applied**: 
+- Replaced mixed event systems (Tokio + ctrlc + GStreamer) with GLib MainContext manual iteration
+- Used AtomicBool + ctrlc signal handler + main_context.iteration(false) tight loop
+- Added race condition checks at multiple startup points
+
+**Still Testing**:
+- Race condition fix with early shutdown detection
+- Pipeline state transition debugging
+- Video display/window focus issues
 
 ## Video playback issues (framerate negotiation)
 

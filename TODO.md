@@ -1,10 +1,16 @@
 # TODO List
 
-Last Updated: 2025-08-24 (Updated with today's fixes and comprehensive scan)
+Last Updated: 2025-08-24 (Complete codebase scan for TODO/FIXME/placeholders)
 
 ## Critical Priority 🔴
 
-### Critical Bugs (from BUGS.md) - UPDATED
+### Active Critical Issues
+- [ ] **Fix video playback state management** (PRP-03 CREATED)
+  - Pipeline fails to reach PLAYING state properly
+  - Elements regress from Paused → Ready → Null
+  - No video window appears despite pipeline running
+  - Root cause: Asynchronous state handling and source synchronization issues
+  
 - [x] **Fix application shutdown issue** ✅ (2025-08-23 - PRP-25 COMPLETED)
   - FIXED: Application now shuts down properly on Ctrl+C
   - FIXED: No more repeated "shutting down..." messages  
@@ -52,6 +58,15 @@ Last Updated: 2025-08-24 (Updated with today's fixes and comprehensive scan)
   - `messages/mod.rs:174,181`: Returns mock implementation ("For now" comments)
   - `pipeline/bus.rs:216`: Requires FFI for `gst_nvmessage_is_stream_eos` ("For now" comment)
   - Need `gst_nvmessage_parse_stream_eos` binding
+
+### Implementation TODOs from Code Comments
+- [ ] **Rendering Module TODOs**
+  - `rendering/deepstream_renderer.rs:190,222`: Implement actual DeepStream metadata processing (requires FFI bindings)
+  - `rendering/metadata_bridge.rs`: Complete metadata bridge implementation
+  
+- [ ] **CPU Vision Backend TODOs**  
+  - `backend/cpu_vision/cpudetector/imp.rs:154`: Attach custom metadata to buffer
+  - `tests/cpu_backend_tests.rs:343`: Test with actual ONNX model file when available
 
 ### Code Quality & Production Readiness  
 - [ ] Replace `unwrap()` calls in production code (100 occurrences across 27 files in ds-rs/src)
@@ -334,37 +349,33 @@ Last Updated: 2025-08-24 (Updated with today's fixes and comprehensive scan)
 
 ## Known Issues 🐛
 
-1. **Critical: Application Shutdown** - NEW
-   - Application doesn't respond to Ctrl+C or window close
-   - Only displays "Received interrupt signal, shutting down..." repeatedly
-   - Status: CRITICAL BUG
+1. **Critical: Video Playback State Management** - ACTIVE
+   - Pipeline fails to reach PLAYING state properly
+   - Elements regress from Paused → Ready → Null
+   - No video window appears
+   - Status: PRP-03 CREATED for fix
 
-2. **Critical: Video Playback Freezing** - NEW
-   - Video stuck on first/last frame
-   - H264 parser framerate warning
-   - Status: CRITICAL BUG
-
-3. **Source Management Tests with Mock Backend**
+2. **Source Management Tests with Mock Backend**
    - 10 tests fail when using Mock backend
    - Reason: Mock backend doesn't support uridecodebin
    - Status: Expected behavior - use Standard backend for full testing
 
-4. **Build Warnings**
+3. **Build Warnings**
    - Unused imports after linter added `#![allow(unused)]`
    - Non-snake-case field `bInferDone` (kept for DeepStream compatibility)
    - Unused workspace manifest keys
 
-5. **DeepStream Backend** 
+4. **DeepStream Backend** 
    - Not tested on actual NVIDIA hardware
    - Need validation on Jetson and x86 with GPU
 
-6. **Memory Management**
+5. **Memory Management**
    - Need to verify no leaks, particularly around dynamic source addition/removal
 
 ## Statistics 📊
 
-- **Total TODO items**: ~55 active items
-- **Critical Bugs**: 2 ACTIVE (shutdown, video freeze) - MUST FIX
+- **Total TODO items**: ~60 active items
+- **Critical Bugs**: 1 ACTIVE (video playback state) - MUST FIX
 - **Code Quality Issues**: 
   - **unwrap() calls**: 100+ occurrences across 27 files in ds-rs/src
   - **TODO comments**: 4 found (3 in Cargo.toml files, 1 in cpu_backend_tests.rs)
@@ -430,7 +441,7 @@ Last Updated: 2025-08-24 (Updated with today's fixes and comprehensive scan)
 - **Test Limitations**: Mock backend cannot test uridecodebin-based functionality
 
 ### Priority Focus
-- **IMMEDIATE**: Fix shutdown and video playback critical bugs
+- **IMMEDIATE**: Fix video playback state management (PRP-03)
 - **Critical**: DeepStream FFI integration for metadata extraction and stream EOS handling
 - **High**: Complete main demo app and config file parsing
 - **New**: CPU Vision Backend implementation for non-NVIDIA systems
@@ -455,7 +466,7 @@ When working on any TODO item:
 
 ---
 
-**Status: ALL CRITICAL BUGS RESOLVED - Ready for feature development**
+**Status: 1 CRITICAL BUG ACTIVE - Video playback state management (PRP-03)**
 
 ### New PRPs Added (2025-08-24)
 - **PRP-27: Multi-Backend Detector Trait Architecture** - Foundation for pluggable detection backends
@@ -465,8 +476,9 @@ When working on any TODO item:
 - **PRP-31: Advanced Tracking Algorithms** - SORT, Deep SORT, and ByteTrack implementations
 
 ### Recent Findings (2025-08-24 Update)
+- **NEW CRITICAL BUG**: Video playback state management issue identified (PRP-03 created)
 - **RESOLVED TODAY**: Fixed 2 critical compilation/test issues (f16/f32 conversion, Application test methods)
-- **TODO Comments**: 6 found (3 in Cargo.toml files about workspace/tokio, 3 in code)
+- **TODO Comments**: 4 found (1 in tests, 3 in rendering module)
 - **No FIXME/HACK/XXX comments** found in active code
 - **Placeholder implementations**: 15+ locations with "for now" comments
 - **Unused parameters**: 50+ underscore-prefixed variables (many legitimate in trait implementations)

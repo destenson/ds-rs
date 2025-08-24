@@ -30,6 +30,7 @@ ds-rs/
 │   ├── ds-rs/              # Main library and application
 │   │   ├── src/
 │   │   │   ├── backend/    # Backend implementations and detection
+│   │   │   │   └── cpu_vision/ # CPU-based object detection and tracking
 │   │   │   ├── config/     # Configuration parsing and management
 │   │   │   ├── elements/   # GStreamer element abstractions
 │   │   │   ├── inference/  # AI inference processing
@@ -45,6 +46,10 @@ ds-rs/
 │   │   │   └── main.rs     # Application entry point
 │   │   ├── examples/       # Usage examples
 │   │   └── tests/          # Integration tests
+│   ├── cpuinfer/           # GStreamer CPU inference plugin
+│   │   ├── src/
+│   │   │   ├── detector.rs # ONNX detector implementation
+│   │   │   └── cpudetector/ # GStreamer element implementation
 │   ├── source-videos/      # Test video generation and RTSP server
 │   │   ├── src/
 │   │   │   ├── config.rs   # Video source configuration
@@ -109,6 +114,38 @@ CUDA_VER=11.4 cargo build --release
 
 # For systems without NVIDIA hardware (uses standard GStreamer)
 cargo build --release
+```
+
+## CPU Inference Plugin
+
+The project includes a custom GStreamer plugin (`cpuinfer`) for CPU-based object detection:
+
+### Features
+- **ONNX Runtime Support**: YOLOv3-v12 models with automatic version detection
+- **Optional Backends**: ONNX (default), OpenCV DNN, or mock detection
+- **Float16/Float32 Support**: Automatic tensor type conversion
+- **Passthrough Architecture**: Identity element behavior with signal emission
+
+### Building the Plugin
+
+```bash
+# Build with ONNX support (default)
+cd crates/cpuinfer
+cargo build --release
+
+# Build without ONNX (lightweight)
+cargo build --release --no-default-features
+
+# Install the plugin (Windows example)
+copy target\release\gstcpuinfer.dll %GSTREAMER_1_0_ROOT_X86_64%\lib\gstreamer-1.0\
+```
+
+### Using the Plugin
+
+```bash
+# Basic pipeline with CPU detection
+gst-launch-1.0 filesrc location=video.mp4 ! decodebin ! videoconvert ! \
+  cpudetector model-path=models/yolov5n.onnx ! videoconvert ! autovideosink
 ```
 
 ## Usage

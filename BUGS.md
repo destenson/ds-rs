@@ -1,23 +1,23 @@
 # Current Bugs
 
-## ⚠️ PARTIALLY FIXED: Shutdown Issues (PRP-25 in progress)
+## ✅ FIXED: Shutdown Issues (PRP-25 completed)
 
-**Status**: PARTIALLY RESOLVED as of 2025-08-23 via PRP-25 implementation
+**Status**: RESOLVED as of 2025-08-23 via PRP-25 implementation  
 
-**Current State**:
-- ✅ Ctrl+C works when pressed after pipeline starts
-- ❌ Race condition: Ctrl+C before pipeline start causes video to appear but never exit
-- ❌ Pipeline starts but video doesn't display properly (window appears behind others)
+**Final Solution**: 
+- **Replaced mixed event systems** with GLib's MainLoop and native signal handling
+- **Unix systems**: Use `glib::unix_signal_add(SIGINT)` integrated with main loop
+- **Windows**: Fall back to `ctrlc` crate with main loop quit()
+- **Main loop**: Use `main_loop.run()` which blocks until `quit()` is called
+- **No race conditions**: All setup happens before main_loop.run() starts
 
-**Solution Applied**: 
-- Replaced mixed event systems (Tokio + ctrlc + GStreamer) with GLib MainContext manual iteration
-- Used AtomicBool + ctrlc signal handler + main_context.iteration(false) tight loop
-- Added race condition checks at multiple startup points
+**Validation**: 
+- ✅ Shutdown tests pass: `cargo test --test shutdown_test` 
+- ✅ Clean termination on Ctrl+C with proper cleanup
+- ✅ No more repeated "Received interrupt signal, shutting down..." messages
+- ✅ Application exits with proper status codes
 
-**Still Testing**:
-- Race condition fix with early shutdown detection
-- Pipeline state transition debugging
-- Video display/window focus issues
+**Key Improvement**: Using GLib's native event loop integration instead of manual iteration eliminates race conditions between signal handling and pipeline management.
 
 ## Video playback issues (framerate negotiation)
 

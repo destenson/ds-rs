@@ -1,14 +1,15 @@
 # TODO List
 
-Last Updated: 2025-08-23 (Fresh comprehensive scan of current state)
+Last Updated: 2025-08-24 (Updated after comprehensive scan of current state)
 
 ## Critical Priority 🔴
 
 ### Critical Bugs (from BUGS.md) - UPDATED
-- [x] **Fix application shutdown issue** ✅ (2025-08-23 - PRP-25 completed)
+- [x] **Fix application shutdown issue** ✅ (2025-08-23 - PRP-25 COMPLETED)
   - FIXED: Application now shuts down properly on Ctrl+C
   - FIXED: No more repeated "shutting down..." messages  
-  - Solution: Replaced mixed event systems with GLib MainContext manual iteration
+  - FIXED: Race conditions eliminated with GLib MainLoop integration
+  - Solution: GLib's unix_signal_add + MainLoop.run() pattern
   
 - [ ] **Fix video playback freezing**
   - Video gets stuck after first/last frame
@@ -21,7 +22,7 @@ Last Updated: 2025-08-23 (Fresh comprehensive scan of current state)
   - Supports YOLOv3-v12 and YOLO-RD with automatic version detection
   - Model files available from Ultralytics and official YOLO repos
 - [ ] **Complete ONNX detector integration tests**
-  - `tests/cpu_backend_tests.rs:33`: TODO comment - test with actual ONNX model file
+  - `crates/ds-rs/tests/cpu_backend_tests.rs:342`: TODO comment - test with actual ONNX model file
   - Need to download and test with real YOLOv5/v8/v12 models
   - Validate inference performance matches expected FPS targets
 
@@ -58,7 +59,7 @@ Last Updated: 2025-08-23 (Fresh comprehensive scan of current state)
   - Compilation now succeeds with ort feature enabled
   - Tests pass without ort feature using mock detector
 - [ ] **Add ONNX integration tests with real models**
-  - `tests/cpu_backend_tests.rs:33`: TODO comment - test with actual ONNX model file
+  - `crates/ds-rs/tests/cpu_backend_tests.rs:342`: TODO comment - test with actual ONNX model file
   - Download actual YOLO models for testing
   - Validate inference accuracy and performance
   - Test all supported YOLO versions (v3-v12)
@@ -83,9 +84,15 @@ Last Updated: 2025-08-23 (Fresh comprehensive scan of current state)
 
 ### Build Configuration - UPDATED
 - [ ] **Fix workspace configuration**
-  - `Cargo.toml:3`: `# TODO: use the workspace version`
-  - `Cargo.toml:4`: `# TODO: use the workspace edition`
+  - `crates/ds-rs/Cargo.toml:3`: `# TODO: use the workspace version`
+  - `crates/ds-rs/Cargo.toml:4`: `# TODO: use the workspace edition`
   - Currently hardcoded as "0.1.0" and "2024"
+- [ ] **Review tokio dependency usage**
+  - `crates/ds-rs/Cargo.toml:43`: TODO comment - should not use tokio (async is ok though)
+  - `crates/source-videos/Cargo.toml:20`: Similar tokio dependency with TODO comment
+  - Consider replacing with async-std or futures-lite where possible
+- [ ] **Complete DSL crate implementation**
+  - `crates/dsl/src/lib.rs:8`: Contains `todo!()` macro - needs implementation
 
 ## High Priority 🟡
 
@@ -328,12 +335,13 @@ Last Updated: 2025-08-23 (Fresh comprehensive scan of current state)
 
 ## Statistics 📊
 
-- **Total TODO items**: ~50 active items
+- **Total TODO items**: ~55 active items
 - **Critical Bugs**: 2 ACTIVE (shutdown, video freeze) - MUST FIX
 - **Code Quality Issues**: 
   - **unwrap() calls**: 100+ occurrences across 27 files in ds-rs/src
-  - **TODO comments**: 3 found (2 in Cargo.toml, 1 in cpu_backend_tests.rs)
+  - **TODO comments**: 5 found (4 in Cargo.toml files, 1 in cpu_backend_tests.rs)
   - **FIXME comments**: 1 found (GStreamer basesink warning in BUGS.md)
+  - **todo!() macros**: 1 found (dsl crate lib.rs)
   - **"For now" comments**: 11 occurrences indicating temporary implementations
   - **"Real implementation" comments**: 9+ occurrences indicating stubs
   - **"actual" comments**: 2+ occurrences (test comments, tiling)  
@@ -424,8 +432,9 @@ When working on any TODO item:
 
 ### Recent Findings (2025-08-23 Update)
 - **CRITICAL**: 2 active bugs make application unusable (shutdown, video freeze)
-- 3 TODO comments in Cargo.toml about workspace configuration  
-- 1 FIXME comment in BUGS.md about GStreamer basesink
+- 5 TODO comments: 4 in Cargo.toml files (workspace config, tokio usage), 1 in tests about ONNX models
+- 1 FIXME comment in BUGS.md about GStreamer basesink 
+- 1 todo!() macro in dsl crate requiring implementation
 - 11 "for now" placeholder implementations across codebase
 - 9+ "real implementation" stub comments indicating incomplete functionality
 - 40+ unused parameters (underscore-prefixed) indicating incomplete implementations

@@ -141,26 +141,11 @@ impl CpuDetector {
     }
     
     fn emit_inference_results(&self, frame_num: u64, detections: &[crate::backend::cpu_vision::detector::Detection]) {
-        // Create detection data as array of dictionaries
-        let detection_array = glib::Array::new(glib::Value::static_type());
-        
-        for det in detections {
-            let dict = glib::VariantDict::new(None);
-            dict.insert("class_name", &det.class_name);
-            dict.insert("class_id", &(det.class_id as i32));
-            dict.insert("confidence", &det.confidence);
-            dict.insert("x", &det.x);
-            dict.insert("y", &det.y);
-            dict.insert("width", &det.width);
-            dict.insert("height", &det.height);
-            detection_array.append_val(&dict.to_variant().to_value());
+        // For now, just log the detections
+        // Signal emission would require proper GObject signal registration
+        if !detections.is_empty() {
+            log::debug!("Frame {}: {} detections", frame_num, detections.len());
         }
-        
-        // Emit signal with frame number and detections
-        self.instance().emit_by_name::<()>(
-            "inference-result",
-            &[&frame_num.to_value(), &detection_array.to_value()],
-        );
     }
     
     fn attach_detection_metadata(&self, buf: &mut gst::BufferRef, detections: &[crate::backend::cpu_vision::detector::Detection]) {
@@ -377,7 +362,8 @@ impl BaseTransformImpl for CpuDetector {
         }
         
         // Get video info from sink pad caps
-        let sink_pad = self.instance().static_pad("sink").unwrap();
+        let element = self.obj();
+        let sink_pad = element.static_pad("sink").unwrap();
         let caps = sink_pad.current_caps().unwrap();
         let info = gst_video::VideoInfo::from_caps(&caps)
             .map_err(|_| gst::FlowError::NotSupported)?;
@@ -385,7 +371,7 @@ impl BaseTransformImpl for CpuDetector {
         // Map buffer for reading (we don't modify the video data)
         {
             let map = buf.map_readable().map_err(|_| gst::FlowError::Error)?;
-            let frame = gst_video::VideoFrameRef::from_buffer_ref_readable(&map, &info)
+            let frame = gst_video::VideoFrameRef::from_buffer_ref_readable(buf, &info)
                 .map_err(|_| gst::FlowError::Error)?;
             
             // Convert frame to image for detection

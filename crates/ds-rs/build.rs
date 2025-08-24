@@ -33,7 +33,7 @@ fn copy_onnx_dlls() -> Result<(), String> {
     let profile = env::var("PROFILE").unwrap_or_else(|_| "debug".to_string());
     let profile_dir = target_dir.join(&profile);
     
-    println!("cargo:warning=Looking for ONNX Runtime DLLs in: {}", profile_dir.display());
+    // println!("cargo:warning=Looking for ONNX Runtime DLLs in: {}", profile_dir.display());
     
     // ONNX Runtime DLL files to copy
     let dll_files = ["onnxruntime.dll", "onnxruntime_providers_shared.dll"];
@@ -61,7 +61,7 @@ fn copy_onnx_dlls() -> Result<(), String> {
     
     // Copy DLLs to all necessary locations
     for (dll_name, source) in &dll_sources {
-        println!("cargo:warning=Found {} at: {}", dll_name, source.display());
+        // println!("cargo:warning=Found {} at: {}", dll_name, source.display());
         
         // Verify the DLL is valid (basic size check)
         let metadata = fs::metadata(&source).map_err(|e| {
@@ -82,7 +82,7 @@ fn copy_onnx_dlls() -> Result<(), String> {
             if dest.exists() {
                 if let Ok(dest_meta) = fs::metadata(&dest) {
                     if dest_meta.len() == metadata.len() {
-                        println!("cargo:warning={} already up-to-date in {}", dll_name, dest_dir.file_name().unwrap_or_default().to_string_lossy());
+                        // println!("cargo:warning={} already up-to-date in {}", dll_name, dest_dir.file_name().unwrap_or_default().to_string_lossy());
                         continue;
                     }
                 }
@@ -92,12 +92,12 @@ fn copy_onnx_dlls() -> Result<(), String> {
                 format!("Failed to copy {} to {}: {}", dll_name, dest.display(), e)
             })?;
             
-            println!("cargo:warning=Successfully copied {} to {}", dll_name, dest_dir.file_name().unwrap_or_default().to_string_lossy());
+            // println!("cargo:warning=Successfully copied {} to {}", dll_name, dest_dir.file_name().unwrap_or_default().to_string_lossy());
         }
     }
     
-    println!("cargo:warning=ONNX Runtime DLL setup completed successfully");
-    println!("cargo:warning=If you still get 0xc000007b errors, ensure Visual C++ Redistributables are installed");
+    // println!("cargo:warning=ONNX Runtime DLL setup completed successfully");
+    // println!("cargo:warning=If you still get 0xc000007b errors, ensure Visual C++ Redistributables are installed");
     
     Ok(())
 }

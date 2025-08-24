@@ -162,16 +162,21 @@ impl Application {
         let _bus_watch = bus.add_watch(move |_, msg| {
             use gst::MessageView;
             
+            let now = std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .unwrap_or_default();
+            let timestamp = format!("{:.3}", now.as_secs_f64());
+            
             match msg.view() {
                 MessageView::Eos(..) => {
-                    println!("End of stream");
+                    println!("[{}] End of stream received", timestamp);
                     main_loop_quit.quit();
                     glib::ControlFlow::Break
                 }
                 MessageView::Error(err) => {
-                    eprintln!("Error: {}", err.error());
+                    eprintln!("[{}] Error: {}", timestamp, err.error());
                     if let Some(debug) = err.debug() {
-                        eprintln!("Debug: {}", debug);
+                        eprintln!("[{}] Debug: {}", timestamp, debug);
                     }
                     main_loop_quit.quit();
                     glib::ControlFlow::Break
@@ -179,18 +184,22 @@ impl Application {
                 MessageView::Warning(warn) => {
                     // Log warnings but don't stop playback
                     if let Some(debug) = warn.debug() {
-                        eprintln!("Warning: {} - {}", warn.error(), debug);
+                        eprintln!("[{}] Warning: {} - {}", timestamp, warn.error(), debug);
+                    } else {
+                        eprintln!("[{}] Warning: {}", timestamp, warn.error());
                     }
                     glib::ControlFlow::Continue
                 }
                 MessageView::StateChanged(state) => {
-                    println!("State changed: {:?} -> {:?} ({})", 
+                    
+                    println!("[{}] State changed: {:?} -> {:?} ({})", 
+                        timestamp,
                         state.old(), 
                         state.current(),
                         state.src().map(|s| s.name()).unwrap_or_else(|| "unknown".into())
                     );
                     if state.current() == gst::State::Playing {
-                        println!("🎬 Pipeline is now PLAYING!");
+                        println!("[{}] 🎬 Pipeline is now PLAYING!", timestamp);
                     }
                     glib::ControlFlow::Continue
                 }

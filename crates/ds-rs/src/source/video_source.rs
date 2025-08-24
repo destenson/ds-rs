@@ -93,7 +93,11 @@ impl VideoSource {
             };
             
             let name = structure.name().as_str();
-            println!("New pad {} from source {}", name, source_id);
+            let now = std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .unwrap_or_default();
+            let timestamp = format!("{:.3}", now.as_secs_f64());
+            println!("[{}] New pad {} from source {}", timestamp, name, source_id);
             
             if !name.starts_with("video/") && !name.starts_with("image/") {
                 return;
@@ -137,9 +141,14 @@ impl VideoSource {
                 }
             };
             
+            let now2 = std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .unwrap_or_default();
+            let timestamp2 = format!("{:.3}", now2.as_secs_f64());
+            
             pad.link(&sinkpad)
-                .map(|_| println!("Linked source {} to mux", source_id))
-                .inspect_err(|e| eprintln!("Failed to link source {} to mux: {:?}", source_id, e))
+                .map(|_| println!("[{}] Linked source {} to mux", timestamp2, source_id))
+                .inspect_err(|e| eprintln!("[{}] Failed to link source {} to mux: {:?}", timestamp2, source_id, e))
                 .ok();
         })
     }

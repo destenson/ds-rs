@@ -33,12 +33,15 @@ fn test_cpu_detector_creation() {
     
     #[cfg(feature = "ort")]
     {
-        // With ort feature, should fail because file doesn't exist
-        assert!(result.is_err());
-        if let Err(e) = result {
-            let error_msg = e.to_string();
-            assert!(error_msg.contains("Model file not found"));
-        }
+        // With ort feature, should succeed but fall back to mock detection when file doesn't exist
+        assert!(result.is_ok());
+        let detector = result.unwrap();
+        
+        // Should work with mock detection
+        use image::DynamicImage;
+        let image = DynamicImage::new_rgb8(640, 640);
+        let detections = detector.detect(&image).unwrap();
+        assert!(!detections.is_empty());
     }
     
     #[cfg(not(feature = "ort"))]

@@ -10,7 +10,7 @@ use crate::elements::factory::ElementFactory;
 use gstreamer as gst;
 use gstreamer::prelude::*;
 use gstreamer::glib;
-use std::sync::{Arc, Mutex, atomic::{AtomicBool, Ordering}};
+use std::sync::{Arc, Mutex};
 
 /// Main application demonstrating runtime source addition/deletion
 pub struct Application {
@@ -147,18 +147,17 @@ impl Application {
         Ok(())
     }
     
-    pub fn run_with_main_context(&mut self, running: Arc<AtomicBool>) -> Result<()> {
-        // Start the pipeline
-        self.pipeline.set_state(gst::State::Paused)?;
-        self.add_initial_source()?;
-        self.pipeline.set_state(gst::State::Playing)?;
+    
+    pub fn run_with_glib_signals(&mut self) -> Result<()> {
+        println!("Starting pipeline...");
         
-        println!("Now playing: {}", self.initial_uri);
-        println!("Pipeline running... Press Ctrl+C to exit");
+        // Create the GLib main loop
+        let main_loop = glib::MainLoop::new(None, false);
+        let main_loop_quit = main_loop.clone();
         
         // Get the bus for message handling
         let bus = self.pipeline.bus().unwrap();
-        let running_clone = running.clone();
+        let pipeline_clone = Arc::clone(&self.pipeline);
         
         // Add bus watch for GStreamer messages  
         let _bus_watch = bus.add_watch(move |_, msg| {
@@ -167,8 +166,7 @@ impl Application {
             match msg.view() {
                 MessageView::Eos(..) => {
                     println!("End of stream");
-                    running_clone.store(false, Ordering::SeqCst);
-                    glib::MainContext::default().wakeup();
+                    main_loop_quit.quit();
                     glib::ControlFlow::Break
                 }
                 MessageView::Error(err) => {
@@ -176,36 +174,61 @@ impl Application {
                     if let Some(debug) = err.debug() {
                         eprintln!("Debug: {}", debug);
                     }
-                    running_clone.store(false, Ordering::SeqCst);
-                    glib::MainContext::default().wakeup();
+                    main_loop_quit.quit();
                     glib::ControlFlow::Break
                 }
                 MessageView::Warning(warn) => {
                     // Log warnings but don't stop playback
                     if let Some(debug) = warn.debug() {
-                        log::warn!("Warning: {} - {}", warn.error(), debug);
+                        eprintln!("Warning: {} - {}", warn.error(), debug);
                     }
+                    glib::ControlFlow::Continue
+                }
+                MessageView::StateChanged(state) => {
+                    println!("State changed: {:?} -> {:?}", state.old(), state.current());
                     glib::ControlFlow::Continue
                 }
                 _ => glib::ControlFlow::Continue,
             }
         })?;
         
-        // Get the main context for manual iteration
-        let main_context = glib::MainContext::default();
+        // Add SIGINT handler using GLib's signal handling
+        let main_loop_signal = main_loop.clone();
+        #[cfg(unix)]
+        let _signal_handler = glib::unix_signal_add(
+            glib::Signal::SIGINT,
+            move || {
+                println!("\nReceived interrupt signal, shutting down...");
+                main_loop_signal.quit();
+                glib::ControlFlow::Break
+            }
+        );
         
-        // Main event loop with manual iteration
-        while running.load(Ordering::SeqCst) {
-            // Always process at least one iteration
-            // Use false for non-blocking so we can check running flag frequently
-            main_context.iteration(false);
+        // On Windows, we'll still use ctrlc as glib unix signals don't work
+        #[cfg(windows)]
+        {
+            let main_loop_ctrlc = main_loop.clone();
+            ctrlc::set_handler(move || {
+                println!("\nReceived interrupt signal, shutting down...");
+                main_loop_ctrlc.quit();
+            }).expect("Error setting Ctrl+C handler");
         }
+        
+        // Start the pipeline
+        self.pipeline.set_state(gst::State::Paused)?;
+        self.add_initial_source()?;
+        self.pipeline.set_state(gst::State::Playing)?;
+        
+        println!("Now playing: {}", self.initial_uri);
+        println!("Pipeline running... Press Ctrl+C to exit");
+        
+        // Run the main loop - this will block until main_loop.quit() is called
+        main_loop.run();
         
         println!("Shutting down pipeline...");
         self.cleanup()?;
         Ok(())
     }
-    
     
     fn cleanup(&self) -> Result<()> {
         println!("Returned, stopping playback");

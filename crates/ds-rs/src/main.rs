@@ -1,7 +1,6 @@
 #![allow(unused)]
 use clap::Parser;
 use ds_rs::{init, app::Application};
-use std::sync::{Arc, atomic::{AtomicBool, Ordering}};
 use gstreamer::glib;
 
 #[derive(Parser, Debug)]
@@ -53,20 +52,8 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let mut app = Application::new(args.uri)?;
     app.init()?;
     
-    // Create atomic flag for shutdown signaling
-    let running = Arc::new(AtomicBool::new(true));
-    let running_clone = running.clone();
-    
-    // Set up signal handler for graceful shutdown
-    ctrlc::set_handler(move || {
-        println!("\nReceived interrupt signal, shutting down...");
-        running_clone.store(false, Ordering::SeqCst);
-        // Wake up the main context so it checks the flag
-        glib::MainContext::default().wakeup();
-    })?;
-    
-    // Run the application with manual main context iteration
-    app.run_with_main_context(running)?;
+    // Run the application with GLib's native signal handling
+    app.run_with_glib_signals()?;
     
     println!("\nApplication exited successfully");
     Ok(())

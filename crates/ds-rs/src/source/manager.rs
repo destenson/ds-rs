@@ -38,31 +38,13 @@ impl SourceAddition for SourceManager {
         
         video_source.update_state(SourceState::Initializing)?;
         
-        let state_result = video_source.set_state(gst::State::Playing)?;
-        match state_result {
-            gst::StateChangeSuccess::Success => {
-                println!("[{:.3}] Source {} state change SUCCESS", crate::timestamp(), id);
-                video_source.update_state(SourceState::Playing)?;
-            }
-            gst::StateChangeSuccess::Async => {
-                println!("[{:.3}] Source {} state change ASYNC", crate::timestamp(), id);
-                let (result, _current, _pending) = video_source.get_state(gst::ClockTime::from_nseconds(0))?;
-                match result {
-                    gst::StateChangeSuccess::Success => {
-                        video_source.update_state(SourceState::Playing)?;
-                    }
-                    _ => {
-                        video_source.update_state(SourceState::Error(
-                            format!("Async state change failed: {:?}", result)
-                        ))?;
-                    }
-                }
-            }
-            gst::StateChangeSuccess::NoPreroll => {
-                println!("[{:.3}] Source {} state change NO PREROLL", crate::timestamp(), id);
-                video_source.update_state(SourceState::Playing)?;
-            }
-        }
+        // CRITICAL: Use sync_state_with_parent() instead of set_state() for dynamic elements
+        // This ensures the element inherits the pipeline's clock and base time
+        println!("[{:.3}] Syncing source {} state with parent pipeline", crate::timestamp(), id);
+        source_element.sync_state_with_parent()?;
+        
+        println!("[{:.3}] Source {} successfully synced with parent pipeline", crate::timestamp(), id);
+        video_source.update_state(SourceState::Playing)?;
         
         let source_info = SourceInfo {
             id,

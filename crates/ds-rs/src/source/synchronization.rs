@@ -16,16 +16,15 @@ impl SourceSynchronizer {
     }
     
     pub fn sync_source_with_pipeline(&self, source_id: SourceId) -> Result<()> {
-        let pipeline = self.manager.get_pipeline()
+        let _pipeline = self.manager.get_pipeline()
             .ok_or_else(|| DeepStreamError::NotInitialized("Pipeline not set".to_string()))?;
-        
-        let (_success, current_state, _pending) = pipeline.get_state(Some(Duration::from_millis(100)))?;
         
         let source = self.manager.get_source(source_id)?;
         
-        let target_state = current_state;
-        
-        source.set_state(target_state)?;
+        // Use sync_state_with_parent() to properly synchronize with pipeline
+        // This ensures the element inherits the pipeline's clock and base time
+        let element = source.element();
+        element.sync_state_with_parent()?;
         
         Ok(())
     }

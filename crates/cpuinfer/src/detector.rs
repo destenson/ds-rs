@@ -123,11 +123,10 @@ impl Default for DetectorConfig {
     }
 }
 
+#[cfg(feature = "onnx")]
 /// ONNX-based object detector for CPU inference
 pub struct OnnxDetector {
-    #[cfg(feature = "onnx")]
     session: Option<ort::Session>,
-    #[cfg(feature = "onnx")]
     environment: Option<std::sync::Arc<ort::Environment>>,
     input_width: u32,
     input_height: u32,
@@ -137,6 +136,7 @@ pub struct OnnxDetector {
     yolo_version: YoloVersion,
 }
 
+#[cfg(feature = "onnx")]
 impl OnnxDetector {
     /// Create a new ONNX detector with the specified model
     pub fn new(model_path: &str) -> Result<Self> {
@@ -149,59 +149,42 @@ impl OnnxDetector {
     
     /// Create a new ONNX detector with a configuration
     pub fn new_with_config(config: DetectorConfig) -> Result<Self> {
-        #[cfg(feature = "onnx")]
-        {
-            // Try to load model if path is provided, but fallback to mock on any error
-            let (session, environment) = if let Some(ref model_path) = config.model_path {
-                if !Path::new(model_path).exists() {
-                    // log::warn!("Model file not found: {}, using mock detector", model_path);
-                    (None, None)
-                } else {
-                    match Self::load_onnx_model(model_path, config.num_threads) {
-                        Ok((env, sess)) => {
-                            // log::info!("Loaded ONNX model from: {}", model_path);
-                            (Some(sess), Some(env))
-                        },
-                        Err(e) => {
-                            // log::warn!("Failed to load ONNX model: {}, using mock detector", e);
-                            (None, None)
-                        }
+        // Try to load model if path is provided, but fallback to mock on any error
+        let (session, environment) = if let Some(ref model_path) = config.model_path {
+            if !Path::new(model_path).exists() {
+                // log::warn!("Model file not found: {}, using mock detector", model_path);
+                (None, None)
+            } else {
+                match Self::load_onnx_model(model_path, config.num_threads) {
+                    Ok((env, sess)) => {
+                        // log::info!("Loaded ONNX model from: {}", model_path);
+                        (Some(sess), Some(env))
+                    },
+                    Err(e) => {
+                        // log::warn!("Failed to load ONNX model: {}, using mock detector", e);
+                        (None, None)
                     }
                 }
-            } else {
-                // log::info!("No model path provided, using mock detector");
-                (None, None)
-            };
-            
-            let class_names = config.class_names.unwrap_or_else(Self::default_class_names);
-            
-            return Ok(Self {
-                session,
-                environment,
-                input_width: config.input_width,
-                input_height: config.input_height,
-                confidence_threshold: config.confidence_threshold,
-                nms_threshold: config.nms_threshold,
-                class_names,
-                yolo_version: config.yolo_version,
-            });
-        }
+            }
+        } else {
+            // log::info!("No model path provided, using mock detector");
+            (None, None)
+        };
         
-        #[cfg(not(feature = "onnx"))]
-        {
-            // When ort feature is not enabled, create mock detector
-            Ok(Self {
-                input_width: config.input_width,
-                input_height: config.input_height,
-                confidence_threshold: config.confidence_threshold,
-                nms_threshold: config.nms_threshold,
-                class_names: config.class_names.unwrap_or_else(Self::default_class_names),
-                yolo_version: config.yolo_version,
-            })
-        }
+        let class_names = config.class_names.unwrap_or_else(Self::default_class_names);
+        
+        return Ok(Self {
+            session,
+            environment,
+            input_width: config.input_width,
+            input_height: config.input_height,
+            confidence_threshold: config.confidence_threshold,
+            nms_threshold: config.nms_threshold,
+            class_names,
+            yolo_version: config.yolo_version,
+        });
     }
     
-    #[cfg(feature = "onnx")]
     fn load_onnx_model(model_path: &str, num_threads: usize) -> Result<(std::sync::Arc<ort::Environment>, ort::Session)> {
         use ort::{Environment, SessionBuilder, GraphOptimizationLevel};
         use std::sync::Arc;
@@ -238,7 +221,6 @@ impl OnnxDetector {
         Ok((environment, session))
     }
     
-    #[cfg(feature = "onnx")]
     fn log_model_info(session: &ort::Session) {
         // log::info!("ONNX Model Information:");
         // log::info!("  Inputs: {}, Outputs: {}", session.inputs.len(), session.outputs.len());
@@ -257,106 +239,110 @@ impl OnnxDetector {
     
     /// Perform detection on an image
     pub fn detect(&self, image: &DynamicImage) -> Result<Vec<Detection>> {
-        #[cfg(feature = "onnx")]
-        {
-            use ndarray::{Array, CowArray, IxDyn};
-            use ort::Value;
-            
-            // Check if we have a real session or should use mock
-            let session = match self.session.as_ref() {
-                Some(s) => s,
-                None => {
-                    // Use mock detection when no model is loaded
-                    // log::debug!("Using mock detection (no ONNX model loaded)");
-                    let mock_output = self.create_mock_yolo_output();
-                    return self.postprocess_outputs(&mock_output, image.width(), image.height());
-                }
-            };
-            
-            // Preprocess image
-            let input_tensor = self.preprocess_image(image)?;
-            
-            // Run inference
-            // log::debug!("Running ONNX inference on {}x{} image", image.width(), image.height());
-            
-            // Create ndarray with correct shape for YOLO (batch, channels, height, width)
-            let shape = vec![1, 3, self.input_height as usize, self.input_width as usize];
-            
-            use ort::tensor::TensorElementDataType::{Float16, Bfloat16};
-            // Check if model expects float16 input
-            #[cfg(feature = "half")]
-            let mut cow_array: CowArray<half::f16, IxDyn>;
-            #[cfg(not(feature = "half"))]
-            let mut cow_array: CowArray<f32, IxDyn>;
-            let inputs = if matches!(session.inputs[0].input_type, Float16 | Bfloat16) {
-                // Convert f32 to f16 and create input tensor
-                #[cfg(feature = "half")]
-                {
-                    use half::f16;
-                    let f16_tensor: Vec<f16> = input_tensor.iter()
-                        .map(|&f| f16::from_f32(f))
-                        .collect();
-                    
-                    let array = Array::from_shape_vec(shape.clone(), f16_tensor)
-                        .map_err(|e| DetectorError::Configuration(
-                            format!("Failed to create f16 ndarray: {}", e)
-                        ))?;
-                    cow_array = array.into_dyn().into();
-
-                    vec![Value::from_array(session.allocator(), &cow_array)
-                        .map_err(|e| DetectorError::Configuration(
-                            format!("Failed to create f16 ORT value: {}", e)
-                        ))?]
-                }
-                #[cfg(not(feature = "half"))]
-                {
-                    return Err(DetectorError::Configuration(
-                        "Model requires float16 but half feature is not enabled".to_string()
-                    ));
-                }
-            } else {
-                // Use f32 input
-                let array = Array::from_shape_vec(shape.clone(), input_tensor)
-                    .map_err(|e| DetectorError::Configuration(
-                        format!("Failed to create f32 ndarray: {}", e)
-                    ))?;
-                
-                let ca = array.into_dyn();
-                cow_array = ca.into();
-                
-                vec![Value::from_array(session.allocator(), &cow_array)
-                    .map_err(|e| DetectorError::Configuration(
-                        format!("Failed to create f32 ORT value: {}", e)
-                    ))?]
-            };
-            
-            // Run the model
-            let outputs: Vec<Value> = session.run(inputs)
-                .map_err(|e| DetectorError::Configuration(
-                    format!("Failed to run ONNX inference: {}", e)
-                ))?;
-            
-            // Extract output tensor using try_extract
-            let output_tensor: ort::tensor::OrtOwnedTensor<f32, _> = outputs[0].try_extract()
-                .map_err(|e| DetectorError::Configuration(
-                    format!("Failed to extract output tensor: {}", e)
-                ))?;
-            
-            // Get view and convert to Vec
-            let output_view = output_tensor.view();
-            let output: Vec<f32> = output_view.iter().cloned().collect();
-            
-            // Postprocess outputs
-            return self.postprocess_outputs(&output, image.width(), image.height());
-        }
+        use ndarray::{Array, CowArray, IxDyn};
+        use ort::Value;
         
-        #[cfg(not(feature = "onnx"))]
-        {
-            // Use mock detection when ONNX feature is not enabled
-            // log::debug!("Using mock detection (ONNX feature not enabled)");
-            let mock_output = self.create_mock_yolo_output();
-            self.postprocess_outputs(&mock_output, image.width(), image.height())
-        }
+        // Check if we have a real session or should use mock
+        let session = match self.session.as_ref() {
+            Some(s) => s,
+            None => {
+                // Use mock detection when no model is loaded
+                // log::debug!("Using mock detection (no ONNX model loaded)");
+                let mock_output = self.create_mock_yolo_output();
+                return self.postprocess_outputs(&mock_output, image.width(), image.height());
+            }
+        };
+        
+        // Preprocess image
+        let input_tensor = self.preprocess_image(image)?;
+        
+        // Run inference
+        // log::debug!("Running ONNX inference on {}x{} image", image.width(), image.height());
+        
+        // Create ndarray with correct shape for YOLO (batch, channels, height, width)
+        let shape = vec![1, 3, self.input_height as usize, self.input_width as usize];
+        
+        use ort::tensor::TensorElementDataType::{Float16, Bfloat16};
+        
+        // Create the input tensor based on model's expected type
+        // We need to keep the array alive for the duration of the inference
+        #[cfg(feature = "half")]
+        let (inputs, _array_holder) = if matches!(session.inputs[0].input_type, Float16 | Bfloat16) {
+            // Convert f32 to f16 and create input tensor
+            use half::f16;
+            let f16_tensor: Vec<f16> = input_tensor.iter()
+                .map(|&f| f16::from_f32(f))
+                .collect();
+            
+            let array = Array::from_shape_vec(shape.clone(), f16_tensor)
+                .map_err(|e| DetectorError::Configuration(
+                    format!("Failed to create f16 ndarray: {}", e)
+                ))?;
+            let array_dyn = array.into_dyn();
+            
+            let value = Value::from_array(session.allocator(), &array_dyn)
+                .map_err(|e| DetectorError::Configuration(
+                    format!("Failed to create f16 ORT value: {}", e)
+                ))?;
+            
+            (vec![value], Box::new(array_dyn) as Box<dyn std::any::Any>)
+        } else {
+            // Use f32 input
+            let array = Array::from_shape_vec(shape.clone(), input_tensor)
+                .map_err(|e| DetectorError::Configuration(
+                    format!("Failed to create f32 ndarray: {}", e)
+                ))?;
+            let array_dyn = array.into_dyn();
+            
+            let value = Value::from_array(session.allocator(), &array_dyn)
+                .map_err(|e| DetectorError::Configuration(
+                    format!("Failed to create f32 ORT value: {}", e)
+                ))?;
+            
+            (vec![value], Box::new(array_dyn) as Box<dyn std::any::Any>)
+        };
+        
+        #[cfg(not(feature = "half"))]
+        let (inputs, _array_holder) = {
+            if matches!(session.inputs[0].input_type, Float16 | Bfloat16) {
+                return Err(DetectorError::Configuration(
+                    "Model requires float16 but half feature is not enabled".to_string()
+                ));
+            }
+            
+            // Use f32 input
+            let array = Array::from_shape_vec(shape.clone(), input_tensor)
+                .map_err(|e| DetectorError::Configuration(
+                    format!("Failed to create f32 ndarray: {}", e)
+                ))?;
+            let array_dyn = array.into_dyn();
+            
+            let value = Value::from_array(session.allocator(), &array_dyn)
+                .map_err(|e| DetectorError::Configuration(
+                    format!("Failed to create f32 ORT value: {}", e)
+                ))?;
+            
+            (vec![value], Box::new(array_dyn) as Box<dyn std::any::Any>)
+        };
+        
+        // Run the model
+        let outputs: Vec<Value> = session.run(inputs)
+            .map_err(|e| DetectorError::Configuration(
+                format!("Failed to run ONNX inference: {}", e)
+            ))?;
+        
+        // Extract output tensor using try_extract
+        let output_tensor: ort::tensor::OrtOwnedTensor<f32, _> = outputs[0].try_extract()
+            .map_err(|e| DetectorError::Configuration(
+                format!("Failed to extract output tensor: {}", e)
+            ))?;
+        
+        // Get view and convert to Vec
+        let output_view = output_tensor.view();
+        let output: Vec<f32> = output_view.iter().cloned().collect();
+        
+        // Postprocess outputs
+        return self.postprocess_outputs(&output, image.width(), image.height());
     }
     
     /// Preprocess image for model input
@@ -718,9 +704,7 @@ impl OnnxDetector {
     /// Create a mock detector for testing without an actual model
     pub fn new_mock() -> Self {
         Self {
-            #[cfg(feature = "onnx")]
             session: None,
-            #[cfg(feature = "onnx")]
             environment: None,
             input_width: 640,
             input_height: 640,
@@ -734,6 +718,28 @@ impl OnnxDetector {
 
 #[cfg(test)]
 mod tests {
+    use super::*;
+    
+    #[test]
+    fn test_detection_creation() {
+        let detection = Detection {
+            x: 100.0,
+            y: 100.0,
+            width: 50.0,
+            height: 50.0,
+            confidence: 0.9,
+            class_id: 0,
+            class_name: "person".to_string(),
+        };
+        
+        assert_eq!(detection.class_name, "person");
+        assert_eq!(detection.confidence, 0.9);
+    }
+}
+
+#[cfg(feature = "onnx")]
+#[cfg(test)]
+mod onnx_tests {
     use super::*;
     
     #[test]
@@ -848,7 +854,6 @@ mod tests {
     }
     
     #[test]
-    #[cfg(feature = "onnx")]
     fn test_onnx_runtime_graceful_fallback() {
         // Test that we can handle ONNX Runtime initialization failures gracefully
         let config = DetectorConfig {

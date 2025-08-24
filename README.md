@@ -4,17 +4,17 @@ A Rust port of NVIDIA's DeepStream runtime source addition/deletion reference ap
 
 ## Recent Updates
 
-### 2025-08-24: Fixed Video Playback Freezing Issue
-- ✅ Resolved critical H264 framerate negotiation bug that caused video freezing
-- Added videorate and capsfilter elements to normalize framerates to 30fps
-- Videos now play smoothly across various formats without stalling
-- Pipeline flow optimized: uridecodebin → videorate → capsfilter → compositor
+### 2025-08-24: Critical Bug Fixes and Improvements
+- ✅ **Fixed f16/f32 array conversion issue** in cpuinfer - Resolved lifetime issues with ONNX tensor arrays
+- ✅ **Fixed Application test compilation errors** - Updated tests to reflect correct API methods
+- ✅ **Fixed video playback freezing** - Added videorate and capsfilter for framerate normalization
+- ✅ **Enhanced timestamp logging** - All state changes now show precise timing for debugging
 
-### 2025-08-24: Enhanced Logging with Timestamps
-- Added timestamps to all state change log messages for better debugging and monitoring
-- Implemented consistent timestamp formatting across the codebase using Unix epoch seconds
-- State changes now show precise timing: `[1735056789.123] Source 1 state change SUCCESS`
-- Improved visibility into pipeline state transitions and source management operations
+### 2025-08-23: Major Milestone Achievements
+- ✅ Fixed application shutdown handling with proper GLib signal integration
+- ✅ Resolved ONNX Runtime API compatibility (v1.16.3)
+- ✅ Fixed ONNX Runtime DLL loading on Windows
+- ✅ Added comprehensive DLL validation module
 
 ## Features
 
@@ -34,7 +34,7 @@ A Rust port of NVIDIA's DeepStream runtime source addition/deletion reference ap
 The project features a flexible backend system that automatically detects and uses the best available video processing backend:
 
 1. **DeepStream Backend**: Full NVIDIA hardware acceleration with AI inference
-2. **Standard Backend**: Software-based processing using standard GStreamer elements
+2. **Standard Backend**: Software-based processing using standard GStreamer elements with CPU vision
 3. **Mock Backend**: Testing and development without any hardware dependencies
 
 ### Project Structure
@@ -55,32 +55,34 @@ ds-rs/
 │   │   │   ├── source/     # Dynamic source management
 │   │   │   ├── tracking/   # Object tracking and trajectories
 │   │   │   ├── app/        # Main application implementation
+│   │   │   ├── dll_validator.rs # Windows DLL validation
 │   │   │   ├── error.rs    # Error handling
 │   │   │   ├── platform.rs # Platform detection (Jetson/x86)
 │   │   │   ├── lib.rs      # Library entry point
 │   │   │   └── main.rs     # Application entry point
+│   │   ├── models/         # YOLO ONNX models
 │   │   ├── examples/       # Usage examples (4 demos)
-│   │   └── tests/          # Integration tests
+│   │   └── tests/          # Integration tests (6 test suites)
 │   ├── cpuinfer/           # GStreamer CPU inference plugin
 │   │   ├── src/
-│   │   │   ├── detector.rs # ONNX detector implementation
+│   │   │   ├── detector.rs # ONNX detector with f16/f32 support
 │   │   │   └── cpudetector/ # GStreamer element implementation
 │   ├── source-videos/      # Test video generation and RTSP server
 │   │   ├── src/
-│   │   │   ├── config.rs   # Video source configuration
+│   │   │   ├── config/     # Configuration management
 │   │   │   ├── file.rs     # File generation (MP4, MKV, WebM)
 │   │   │   ├── manager.rs  # Source management
 │   │   │   ├── patterns.rs # 25+ test patterns (SMPTE, ball, etc.)
 │   │   │   ├── pipeline/   # Pipeline builders
 │   │   │   ├── rtsp/       # RTSP server implementation
-│   │   │   └── main.rs     # CLI application
+│   │   │   └── runtime/    # Runtime configuration
 │   │   └── tests/
 │   └── dsl/                # DeepStream Services Library (future)
 ├── scripts/                # Test orchestration scripts
 ├── TODO.md                 # Current task tracking
 ├── BUGS.md                 # Known issues and bug tracking
-├── codebase-review-report.md # Code quality assessment
-└── CLAUDE.md               # AI assistant guidance
+├── CLAUDE.md               # AI assistant guidance
+└── codebase-review-report.md # Code quality assessment
 ```
 
 ## Installation
@@ -118,9 +120,9 @@ cd ds-rs
 cargo build --release
 
 # Build with CPU vision features (includes ONNX support)
-cargo build --release --features cpu_vision,nalgebra
+cargo build --release --features cpu_vision,nalgebra,half,ort
 
-# Run tests (200+ total tests)
+# Run tests (137 passing, 10 expected failures with Mock backend)
 cargo test
 
 # Build with specific GStreamer version
@@ -148,6 +150,7 @@ The project includes a custom GStreamer plugin (`cpuinfer`) for CPU-based object
 - **ONNX Runtime Support**: YOLOv3-v12 models with automatic version detection
 - **Multiple Backends**: ONNX (default), OpenCV DNN, or mock detection
 - **Float16/Float32 Support**: Full support for both half-precision (f16) and full precision (f32) models
+- **Automatic Type Conversion**: Handles f16/f32 conversion based on model requirements
 - **Passthrough Architecture**: Identity element behavior with signal emission
 
 ### Building the Plugin
@@ -155,7 +158,7 @@ The project includes a custom GStreamer plugin (`cpuinfer`) for CPU-based object
 ```bash
 # Build with ONNX support (default)
 cd crates/cpuinfer
-cargo build --release
+cargo build --release --features half,ort
 
 # Build without ONNX (lightweight mock mode)
 cargo build --release --no-default-features
@@ -222,7 +225,7 @@ cargo run --example runtime_demo
 cargo run --example detection_app -- file:///path/to/video.mp4
 
 # CPU detection demo (requires ONNX model)
-cargo run --example cpu_detection_demo --features cpu_vision,nalgebra
+cargo run --example cpu_detection_demo --features cpu_vision,nalgebra,half
 ```
 
 ### Test Video Generation and RTSP Server
@@ -354,12 +357,14 @@ The library can parse standard DeepStream configuration files:
 - **Test Infrastructure**: Complete test video generation with RTSP server
 - **Enhanced Logging**: Timestamp support for all state changes
 - **Configuration System**: TOML and DeepStream format parsing
-- **Test Suite**: 200+ tests across all modules
+- **Float16 Support**: Full f16/f32 conversion and model compatibility
+- **Test Suite**: 137+ passing tests across all modules
 
 ### Current Limitations
 - **Mock Backend**: Cannot test uridecodebin-based source management (10 tests fail as expected)
 - **DeepStream Metadata**: Mock implementations for non-NVIDIA systems
-- **Code Quality**: Some unwrap() calls need proper error handling
+- **Code Quality**: Some unwrap() calls need proper error handling (100+ occurrences)
+- **Placeholder Implementations**: 15+ locations with "for now" comments
 
 ### Planned Enhancements 📋
 - Real-time bounding box rendering on video output
@@ -367,14 +372,15 @@ The library can parse standard DeepStream configuration files:
 - Detection data export (MQTT, RabbitMQ, databases)
 - Enhanced tracking algorithms (Kalman filter, SORT)
 - WebSocket control API for remote management
+- Additional inference backends (TensorFlow Lite, OpenVINO, TensorRT)
 
 ## Testing
 
 ### Running Tests
 
 ```bash
-# Run all tests
-cargo test
+# Run all tests (use -j 1 to avoid memory issues on Windows)
+cargo test --features cpu_vision,nalgebra,half,ort -j 1
 
 # Run tests with output and timestamps
 RUST_LOG=debug cargo test -- --nocapture
@@ -393,11 +399,17 @@ cd crates/cpuinfer && cargo test
 ```
 
 ### Test Coverage
-- **Total Tests**: 200+ across all modules
-- **Core Library Tests**: 83 passing
-- **CPU Inference Tests**: 10+ passing
-- **Source Videos Tests**: 24+ passing
-- **Known Limitations**: Mock backend cannot test uridecodebin (10 expected failures)
+- **Total Tests**: 147 tests across all modules
+- **Passing Tests**: 137 tests
+- **Expected Failures**: 10 source_management tests with Mock backend
+- **Test Suites**:
+  - Core Library Tests: 90 passing
+  - CPU Inference Tests: 10 passing  
+  - Backend Tests: 9 passing
+  - CPU Backend Tests: 10 passing
+  - Pipeline Tests: 13 passing
+  - Shutdown Tests: 2 passing
+  - Source Management: 3 passing, 10 expected failures with Mock
 
 ## Environment Variables
 
@@ -433,21 +445,27 @@ cd crates/cpuinfer && cargo test
    - **Solution 3**: Set ORT_DYLIB_PATH to ONNX Runtime location
      - `set ORT_DYLIB_PATH=C:\path\to\onnxruntime.dll`
 
-2. **DLLs not found in examples directory**
+2. **Memory allocation failures during build**
+   - Use `-j 1` flag to limit parallel compilation
+   - Example: `cargo test -j 1`
+   - This prevents excessive memory usage on Windows
+
+3. **DLLs not found in examples directory**
    - The build.rs script should copy DLLs automatically
    - Check build output for "Successfully copied" messages
    - Manual fix: Copy from `target\debug\` to `target\debug\examples\`
 
-3. **Model precision mismatch**
+4. **Model precision mismatch**
    - Both Float16 and Float32 models are now supported
    - The detector automatically handles conversion between f16 and f32 as needed
+   - Arrays are properly managed with correct lifetimes
 
-4. **Source management test failures**
+5. **Source management test failures**
    - Mock backend doesn't support uridecodebin
    - Use Standard backend for full source management testing
-   - This is expected behavior
+   - This is expected behavior documented in CLAUDE.md
 
-5. **RTSP server issues**
+6. **RTSP server issues**
    - Ensure gstreamer1.0-rtsp-server is installed
    - Check firewall settings for port 8554
    - Verify with: `gst-inspect-1.0 | grep rtsp`
@@ -462,6 +480,12 @@ See [TODO.md](TODO.md) for current tasks and priorities. When contributing:
 4. Write tests for new functionality
 5. Update documentation as needed
 6. Mark complete in TODO.md when merged
+
+### Recent Contributors
+- Fixed critical f16/f32 conversion issues
+- Resolved application test compilation errors
+- Enhanced Windows DLL handling
+- Improved test stability
 
 ## Related Projects
 
@@ -485,6 +509,10 @@ This project is a port of NVIDIA's DeepStream reference applications. Please ref
 
 This is an active port of NVIDIA's DeepStream reference application to Rust. Core functionality is complete with dynamic source management, cross-platform backend abstraction, and CPU-based object detection working.
 
-**Recent Achievement**: Successfully added timestamp logging to all state changes for improved debugging and monitoring.
+**Recent Achievements** (2025-08-24):
+- ✅ Fixed critical f16/f32 array lifetime issues in ONNX inference
+- ✅ Resolved Application test API mismatches
+- ✅ Enhanced Windows build with automatic DLL management
+- ✅ Stabilized test suite with 137 passing tests
 
-**Current Focus**: CPU vision backend with ONNX Runtime integration for object detection. Float32 models are fully supported, with YOLOv3-v12 automatic version detection.
+**Current Focus**: Improving test coverage and resolving placeholder implementations. The CPU vision backend with ONNX Runtime is fully functional for YOLOv3-v12 models with automatic version detection and f16/f32 support.

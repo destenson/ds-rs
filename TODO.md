@@ -1,6 +1,6 @@
 # TODO List
 
-Last Updated: 2025-08-24 (Updated after comprehensive scan of current state)
+Last Updated: 2025-08-24 (Updated with today's fixes and comprehensive scan)
 
 ## Critical Priority 🔴
 
@@ -17,6 +17,16 @@ Last Updated: 2025-08-24 (Updated after comprehensive scan of current state)
   - FIXED: No more H264 parser warnings about excessive framerate
   - Solution: Pipeline flow now: uridecodebin → videorate → capsfilter(30fps) → compositor
 
+- [x] **Fix f16/f32 array conversion in cpuinfer** ✅ (2025-08-24 - COMPLETED)
+  - FIXED: Array lifetime issue when using ONNX with half feature
+  - FIXED: Aligned cpuinfer detector with ds-rs backend implementation
+  - Solution: Declare arrays outside conditional blocks to maintain lifetime
+
+- [x] **Fix Application test methods** ✅ (2025-08-24 - COMPLETED)
+  - FIXED: Removed calls to non-existent stop() and run() methods
+  - FIXED: Tests now properly reflect Application's synchronous run_with_glib_signals()
+  - File: `crates/ds-rs/tests/main_app_test.rs`
+
 ### CPU Vision Backend Implementation
 - [x] **Fix ONNX Runtime API compatibility issues** ✅ (2025-08-23 - PRP-24)
   - Successfully fixed all ONNX Runtime v1.16.3 API issues
@@ -28,7 +38,7 @@ Last Updated: 2025-08-24 (Updated after comprehensive scan of current state)
   - Added comprehensive DLL validation and diagnostic module
   - Updated documentation with Windows-specific troubleshooting
 - [ ] **Complete ONNX detector integration tests**
-  - `crates/ds-rs/tests/cpu_backend_tests.rs:342`: TODO comment - test with actual ONNX model file
+  - `crates/ds-rs/tests/cpu_backend_tests.rs:343`: TODO comment - test with actual ONNX model file
   - Need to download and test with real YOLOv5/v8/v12 models
   - Validate inference performance matches expected FPS targets
 
@@ -55,42 +65,48 @@ Last Updated: 2025-08-24 (Updated after comprehensive scan of current state)
 - [x] Fix build warnings ✅ (2025-08-23)
   - `backend/cpu_vision/detector.rs`: Fixed unused imports
   - `backend/cpu_vision/elements.rs`: Removed unused Arc, Mutex imports
-- [ ] Clean up unused parameters (25+ underscore-prefixed variables found)
+- [ ] Clean up unused parameters (50+ underscore-prefixed variables found)
   - Callback handlers: `_bus`, `_pad`, `_info` in multiple probe callbacks
-  - Function parameters: `_path`, `_msg`, `_decodebin` indicating incomplete implementations
-  - Test/mock code appropriately uses underscore prefix
+  - Function parameters: `_path`, `_msg`, `_decodebin`, `_id`, `_modify_fn`
+  - Source management: `_event_handler`, `_source_id`, `_signal_handler`
+  - Note: Many are legitimate unused parameters in trait implementations
 
 ### Test Issues
 - [x] **Fix ONNX detector compilation** ✅ (2025-08-23)
   - Compilation now succeeds with ort feature enabled
   - Tests pass without ort feature using mock detector
 - [ ] **Add ONNX integration tests with real models**
-  - `crates/ds-rs/tests/cpu_backend_tests.rs:342`: TODO comment - test with actual ONNX model file
+  - `crates/ds-rs/tests/cpu_backend_tests.rs:343`: TODO comment - test with actual ONNX model file
   - Download actual YOLO models for testing
   - Validate inference accuracy and performance
   - Test all supported YOLO versions (v3-v12)
 - [ ] **Fix source-videos file generation test**
   - `integration_test.rs`: test_file_generation times out after 11 seconds
+- [ ] **Fix source_management tests with Mock backend**
+  - 10 tests fail with Mock backend due to uridecodebin requirements
+  - This is expected behavior per CLAUDE.md but should be documented
   
 ### Placeholder Implementation Resolution
 - [ ] **Complete metadata attachment in CPU detector**
-  - `backend/cpu_vision/cpudetector/imp.rs:167-168`: TODO comment about attaching custom metadata to buffer
+  - `backend/cpu_vision/cpudetector/imp.rs:154`: TODO comment about attaching custom metadata to buffer
+  - `cpuinfer/src/cpudetector/imp.rs:153`: Similar metadata attachment placeholder
   - Currently just passes through without attaching detection metadata
 - [ ] **Replace stub implementations with actual functionality**
   - `metadata/mod.rs:60`: "In a real implementation, this would call gst_buffer_get_nvds_batch_meta"
   - `metadata/mod.rs:125`: `_batch_meta` unused - extraction not implemented
   - `messages/mod.rs:174`: "In real DeepStream, this would call gst_nvmessage_is_stream_eos"
   - `messages/mod.rs:181`: "In real DeepStream, this would call gst_nvmessage_parse_stream_eos"
-  - `inference/mod.rs:174-175`: "In a real implementation, this would parse a label file" ("for now" comment)
-  - `inference/config.rs:227-228`: `from_deepstream_config` takes `_path` - returns mock config ("for now" comment)
+  - `inference/mod.rs:173`: `load_from_file` takes `_path` - returns mock ("for now" comment)
+  - `inference/config.rs:226`: `from_deepstream_config` takes `_path` - returns mock config ("for now" comment)
   - `backend/cpu_vision/elements.rs:108-109`: Detection metadata attachment placeholder ("For now" comment)
   - `backend/cpu_vision/elements.rs:145-146`: Image creation placeholder ("For now" comment) 
   - `backend/cpu_vision/elements.rs:235`: CPU tracker currently just passes through ("For now" comment)
-  - `cpuinfer/detector.rs:417`: YOLOv10 NMS-free design handling placeholder ("For now" comment)
+  - `cpuinfer/detector.rs:377`: YOLOv10 NMS-free design handling placeholder ("For now" comment)
   - `pipeline/bus.rs:214`: `is_stream_eos` takes `_msg` - returns None (mock)
   - `source/controller.rs:154`: `_event_handler` cloned but not used
   - `backend/standard.rs`: Tiler comment says "actual tiling is done by the compositor"
   - `platform.rs:149`: GPU capabilities returns common capabilities ("for now" comment)
+  - `source/manager.rs:210`: `modify_source_config` function stub with unused parameters
 
 ### Build Configuration
 - [ ] **Fix workspace configuration**
@@ -98,9 +114,8 @@ Last Updated: 2025-08-24 (Updated after comprehensive scan of current state)
   - `crates/ds-rs/Cargo.toml:4`: `# TODO: use the workspace edition`
   - Currently hardcoded as "0.1.0" and "2024"
 - [ ] **Review tokio dependency usage**
-  - `crates/ds-rs/Cargo.toml:48`: TODO comment - should not use tokio (async is ok though)
+  - `crates/ds-rs/Cargo.toml:49`: TODO comment - should not use tokio (async is ok though)
   - `crates/source-videos/Cargo.toml:20`: Similar tokio dependency with TODO comment
-  - Consider replacing with async-std or futures-lite where possible
 
 ## High Priority 🟡
 
@@ -111,11 +126,11 @@ Last Updated: 2025-08-24 (Updated after comprehensive scan of current state)
   - Related: Known limitation from CLAUDE.md
 
 - [ ] **Implement DeepStream config file parsing**
-  - `inference/config.rs:228`: `from_deepstream_config()` returns mock ("for now" comment)
+  - `inference/config.rs:226`: `from_deepstream_config()` returns mock ("for now" comment)
   - Need to parse actual .txt config format
 
 - [ ] **Implement label map file loading**
-  - `inference/mod.rs:175`: `load_from_file()` returns default map ("for now" comment)
+  - `inference/mod.rs:173`: `load_from_file()` returns default map ("for now" comment)
   - Parse actual label files
 
 ### Testing & CI/CD Infrastructure  
@@ -450,12 +465,13 @@ When working on any TODO item:
 - **PRP-31: Advanced Tracking Algorithms** - SORT, Deep SORT, and ByteTrack implementations
 
 ### Recent Findings (2025-08-24 Update)
-- **CRITICAL**: 2 active bugs make application unusable (shutdown, video freeze)
-- 4 TODO comments: 3 in Cargo.toml files (workspace config, tokio usage), 1 in tests about ONNX models
-- No FIXME/HACK/XXX/NOTE comments found in active code
-- No todo!() macros found in current scan
-- 15+ "for now" placeholder implementations across codebase
-- Multiple "actual", "real implementation" and "temporary" references indicating incomplete functionality
-- 40+ unused parameters (underscore-prefixed) indicating incomplete implementations
-- Multiple references to "later", "temporary", "actual" indicating pending work
-- Test coverage: 67 tests pass, Mock backend limitations expected with uridecodebin
+- **RESOLVED TODAY**: Fixed 2 critical compilation/test issues (f16/f32 conversion, Application test methods)
+- **TODO Comments**: 6 found (3 in Cargo.toml files about workspace/tokio, 3 in code)
+- **No FIXME/HACK/XXX comments** found in active code
+- **Placeholder implementations**: 15+ locations with "for now" comments
+- **Unused parameters**: 50+ underscore-prefixed variables (many legitimate in trait implementations)
+- **Test coverage**: 10 source_management tests fail with Mock backend (expected per CLAUDE.md)
+- **Recent fixes today**:
+  - ✅ Fixed f16/f32 array conversion lifetime issue in cpuinfer
+  - ✅ Fixed Application test compilation errors
+  - ✅ Aligned cpuinfer detector with ds-rs backend implementation

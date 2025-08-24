@@ -41,9 +41,28 @@ pub use messages::{
 pub fn init() -> Result<()> {
     gstreamer::init().map_err(|e| DeepStreamError::GStreamer(e.into()))?;
     
+    // Register custom elements
+    register_elements()?;
+    
     // Initialize logging if not already done
     let _ = log::set_logger(&SimpleLogger);
     log::set_max_level(log::LevelFilter::Info);
+    
+    Ok(())
+}
+
+fn register_elements() -> Result<()> {
+    use gstreamer as gst;
+    
+    // Create a temporary plugin for registering elements
+    let plugin = gst::Plugin::load_by_name("coreelements")
+        .map_err(|e| DeepStreamError::GStreamer(e.into()))?;
+    
+    // Register CPU detector element
+    backend::cpu_vision::cpudetector::register(&plugin)
+        .map_err(|e| DeepStreamError::Configuration(format!("Failed to register cpudetector element: {}", e)))?;
+    
+    log::info!("Successfully registered custom CPU detector element");
     
     Ok(())
 }

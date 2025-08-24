@@ -3,6 +3,7 @@ pub mod detector;
 pub mod tracker;
 pub mod elements;
 pub mod metadata;
+pub mod cpudetector;
 
 use crate::error::Result;
 

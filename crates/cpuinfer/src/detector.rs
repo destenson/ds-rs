@@ -43,7 +43,18 @@
 //! YOLOv10 introduces NMS-free inference for improved performance.
 //! YOLOv12 achieves the best mAP improvements in the series.
 
-use crate::error::{DeepStreamError, Result};
+// Error types for the detector
+#[derive(Debug, thiserror::Error)]
+pub enum DetectorError {
+    #[error("Configuration error: {0}")]
+    Configuration(String),
+    #[error("Model loading error: {0}")]
+    ModelLoading(String),
+    #[error("Inference error: {0}")]
+    Inference(String),
+}
+
+pub type Result<T> = std::result::Result<T, DetectorError>;
 use image::{DynamicImage, imageops::FilterType};
 use std::path::Path;
 
@@ -114,9 +125,9 @@ impl Default for DetectorConfig {
 
 /// ONNX-based object detector for CPU inference
 pub struct OnnxDetector {
-    #[cfg(feature = "ort")]
+    #[cfg(feature = "onnx")]
     session: Option<ort::Session>,
-    #[cfg(feature = "ort")]
+    #[cfg(feature = "onnx")]
     environment: Option<std::sync::Arc<ort::Environment>>,
     input_width: u32,
     input_height: u32,
@@ -138,27 +149,27 @@ impl OnnxDetector {
     
     /// Create a new ONNX detector with a configuration
     pub fn new_with_config(config: DetectorConfig) -> Result<Self> {
-        #[cfg(feature = "ort")]
+        #[cfg(feature = "onnx")]
         {
             // Try to load model if path is provided, but fallback to mock on any error
             let (session, environment) = if let Some(ref model_path) = config.model_path {
                 if !Path::new(model_path).exists() {
-                    log::warn!("Model file not found: {}, using mock detector", model_path);
+                    // log::warn!("Model file not found: {}, using mock detector", model_path);
                     (None, None)
                 } else {
                     match Self::load_onnx_model(model_path, config.num_threads) {
                         Ok((env, sess)) => {
-                            log::info!("Loaded ONNX model from: {}", model_path);
+                            // log::info!("Loaded ONNX model from: {}", model_path);
                             (Some(sess), Some(env))
                         },
                         Err(e) => {
-                            log::warn!("Failed to load ONNX model: {}, using mock detector", e);
+                            // log::warn!("Failed to load ONNX model: {}, using mock detector", e);
                             (None, None)
                         }
                     }
                 }
             } else {
-                log::info!("No model path provided, using mock detector");
+                // log::info!("No model path provided, using mock detector");
                 (None, None)
             };
             
@@ -176,7 +187,7 @@ impl OnnxDetector {
             });
         }
         
-        #[cfg(not(feature = "ort"))]
+        #[cfg(not(feature = "onnx"))]
         {
             // When ort feature is not enabled, create mock detector
             Ok(Self {
@@ -190,7 +201,7 @@ impl OnnxDetector {
         }
     }
     
-    #[cfg(feature = "ort")]
+    #[cfg(feature = "onnx")]
     fn load_onnx_model(model_path: &str, num_threads: usize) -> Result<(std::sync::Arc<ort::Environment>, ort::Session)> {
         use ort::{Environment, SessionBuilder, GraphOptimizationLevel};
         use std::sync::Arc;
@@ -199,25 +210,25 @@ impl OnnxDetector {
         let environment = Arc::new(Environment::builder()
             .with_name("onnx_detector")
             .build()
-            .map_err(|e| DeepStreamError::Configuration(
+            .map_err(|e| DetectorError::Configuration(
                 format!("Failed to create ONNX environment: {}", e)
             ))?);
         
         // Create session with the environment
         let session = SessionBuilder::new(&environment)
-            .map_err(|e| DeepStreamError::Configuration(
+            .map_err(|e| DetectorError::Configuration(
                 format!("Failed to create session builder: {}", e)
             ))?
             .with_optimization_level(GraphOptimizationLevel::Level3)
-            .map_err(|e| DeepStreamError::Configuration(
+            .map_err(|e| DetectorError::Configuration(
                 format!("Failed to set optimization level: {}", e)
             ))?
             .with_intra_threads(num_threads.try_into().unwrap_or(4))
-            .map_err(|e| DeepStreamError::Configuration(
+            .map_err(|e| DetectorError::Configuration(
                 format!("Failed to set intra threads: {}", e)
             ))?
             .with_model_from_file(model_path)
-            .map_err(|e| DeepStreamError::Configuration(
+            .map_err(|e| DetectorError::Configuration(
                 format!("Failed to load model from file: {}", e)
             ))?;
             
@@ -227,26 +238,26 @@ impl OnnxDetector {
         Ok((environment, session))
     }
     
-    #[cfg(feature = "ort")]
+    #[cfg(feature = "onnx")]
     fn log_model_info(session: &ort::Session) {
-        log::info!("ONNX Model Information:");
-        log::info!("  Inputs: {}, Outputs: {}", session.inputs.len(), session.outputs.len());
+        // log::info!("ONNX Model Information:");
+        // log::info!("  Inputs: {}, Outputs: {}", session.inputs.len(), session.outputs.len());
         
         for (i, input) in session.inputs.iter().enumerate() {
-            log::info!("  Input {}: name='{}', type={:?}, shape={:?}",
-                      i, input.name, input.input_type, input.dimensions);
+            // log::info!("  Input {}: name='{}', type={:?}, shape={:?}",
+            //           i, input.name, input.input_type, input.dimensions);
         }
         
         for (i, output) in session.outputs.iter().enumerate() {
-            log::info!("  Output {}: name='{}', type={:?}, shape={:?}",
-                      i, output.name, output.output_type, output.dimensions);
+            // log::info!("  Output {}: name='{}', type={:?}, shape={:?}",
+            //           i, output.name, output.output_type, output.dimensions);
         }
     }
     
     
     /// Perform detection on an image
     pub fn detect(&self, image: &DynamicImage) -> Result<Vec<Detection>> {
-        #[cfg(feature = "ort")]
+        #[cfg(feature = "onnx")]
         {
             use ndarray::{Array, CowArray, IxDyn};
             use ort::Value;
@@ -256,7 +267,7 @@ impl OnnxDetector {
                 Some(s) => s,
                 None => {
                     // Use mock detection when no model is loaded
-                    log::debug!("Using mock detection (no ONNX model loaded)");
+                    // log::debug!("Using mock detection (no ONNX model loaded)");
                     let mock_output = self.create_mock_yolo_output();
                     return self.postprocess_outputs(&mock_output, image.width(), image.height());
                 }
@@ -266,7 +277,7 @@ impl OnnxDetector {
             let input_tensor = self.preprocess_image(image)?;
             
             // Run inference
-            log::debug!("Running ONNX inference on {}x{} image", image.width(), image.height());
+            // log::debug!("Running ONNX inference on {}x{} image", image.width(), image.height());
             
             // Create ndarray with correct shape for YOLO (batch, channels, height, width)
             let shape = vec![1, 3, self.input_height as usize, self.input_width as usize];
@@ -284,47 +295,47 @@ impl OnnxDetector {
                         .collect();
                     
                     let array = Array::from_shape_vec(shape.clone(), f16_tensor)
-                        .map_err(|e| DeepStreamError::Configuration(
+                        .map_err(|e| DetectorError::Configuration(
                             format!("Failed to create f16 ndarray: {}", e)
                         ))?;
                     
                     let cow_array: CowArray<f16, IxDyn> = CowArray::from(array.into_dyn());
                     
                     vec![Value::from_array(session.allocator(), &cow_array)
-                        .map_err(|e| DeepStreamError::Configuration(
+                        .map_err(|e| DetectorError::Configuration(
                             format!("Failed to create f16 ORT value: {}", e)
                         ))?]
                 }
                 #[cfg(not(feature = "half"))]
                 {
-                    return Err(DeepStreamError::Configuration(
+                    return Err(DetectorError::Configuration(
                         "Model requires float16 but half feature is not enabled".to_string()
                     ));
                 }
             } else {
                 // Use f32 input
                 let array = Array::from_shape_vec(shape.clone(), input_tensor)
-                    .map_err(|e| DeepStreamError::Configuration(
+                    .map_err(|e| DetectorError::Configuration(
                         format!("Failed to create f32 ndarray: {}", e)
                     ))?;
                 
                 let cow_array: CowArray<f32, IxDyn> = CowArray::from(array.into_dyn());
                 
                 vec![Value::from_array(session.allocator(), &cow_array)
-                    .map_err(|e| DeepStreamError::Configuration(
+                    .map_err(|e| DetectorError::Configuration(
                         format!("Failed to create f32 ORT value: {}", e)
                     ))?]
             };
             
             // Run the model
             let outputs: Vec<Value> = session.run(inputs)
-                .map_err(|e| DeepStreamError::Configuration(
+                .map_err(|e| DetectorError::Configuration(
                     format!("Failed to run ONNX inference: {}", e)
                 ))?;
             
             // Extract output tensor using try_extract
             let output_tensor: ort::tensor::OrtOwnedTensor<f32, _> = outputs[0].try_extract()
-                .map_err(|e| DeepStreamError::Configuration(
+                .map_err(|e| DetectorError::Configuration(
                     format!("Failed to extract output tensor: {}", e)
                 ))?;
             
@@ -336,10 +347,10 @@ impl OnnxDetector {
             return self.postprocess_outputs(&output, image.width(), image.height());
         }
         
-        #[cfg(not(feature = "ort"))]
+        #[cfg(not(feature = "onnx"))]
         {
             // Use mock detection when ONNX feature is not enabled
-            log::debug!("Using mock detection (ONNX feature not enabled)");
+            // log::debug!("Using mock detection (ONNX feature not enabled)");
             let mock_output = self.create_mock_yolo_output();
             self.postprocess_outputs(&mock_output, image.width(), image.height())
         }
@@ -372,9 +383,9 @@ impl OnnxDetector {
             }
         }
         
-        log::trace!("Preprocessed image from {}x{} to {}x{} tensor", 
-                   image.width(), image.height(), 
-                   self.input_width, self.input_height);
+        // log::trace!("Preprocessed image from {}x{} to {}x{} tensor", 
+        //           image.width(), image.height(), 
+        //           self.input_width, self.input_height);
         
         Ok(tensor)
     }
@@ -387,7 +398,7 @@ impl OnnxDetector {
             v => v,
         };
         
-        log::debug!("Processing outputs with YOLO version: {:?}", version);
+        // log::debug!("Processing outputs with YOLO version: {:?}", version);
         
         match version {
             // Classic format with objectness (v3-v7)
@@ -404,7 +415,7 @@ impl OnnxDetector {
             YoloVersion::V10 => {
                 // V10 uses one-to-one predictions, may need special handling
                 // For now, treat similar to v8 but log the difference
-                log::info!("Processing YOLOv10 with NMS-free design");
+                // log::info!("Processing YOLOv10 with NMS-free design");
                 self.postprocess_yolov8(outputs, img_width, img_height)
             },
             YoloVersion::Auto => {
@@ -428,7 +439,7 @@ impl OnnxDetector {
             let num_anchors = len / 84;
             if num_anchors > 1000 && num_anchors < 10000 {
                 // Likely v8, v9, v11 format
-                log::debug!("Detected YOLOv8+ format with {} anchors", num_anchors);
+                // log::debug!("Detected YOLOv8+ format with {} anchors", num_anchors);
                 return YoloVersion::V8;
             }
         }
@@ -438,20 +449,20 @@ impl OnnxDetector {
             let num_anchors = len / 85;
             if num_anchors > 1000 {
                 // Likely v3-v7 format
-                log::debug!("Detected YOLOv3-v7 format with {} anchors", num_anchors);
+                // log::debug!("Detected YOLOv3-v7 format with {} anchors", num_anchors);
                 return YoloVersion::V5; // Use v5 processing for v3-v7
             }
         }
         
         // Check for smaller models or different input sizes
         if len % 85 == 0 || len % 84 == 0 {
-            log::info!("Detected YOLO format with {} total values", len);
+            // log::info!("Detected YOLO format with {} total values", len);
             // Default to newer format for smaller outputs
             return if len % 84 == 0 { YoloVersion::V8 } else { YoloVersion::V5 };
         }
         
         // Unknown format
-        log::warn!("Unknown YOLO output format with {} elements, defaulting to V5", len);
+        // log::warn!("Unknown YOLO output format with {} elements, defaulting to V5", len);
         YoloVersion::V5
     }
     
@@ -525,8 +536,8 @@ impl OnnxDetector {
         // Apply Non-Maximum Suppression
         let filtered_detections = self.apply_nms(detections);
         
-        log::debug!("YOLOv5: Postprocessed {} anchors, {} detections after NMS", 
-                   num_anchors, filtered_detections.len());
+        // log::debug!("YOLOv5: Postprocessed {} anchors, {} detections after NMS", 
+        //           num_anchors, filtered_detections.len());
         
         Ok(filtered_detections)
     }
@@ -595,8 +606,8 @@ impl OnnxDetector {
         // Apply NMS
         let filtered_detections = self.apply_nms(detections);
         
-        log::debug!("YOLOv8/v9: Postprocessed {} anchors, {} detections after NMS", 
-                   num_anchors, filtered_detections.len());
+        // log::debug!("YOLOv8/v9: Postprocessed {} anchors, {} detections after NMS", 
+        //           num_anchors, filtered_detections.len());
         
         Ok(filtered_detections)
     }
@@ -698,15 +709,15 @@ impl OnnxDetector {
     /// Set the YOLO version for output processing
     pub fn set_yolo_version(&mut self, version: YoloVersion) {
         self.yolo_version = version;
-        log::info!("Set YOLO version to: {:?}", version);
+        // log::info!("Set YOLO version to: {:?}", version);
     }
     
     /// Create a mock detector for testing without an actual model
     pub fn new_mock() -> Self {
         Self {
-            #[cfg(feature = "ort")]
+            #[cfg(feature = "onnx")]
             session: None,
-            #[cfg(feature = "ort")]
+            #[cfg(feature = "onnx")]
             environment: None,
             input_width: 640,
             input_height: 640,
@@ -834,7 +845,7 @@ mod tests {
     }
     
     #[test]
-    #[cfg(feature = "ort")]
+    #[cfg(feature = "onnx")]
     fn test_onnx_runtime_graceful_fallback() {
         // Test that we can handle ONNX Runtime initialization failures gracefully
         let config = DetectorConfig {

@@ -90,6 +90,9 @@ impl Backend for StandardBackend {
     }
     
     fn create_inference(&self, name: Option<&str>, config_path: &str) -> Result<gst::Element> {
+        // Create the CPU detector element
+        let detector = super::cpu_vision::cpudetector::CpuDetector::new(name);
+        
         // Try to find an ONNX model - prefer float32 models
         let model_candidates = [
             config_path,
@@ -104,27 +107,20 @@ impl Backend for StandardBackend {
             
         match model_path {
             Some(path) => {
-                log::info!("Standard backend: Attempting to load ONNX model: {}", path);
-                match super::cpu_vision::elements::create_cpu_detector(name, Some(path)) {
-                    Ok(detector) => {
-                        log::info!("Standard backend: Successfully created CPU detector with model");
-                        Ok(detector)
-                    },
-                    Err(e) => {
-                        log::warn!("Failed to load ONNX model {}: {}. Using mock detector.", path, e);
-                        // Fall back to mock detector
-                        super::cpu_vision::elements::create_cpu_detector(name, None)
-                    }
-                }
+                log::info!("Standard backend: Setting ONNX model path: {}", path);
+                detector.set_property("model-path", path);
+                log::info!("Standard backend: Created CPU detector with ONNX model");
             },
             None => {
                 log::info!("Standard backend: No ONNX model found, using mock detector");
                 log::info!("  To use real ONNX inference:");
-                log::info!("  1. Run: python export_yolov5n_float32.py");
+                log::info!("  1. Run: python export_yolov5n_float32.py");  
                 log::info!("  2. Or place yolov5n.onnx in models/ directory");
-                super::cpu_vision::elements::create_cpu_detector(name, None)
+                // Element will use mock detector automatically when model file doesn't exist
             }
         }
+        
+        Ok(detector.upcast())
     }
     
     fn create_tracker(&self, name: Option<&str>) -> Result<gst::Element> {

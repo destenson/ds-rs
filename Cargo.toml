@@ -3,6 +3,7 @@ members = [
     "crates/dsl",
     "crates/ds-rs",
     "crates/source-videos",
+    "crates/cpuinfer",
 ]
 resolver = "3" # DO NOT CHANGE
 
@@ -14,5 +15,6 @@ description = "Powerful library to control nVidia DeepStream AI processing frame
 [workspace.dependencies]
 gstreamer = "0.24.1"
 gstreamer-app = "0.24.0"
+gstreamer-base = "0.24.0"
 gstreamer-video = "0.24.1"
 rand = "0.8" # keep this 0.8

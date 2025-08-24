@@ -1,0 +1,40 @@
+[package]
+name = "cpuinfer"
+version.workspace = true
+edition.workspace = true
+description.workspace = true
+
+[lib]
+name = "gstcpuinfer"
+crate-type = ["cdylib", "rlib"]
+path = "src/lib.rs"
+
+[dependencies]
+gstreamer.workspace = true
+gstreamer-base.workspace = true
+gstreamer-video.workspace = true
+once_cell = "1.21.3"
+image = "0.25.6"
+thiserror = "2.0.16"
+
+# Optional ONNX Runtime support
+ort = { version = "1.16.3", features = ["half"], optional = true }
+half = { version = "2.6.0", optional = true }
+ndarray = { version = "0.15.6", optional = true }
+
+# Optional OpenCV DNN support (alternative to ONNX)
+opencv = { version = "0.95", default-features = false, features = ["dnn", "imgproc"], optional = true }
+
+# Optional TensorFlow Lite support (lightweight alternative)
+# tflite = { version = "0.9", optional = true }
+
+[features]
+default = ["onnx"]  # Default to ONNX, but can be disabled
+onnx = ["dep:ort", "dep:half", "dep:ndarray"]
+opencv-dnn = ["dep:opencv"]
+# tflite = ["dep:tflite"]
+static = []
+capi = []
+
+[build-dependencies]
+gst-plugin-version-helper = "0.8.3"

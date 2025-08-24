@@ -4,6 +4,12 @@ A Rust port of NVIDIA's DeepStream runtime source addition/deletion reference ap
 
 ## Recent Updates
 
+### 2025-08-24: Fixed Video Playback Freezing Issue
+- ✅ Resolved critical H264 framerate negotiation bug that caused video freezing
+- Added videorate and capsfilter elements to normalize framerates to 30fps
+- Videos now play smoothly across various formats without stalling
+- Pipeline flow optimized: uridecodebin → videorate → capsfilter → compositor
+
 ### 2025-08-24: Enhanced Logging with Timestamps
 - Added timestamps to all state change log messages for better debugging and monitoring
 - Implemented consistent timestamp formatting across the codebase using Unix epoch seconds

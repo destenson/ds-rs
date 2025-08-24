@@ -1,0 +1,15 @@
+{
+  "permissions": {
+    "allow": [
+      "WebSearch",
+      "mcp__Cargo__cargo_check",
+      "mcp__Cargo__cargo_build",
+      "mcp__Cargo__cargo_test",
+      "WebFetch(domain:github.com)",
+      "WebFetch(domain:docs.rs)",
+      "WebFetch(domain:docs.ultralytics.com)"
+    ],
+    "deny": [],
+    "ask": []
+  }
+}

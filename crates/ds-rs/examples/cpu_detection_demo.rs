@@ -8,8 +8,10 @@ use image::{DynamicImage, RgbImage};
 use std::path::Path;
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
-    // Initialize logging
-    env_logger::init();
+    // Initialize logging with debug level to see model info
+    env_logger::Builder::from_default_env()
+        .filter_level(log::LevelFilter::Debug)
+        .init();
     
     println!("CPU Object Detection Demo");
     println!("=============================");
@@ -28,15 +30,27 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     match model_path {
         Some(path) => {
             println!("Using ONNX model: {}", path);
-            test_real_detection(path).unwrap_or_else(|e| {
-                println!("Real detection failed: {}", e);
-                println!("Falling back to mock detection...");
-                test_mock_detection();
-            });
+            println!("Testing real ONNX detection...");
+            
+            match test_real_detection(path) {
+                Ok(()) => println!("Real ONNX detection completed successfully"),
+                Err(e) => {
+                    println!("Real detection failed: {}", e);
+                    println!("This may be due to model format (float16 vs float32) or compatibility issues");
+                    println!("\nTo fix this:");
+                    println!("1. Run: python export_yolov5n_float32.py");
+                    println!("2. Or install ultralytics and run: yolo export model=yolov5n.pt format=onnx half=False");
+                    println!("\nFalling back to mock detection to show the pipeline works:");
+                    test_mock_detection();
+                }
+            }
         },
         None => {
             println!("No ONNX model found, using mock detection");
-            println!("   To test with real model, place yolov5n.onnx in models/ directory");
+            println!("To use real ONNX inference:");
+            println!("1. Run: python export_yolov5n_float32.py");
+            println!("2. Or place a compatible yolov5n.onnx file in models/ directory");
+            println!("");
             test_mock_detection();
         }
     }

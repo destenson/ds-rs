@@ -221,8 +221,28 @@ impl OnnxDetector {
                 format!("Failed to load model from file: {}", e)
             ))?;
             
+        // Log model information for debugging
+        Self::log_model_info(&session);
+        
         Ok((environment, session))
     }
+    
+    #[cfg(feature = "ort")]
+    fn log_model_info(session: &ort::Session) {
+        log::info!("ONNX Model Information:");
+        log::info!("  Inputs: {}, Outputs: {}", session.inputs.len(), session.outputs.len());
+        
+        for (i, input) in session.inputs.iter().enumerate() {
+            log::info!("  Input {}: name='{}', type={:?}, shape={:?}",
+                      i, input.name, input.input_type, input.dimensions);
+        }
+        
+        for (i, output) in session.outputs.iter().enumerate() {
+            log::info!("  Output {}: name='{}', type={:?}, shape={:?}",
+                      i, output.name, output.output_type, output.dimensions);
+        }
+    }
+    
     
     /// Perform detection on an image
     pub fn detect(&self, image: &DynamicImage) -> Result<Vec<Detection>> {
@@ -250,22 +270,54 @@ impl OnnxDetector {
             
             // Create ndarray with correct shape for YOLO (batch, channels, height, width)
             let shape = vec![1, 3, self.input_height as usize, self.input_width as usize];
-            let array = Array::from_shape_vec(shape.clone(), input_tensor)
-                .map_err(|e| DeepStreamError::Configuration(
-                    format!("Failed to create ndarray: {}", e)
-                ))?;
             
-            // Convert to CowArray with dynamic dimensions
-            let cow_array: CowArray<f32, IxDyn> = CowArray::from(array.into_dyn());
+            // Check if model expects float16 input
+            let is_f16_input = session.inputs[0].input_type.to_string().contains("Float16");
             
-            // Create Value using the session's allocator
-            let input_value = Value::from_array(session.allocator(), &cow_array)
-                .map_err(|e| DeepStreamError::Configuration(
-                    format!("Failed to create ORT value: {}", e)
-                ))?;
+            let inputs = if is_f16_input {
+                // Convert f32 to f16 and create input tensor
+                #[cfg(feature = "half")]
+                {
+                    use half::f16;
+                    let f16_tensor: Vec<f16> = input_tensor.iter()
+                        .map(|&f| f16::from_f32(f))
+                        .collect();
+                    
+                    let array = Array::from_shape_vec(shape.clone(), f16_tensor)
+                        .map_err(|e| DeepStreamError::Configuration(
+                            format!("Failed to create f16 ndarray: {}", e)
+                        ))?;
+                    
+                    let cow_array: CowArray<f16, IxDyn> = CowArray::from(array.into_dyn());
+                    
+                    vec![Value::from_array(session.allocator(), &cow_array)
+                        .map_err(|e| DeepStreamError::Configuration(
+                            format!("Failed to create f16 ORT value: {}", e)
+                        ))?]
+                }
+                #[cfg(not(feature = "half"))]
+                {
+                    return Err(DeepStreamError::Configuration(
+                        "Model requires float16 but half feature is not enabled".to_string()
+                    ));
+                }
+            } else {
+                // Use f32 input
+                let array = Array::from_shape_vec(shape.clone(), input_tensor)
+                    .map_err(|e| DeepStreamError::Configuration(
+                        format!("Failed to create f32 ndarray: {}", e)
+                    ))?;
+                
+                let cow_array: CowArray<f32, IxDyn> = CowArray::from(array.into_dyn());
+                
+                vec![Value::from_array(session.allocator(), &cow_array)
+                    .map_err(|e| DeepStreamError::Configuration(
+                        format!("Failed to create f32 ORT value: {}", e)
+                    ))?]
+            };
             
             // Run the model
-            let outputs: Vec<Value> = session.run(vec![input_value])
+            let outputs: Vec<Value> = session.run(inputs)
                 .map_err(|e| DeepStreamError::Configuration(
                     format!("Failed to run ONNX inference: {}", e)
                 ))?;

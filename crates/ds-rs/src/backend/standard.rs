@@ -90,45 +90,39 @@ impl Backend for StandardBackend {
     }
     
     fn create_inference(&self, name: Option<&str>, config_path: &str) -> Result<gst::Element> {
-        // Determine model path - try config_path first, then fallback to default model
-        let model_path = if std::path::Path::new(config_path).exists() {
-            config_path
-        } else {
-            // Try to find the bundled YOLOv5n model
-            let default_model = "models/yolov5n.onnx";
-            if std::path::Path::new(default_model).exists() {
-                default_model
-            } else {
-                // Try relative to crate root
-                let crate_model = "crates/ds-rs/models/yolov5n.onnx";
-                if std::path::Path::new(crate_model).exists() {
-                    crate_model
-                } else {
-                    log::warn!("No ONNX model found, will use mock detector");
-                    ""
-                }
-            }
-        };
+        // Try to find an ONNX model - prefer float32 models
+        let model_candidates = [
+            config_path,
+            "models/yolov5n.onnx",
+            "crates/ds-rs/models/yolov5n.onnx",
+            "yolov5n.onnx",  // In current directory (after Python export)
+        ];
         
-        // Try to create CPU detector with ONNX model
-        let model_to_use = if model_path.is_empty() { None } else { Some(model_path) };
-        match super::cpu_vision::elements::create_cpu_detector(name, model_to_use) {
-            Ok(detector) => {
-                if let Some(path) = model_to_use {
-                    log::info!("Standard backend: Using CPU detector with model: {}", path);
-                } else {
-                    log::info!("Standard backend: Using CPU detector with mock inference");
+        let model_path = model_candidates.iter()
+            .find(|path| std::path::Path::new(path).exists())
+            .copied();
+            
+        match model_path {
+            Some(path) => {
+                log::info!("Standard backend: Attempting to load ONNX model: {}", path);
+                match super::cpu_vision::elements::create_cpu_detector(name, Some(path)) {
+                    Ok(detector) => {
+                        log::info!("Standard backend: Successfully created CPU detector with model");
+                        Ok(detector)
+                    },
+                    Err(e) => {
+                        log::warn!("Failed to load ONNX model {}: {}. Using mock detector.", path, e);
+                        // Fall back to mock detector
+                        super::cpu_vision::elements::create_cpu_detector(name, None)
+                    }
                 }
-                Ok(detector)
-            }
-            Err(e) => {
-                log::warn!("Failed to create CPU detector: {}, falling back to fakesink", e);
-                
-                // Fallback to fakesink if CPU detector fails
-                let fakesink = Self::create_element("fakesink", name)?;
-                fakesink.set_property("sync", false);
-                fakesink.set_property("async", false);
-                Ok(fakesink)
+            },
+            None => {
+                log::info!("Standard backend: No ONNX model found, using mock detector");
+                log::info!("  To use real ONNX inference:");
+                log::info!("  1. Run: python export_yolov5n_float32.py");
+                log::info!("  2. Or place yolov5n.onnx in models/ directory");
+                super::cpu_vision::elements::create_cpu_detector(name, None)
             }
         }
     }

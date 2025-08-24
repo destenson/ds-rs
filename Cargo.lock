@@ -463,6 +463,7 @@ version = "0.1.0"
 dependencies = [
  "clap",
  "ctrlc",
+ "env_logger",
  "gstreamer",
  "gstreamer-app",
  "gstreamer-video",

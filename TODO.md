@@ -266,6 +266,11 @@ Last Updated: 2025-08-24 (Updated after comprehensive scan of current state)
 - PRP-18: Dynamic Source Properties
 - PRP-19: Network Simulation
 - PRP-23: GST Plugins Integration
+- PRP-27: Multi-Backend Detector Trait Architecture (NEW)
+- PRP-28: OpenCV DNN Backend (NEW)
+- PRP-29: TensorFlow Lite Backend (NEW)
+- PRP-30: Darknet Native Backend (NEW)
+- PRP-31: Advanced Tracking Algorithms (NEW)
 
 ## Recently Completed ✅
 
@@ -353,7 +358,7 @@ Last Updated: 2025-08-24 (Updated after comprehensive scan of current state)
 - **Codebase Size**: ~15,000+ lines across all crates
 - **Build Status**: ✅ SUCCESS with ort,ndarray features enabled
 - **YOLO Support**: v3-v12 + YOLO-RD with automatic version detection
-- **PRP Progress**: 11/24 complete (46%), 3/24 in progress (13%), 10/24 not started (42%)
+- **PRP Progress**: 11/31 complete (35%), 3/31 in progress (10%), 17/31 not started (55%)
 
 ## New Feature Development 🚀
 
@@ -430,6 +435,13 @@ When working on any TODO item:
 ---
 
 **Status: CRITICAL BUGS - Shutdown and video playback issues need immediate attention**
+
+### New PRPs Added (2025-08-24)
+- **PRP-27: Multi-Backend Detector Trait Architecture** - Foundation for pluggable detection backends
+- **PRP-28: OpenCV DNN Backend** - Leverage OpenCV's optimized CPU inference
+- **PRP-29: TensorFlow Lite Backend** - Optimized for mobile/edge devices
+- **PRP-30: Darknet Native Backend** - Direct support for original YOLO implementations
+- **PRP-31: Advanced Tracking Algorithms** - SORT, Deep SORT, and ByteTrack implementations
 
 ### Recent Findings (2025-08-24 Update)
 - **CRITICAL**: 2 active bugs make application unusable (shutdown, video freeze)

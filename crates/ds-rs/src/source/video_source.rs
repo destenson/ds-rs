@@ -100,7 +100,7 @@ impl VideoSource {
         let timestamp = format!("{:.3}", now.as_secs_f64());
         println!("[{}] Connecting pad-added callback for source {}", timestamp, self.source_id);
         
-        self.connect_pad_added(streammux, |_decodebin, pad, source_id, mux| {
+        self.connect_pad_added(streammux, |decodebin, pad, source_id, mux| {
             let caps = pad.current_caps().unwrap_or_else(|| pad.query_caps(None));
             
             let Some(structure) = caps.structure(0) else {
@@ -126,13 +126,77 @@ impl VideoSource {
                 .map(|f| f.name() == "compositor")
                 .unwrap_or(false);
             
-            // Check if the pad already exists or request a new one
-            let sinkpad = if is_compositor {
-                // Compositor uses request pads without specific names
-                match mux.request_pad_simple("sink_%u") {
+            // For compositor, we need to add videorate and capsfilter to normalize framerate
+            // This fixes the H264 parser warning about excessive framerate
+            if is_compositor {
+                // Get the parent pipeline
+                let pipeline = mux.parent()
+                    .and_then(|p| p.downcast::<gst::Pipeline>().ok())
+                    .or_else(|| {
+                        // Try to get pipeline from decodebin parent
+                        decodebin.parent()
+                            .and_then(|p| p.downcast::<gst::Pipeline>().ok())
+                    });
+                
+                let Some(pipeline) = pipeline else {
+                    eprintln!("Failed to get pipeline for source {}", source_id);
+                    return;
+                };
+                
+                // Create elements to normalize framerate
+                let videorate = match gst::ElementFactory::make("videorate")
+                    .name(&format!("videorate-{}", source_id.0))
+                    .build() {
+                    Ok(e) => e,
+                    Err(_) => {
+                        eprintln!("Failed to create videorate for source {}", source_id);
+                        return;
+                    }
+                };
+                
+                let capsfilter = match gst::ElementFactory::make("capsfilter")
+                    .name(&format!("capsfilter-{}", source_id.0))
+                    .build() {
+                    Ok(e) => e,
+                    Err(_) => {
+                        eprintln!("Failed to create capsfilter for source {}", source_id);
+                        return;
+                    }
+                };
+                
+                // Set caps to normalize framerate to 30fps
+                let filtercaps = gst::Caps::builder("video/x-raw")
+                    .field("framerate", gst::Fraction::new(30, 1))
+                    .build();
+                capsfilter.set_property("caps", &filtercaps);
+                
+                // Add elements to pipeline
+                if let Err(e) = pipeline.add_many([&videorate, &capsfilter]) {
+                    eprintln!("Failed to add framerate elements to pipeline: {:?}", e);
+                    return;
+                }
+                
+                // Link videorate -> capsfilter
+                if let Err(e) = videorate.link(&capsfilter) {
+                    eprintln!("Failed to link videorate to capsfilter: {:?}", e);
+                    return;
+                }
+                
+                // Sync state with parent
+                videorate.sync_state_with_parent().ok();
+                capsfilter.sync_state_with_parent().ok();
+                
+                // Link decoder pad to videorate
+                let videorate_sink = videorate.static_pad("sink").unwrap();
+                if let Err(e) = pad.link(&videorate_sink) {
+                    eprintln!("Failed to link decoder to videorate: {:?}", e);
+                    return;
+                }
+                
+                // Get compositor sink pad
+                let sinkpad = match mux.request_pad_simple("sink_%u") {
                     Some(pad) => {
-                        // Set position for this video on the compositor
-                        // For now, just place videos side by side
+                        // Set position for this video on the compositor  
                         let x_pos = (source_id.0 % 2) * 640;
                         let y_pos = (source_id.0 / 2) * 480;
                         pad.set_property("xpos", x_pos as i32);
@@ -143,7 +207,29 @@ impl VideoSource {
                         eprintln!("Failed to get compositor pad for source {}", source_id);
                         return;
                     }
+                };
+                
+                // Link capsfilter to compositor
+                let capsfilter_src = capsfilter.static_pad("src").unwrap();
+                if let Err(e) = capsfilter_src.link(&sinkpad) {
+                    eprintln!("Failed to link capsfilter to compositor: {:?}", e);
+                    return;
                 }
+                
+                let now2 = std::time::SystemTime::now()
+                    .duration_since(std::time::UNIX_EPOCH)
+                    .unwrap_or_default();
+                let timestamp2 = format!("{:.3}", now2.as_secs_f64());
+                println!("[{}] Linked source {} through framerate normalizer to compositor", timestamp2, source_id);
+                
+                return;
+            }
+            
+            // Check if the pad already exists or request a new one
+            let sinkpad = if is_compositor {
+                // This should not be reached anymore due to early return above
+                eprintln!("Unexpected: compositor path reached after framerate handling");
+                return;
             } else {
                 // For nvstreammux or other muxers
                 match mux.static_pad(&pad_name)

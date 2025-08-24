@@ -24,6 +24,7 @@ nalgebra = ["dep:nalgebra"]
 ndarray = ["dep:ndarray"]
 ort = ["dep:ort"]
 imgproc = ["dep:imgproc"]
+gst_cpuinfer = []
 
 
 [dependencies]

@@ -1,3 +1,4 @@
+#![allow(unused)]
 use crate::config_types::{AppConfig, VideoSourceConfig};
 use std::collections::{HashMap, HashSet};
 

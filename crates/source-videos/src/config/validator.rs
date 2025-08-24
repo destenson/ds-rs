@@ -1,3 +1,4 @@
+#![allow(unused)]
 use crate::config::{AppConfig, VideoSourceConfig, VideoSourceType, Resolution, Framerate};
 use crate::error::{Result, SourceVideoError};
 use std::collections::HashSet;

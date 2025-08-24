@@ -1,3 +1,4 @@
+#![allow(unused)]
 use source_videos::{
     AppConfig, VideoSourceConfig, VideoSourceManager, RuntimeManager,
     ConfigurationEvent,

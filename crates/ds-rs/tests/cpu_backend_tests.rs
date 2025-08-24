@@ -1,3 +1,4 @@
+#![allow(unused)]
 use ds_rs::backend::{Backend, BackendManager, BackendType};
 #[cfg(feature = "nalgebra")]
 use ds_rs::backend::cpu_vision::tracker;

@@ -1,6 +1,6 @@
 # TODO List
 
-Last Updated: 2025-08-24 (Comprehensive TODO/FIXME scan)
+Last Updated: 2025-08-23 (Fresh comprehensive scan of current state)
 
 ## Critical Priority 🔴
 
@@ -327,23 +327,23 @@ Last Updated: 2025-08-24 (Comprehensive TODO/FIXME scan)
 
 ## Statistics 📊
 
-- **Total TODO items**: ~50 active items (increased from ~40)
-- **Critical Bugs**: 2 NEW (shutdown, video freeze)
+- **Total TODO items**: ~50 active items
+- **Critical Bugs**: 2 ACTIVE (shutdown, video freeze) - MUST FIX
 - **Code Quality Issues**: 
-  - **unwrap() calls**: 100 occurrences across 27 files
+  - **unwrap() calls**: 100+ occurrences across 27 files in ds-rs/src
   - **TODO comments**: 3 found (2 in Cargo.toml, 1 in cpu_backend_tests.rs)
-  - **NOTE comments**: 4 found (mostly technical notes about YOLO versions)
+  - **FIXME comments**: 1 found (GStreamer basesink warning in BUGS.md)
   - **"For now" comments**: 11 occurrences indicating temporary implementations
-  - **"Real implementation" comments**: 9 occurrences indicating stubs
-  - **"actual" comments**: 2 occurrences (tiling, runtime test)
-  - **Unused parameters**: 40+ underscore-prefixed variables
-  - **Mock backend**: Extensive mock implementation for testing
-  - **Build warnings**: 1 warning (unused `create_mock_yolo_output` method)
-- **Test Coverage**: Tests pass with and without ort feature
+  - **"Real implementation" comments**: 9+ occurrences indicating stubs
+  - **"actual" comments**: 2+ occurrences (test comments, tiling)  
+  - **"later/temporary" comments**: Multiple references to incomplete work
+  - **Unused parameters**: 40+ underscore-prefixed variables indicating incomplete implementations
+  - **Mock backend**: Extensive mock implementation for testing without hardware
+- **Test Coverage**: 67 tests total, some fail on Mock backend (expected)
 - **Codebase Size**: ~15,000+ lines across all crates
 - **Build Status**: ✅ SUCCESS with ort,ndarray features enabled
-- **YOLO Support**: v3-v12 + YOLO-RD with auto-detection
-- **PRP Progress**: 11/24 complete (46%), 2/24 in progress (8%), 11/24 not started (46%)
+- **YOLO Support**: v3-v12 + YOLO-RD with automatic version detection
+- **PRP Progress**: 11/24 complete (46%), 3/24 in progress (13%), 10/24 not started (42%)
 
 ## New Feature Development 🚀
 
@@ -421,9 +421,12 @@ When working on any TODO item:
 
 **Status: CRITICAL BUGS - Shutdown and video playback issues need immediate attention**
 
-### Recent Findings (2025-08-24 Update)
-- 2 CRITICAL BUGS discovered: shutdown not working, video playback frozen
-- 3 TODO comments in Cargo.toml about workspace configuration
+### Recent Findings (2025-08-23 Update)
+- **CRITICAL**: 2 active bugs make application unusable (shutdown, video freeze)
+- 3 TODO comments in Cargo.toml about workspace configuration  
+- 1 FIXME comment in BUGS.md about GStreamer basesink
 - 11 "for now" placeholder implementations across codebase
-- 40+ unused parameters indicating incomplete implementations
-- Test coverage affected by Mock backend limitations with uridecodebin
+- 9+ "real implementation" stub comments indicating incomplete functionality
+- 40+ unused parameters (underscore-prefixed) indicating incomplete implementations
+- Multiple references to "later", "temporary", "actual" indicating pending work
+- Test coverage: 67 tests pass, Mock backend limitations expected with uridecodebin

@@ -1,7 +1,6 @@
 use ds_rs::backend::{Backend, BackendManager, BackendType};
 #[cfg(feature = "nalgebra")]
 use ds_rs::backend::cpu_vision::tracker;
-use ds_rs::backend::cpu_vision::detector;
 use ds_rs::backend::standard::StandardBackend;
 use ds_rs::platform::PlatformInfo;
 use ds_rs::init;
@@ -29,10 +28,24 @@ fn test_standard_backend_with_cpu_vision() {
 fn test_cpu_detector_creation() {
     use ds_rs::backend::cpu_vision::detector::OnnxDetector;
     
-    // Placeholder implementation currently returns Ok for any path
-    // TODO: Once ONNX Runtime is integrated, this should check file existence
+    // Test depends on whether ort feature is enabled
     let result = OnnxDetector::new("nonexistent.onnx");
-    assert!(result.is_ok());
+    
+    #[cfg(feature = "ort")]
+    {
+        // With ort feature, should fail because file doesn't exist
+        assert!(result.is_err());
+    }
+    
+    #[cfg(not(feature = "ort"))]
+    {
+        // Without ort feature, should return feature not enabled error
+        assert!(result.is_err());
+        if let Err(e) = result {
+            let error_msg = e.to_string();
+            assert!(error_msg.contains("ONNX Runtime feature not enabled"));
+        }
+    }
 }
 
 #[test]

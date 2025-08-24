@@ -4,6 +4,13 @@ A Rust port of NVIDIA's DeepStream runtime source addition/deletion reference ap
 
 ## Recent Updates
 
+### 2025-08-24: Fixed Video Playback State Management (PRP-03)
+- ✅ **FIXED: Pipeline now properly reaches PLAYING state** - Video window appears and displays content
+- ✅ **Corrected initialization order** - Sources are now added before pipeline transitions to PAUSED
+- ✅ **Implemented proper async state handling** - Pipeline waits for state changes to complete
+- ✅ **Fixed dynamic element synchronization** - Using sync_state_with_parent() for proper clock inheritance
+- ✅ **Added comprehensive state validation** - Detailed logging of all element states for debugging
+
 ### 2025-08-24: Real-time Bounding Box Rendering (PRP-11)
 - ✅ **Implemented real-time bounding box visualization** - Dynamic rendering of detection results
 - ✅ **Created cross-backend rendering system** - Works with DeepStream (nvdsosd) and Standard (Cairo/text overlay)

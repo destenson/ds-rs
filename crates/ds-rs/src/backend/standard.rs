@@ -78,28 +78,14 @@ impl Backend for StandardBackend {
     fn create_stream_mux(&self, name: Option<&str>) -> Result<gst::Element> {
         // Use compositor as a batching replacement for nvstreammux
         let compositor = Self::create_element("compositor", name)?;
-        /*
-            background          : Background type
-                                flags: readable, writable
-                                Enum "GstCompositorBackground" Default: 0, "checker"
-                                    (0): checker          - Checker pattern
-                                    (1): black            - Black
-                                    (2): white            - White
-                                    (3): transparent      - Transparent Background to enable further compositing
-         */
+        
         // Set up compositor for grid layout similar to nvstreammux
-        // Use set_property_from_str for enum properties
-        compositor.set_property_from_str("background", "black"); // Black background
-        
-        // Important: Set compositor to not wait for all pads
-        // This allows it to start outputting when any pad has data
-        compositor.set_property_from_str("start-time-selection", "first"); // Use first pad's timestamp
-        
-        // Set to ignore inactive pads to ensure continuous output
+        compositor.set_property_from_str("background", "black");
+        compositor.set_property_from_str("start-time-selection", "first");
         compositor.set_property("ignore-inactive-pads", true);
         
-        // Note: max-threads property may not exist on all compositor versions
-
+        log::info!("Standard backend: Using compositor for tiling");
+        
         Ok(compositor)
     }
     
@@ -140,16 +126,14 @@ impl Backend for StandardBackend {
     }
     
     fn create_tiler(&self, name: Option<&str>) -> Result<gst::Element> {
-        // Use compositor with manual pad positioning for tiling
-        let compositor = Self::create_element("compositor", name)?;
+        // For Standard backend, tiler is just an identity element
+        // The actual tiling is done by the compositor used as streammux
+        let identity = Self::create_element("identity", name)?;
+        identity.set_property("sync", false);
         
-        // Configure for 2x2 grid
-        // Use set_property_from_str for enum properties
-        compositor.set_property_from_str("background", "checker");
+        log::info!("Standard backend: Using identity for tiler (tiling handled by compositor mux)");
         
-        log::info!("Standard backend: Using compositor for tiling");
-        
-        Ok(compositor)
+        Ok(identity)
     }
     
     fn create_osd(&self, name: Option<&str>) -> Result<gst::Element> {

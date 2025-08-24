@@ -101,17 +101,45 @@ impl VideoSource {
             
             let pad_name = format!("sink_{}", source_id.0);
             
+            // For compositor (Standard backend), we need to configure the pad properly
+            let is_compositor = mux.factory()
+                .map(|f| f.name() == "compositor")
+                .unwrap_or(false);
+            
             // Check if the pad already exists or request a new one
-            let Some(sinkpad) = mux.static_pad(&pad_name)
-                .filter(|p| !p.is_linked())
-                .or_else(|| mux.request_pad_simple(&pad_name)) else {
-                eprintln!("Failed to get pad {} from streammux", pad_name);
-                return;
+            let sinkpad = if is_compositor {
+                // Compositor uses request pads without specific names
+                match mux.request_pad_simple("sink_%u") {
+                    Some(pad) => {
+                        // Set position for this video on the compositor
+                        // For now, just place videos side by side
+                        let x_pos = (source_id.0 % 2) * 640;
+                        let y_pos = (source_id.0 / 2) * 480;
+                        pad.set_property("xpos", x_pos as i32);
+                        pad.set_property("ypos", y_pos as i32);
+                        pad
+                    }
+                    None => {
+                        eprintln!("Failed to get compositor pad for source {}", source_id);
+                        return;
+                    }
+                }
+            } else {
+                // For nvstreammux or other muxers
+                match mux.static_pad(&pad_name)
+                    .filter(|p| !p.is_linked())
+                    .or_else(|| mux.request_pad_simple(&pad_name)) {
+                    Some(pad) => pad,
+                    None => {
+                        eprintln!("Failed to get pad {} from mux", pad_name);
+                        return;
+                    }
+                }
             };
             
             pad.link(&sinkpad)
-                .map(|_| println!("Linked source {} to streammux", source_id))
-                .inspect_err(|e| eprintln!("Failed to link source {} to streammux: {:?}", source_id, e))
+                .map(|_| println!("Linked source {} to mux", source_id))
+                .inspect_err(|e| eprintln!("Failed to link source {} to mux: {:?}", source_id, e))
                 .ok();
         })
     }

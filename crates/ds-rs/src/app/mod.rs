@@ -20,6 +20,14 @@ pub struct Application {
     initial_uri: String,
 }
 
+#[inline]
+pub(crate) fn now() -> f64 {
+    std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .unwrap_or_default()
+        .as_secs_f64()
+}
+
 impl Application {
     pub fn new(uri: String) -> Result<Self> {
         let backend_manager = Arc::new(BackendManager::new()?);
@@ -199,7 +207,7 @@ impl Application {
                         state.src().map(|s| s.name()).unwrap_or_else(|| "unknown".into())
                     );
                     if state.current() == gst::State::Playing {
-                        println!("[{}] 🎬 Pipeline is now PLAYING!", timestamp);
+                        println!("[{}] Pipeline is now PLAYING!", timestamp);
                     }
                     glib::ControlFlow::Continue
                 }
@@ -207,8 +215,9 @@ impl Application {
                     println!("[{}] Stream started", timestamp);
                     glib::ControlFlow::Continue
                 }
-                MessageView::AsyncDone(_) => {
-                    println!("[{}] Async operation completed", timestamp);
+                MessageView::AsyncDone(async_done) => {
+                    println!("[{}] Async operation completed from: {}", timestamp,
+                        async_done.src().map(|s| s.name()).unwrap_or_else(|| "unknown".into()));
                     glib::ControlFlow::Continue
                 }
                 MessageView::Element(element) => {
@@ -248,23 +257,35 @@ impl Application {
         // Start the pipeline
         self.pipeline.set_state(gst::State::Paused)?;
         self.add_initial_source()?;
-        println!("Setting pipeline to PLAYING state...");
+        println!("[{:.3}] Setting pipeline to PLAYING state...", now());
         let state_change_result = self.pipeline.set_state(gst::State::Playing)?;
-        println!("Pipeline state change result: {:?}", state_change_result);
+        println!("[{:.3}] Pipeline state change result: {:?}", now(), state_change_result);
         
-        // Wait for the pipeline to reach playing state
-        println!("Waiting for pipeline to reach PLAYING state...");
-        match self.pipeline.get_state(Some(std::time::Duration::from_secs(5))) {
+        // Give pipeline brief moment to start, then continue
+        println!("[{:.3}] Checking pipeline state...", now());
+        match self.pipeline.get_state(Some(std::time::Duration::from_millis(500))) {
             Ok((result, current, pending)) => {
-                println!("Final state: {:?} (current: {:?}, pending: {:?})", result, current, pending);
+                println!("[{:.3}] Pipeline state: {:?} (current: {:?}, pending: {:?})", now(), result, current, pending);
+                match result {
+                    gst::StateChangeSuccess::Success => {
+                        println!("[{:.3}] Pipeline reached PLAYING state successfully!", now());
+                    }
+                    gst::StateChangeSuccess::Async => {
+                        println!("[{:.3}] Pipeline transitioning to PLAYING state asynchronously...", now());
+                    }
+                    _ => {
+                        println!("[{:.3}] Pipeline state change: {:?}", now(), result);
+                    }
+                }
             }
             Err(err) => {
-                eprintln!("Failed to get final state: {:?}", err);
+                eprintln!("[{:.3}] Pipeline state check timeout: {:?}", now(), err);
+                println!("[{:.3}] Continuing anyway - pipeline may still be starting...", now());
             }
         }
         
-        println!("Now playing: {}", self.initial_uri);
-        println!("Pipeline running... Press Ctrl+C to exit");
+        println!("[{:.3}] Now playing: {}", now(), self.initial_uri);
+        println!("[{:.3}] Pipeline running... Press Ctrl+C to exit", now());
         
         // Run the main loop - this will block until main_loop.quit() is called
         main_loop.run();

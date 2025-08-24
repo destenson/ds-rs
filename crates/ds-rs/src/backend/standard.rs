@@ -79,9 +79,9 @@ impl Backend for StandardBackend {
         // Use compositor as a batching replacement for nvstreammux
         let compositor = Self::create_element("compositor", name)?;
         
-        // Set up compositor for grid layout similar to nvstreammux
+        // Set up compositor for immediate playback
         compositor.set_property_from_str("background", "black");
-        compositor.set_property_from_str("start-time-selection", "first");
+        compositor.set_property_from_str("start-time-selection", "zero");
         compositor.set_property("ignore-inactive-pads", true);
         
         log::info!("Standard backend: Using compositor for tiling");

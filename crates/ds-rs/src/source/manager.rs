@@ -24,7 +24,10 @@ impl SourceAddition for SourceManager {
         let streammux = self.get_streammux()
             .ok_or_else(|| DeepStreamError::NotInitialized("Streammux not set".to_string()))?;
         
-        println!("Adding source {} with URI: {}", id, uri);
+        let now = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .unwrap_or_default();
+        println!("[{:.3}] Adding source {} with URI: {}", now.as_secs_f64(), id, uri);
         
         let mut video_source = VideoSource::new(id, uri)?;
         

@@ -162,10 +162,43 @@ impl VideoSource {
                 .unwrap_or_default();
             let timestamp2 = format!("{:.3}", now2.as_secs_f64());
             
-            pad.link(&sinkpad)
-                .map(|_| println!("[{}] Linked source {} to mux", timestamp2, source_id))
-                .inspect_err(|e| eprintln!("[{}] Failed to link source {} to mux: {:?}", timestamp2, source_id, e))
-                .ok();
+            let link_result = pad.link(&sinkpad);
+            match link_result {
+                Ok(_) => {
+                    println!("[{}] Linked source {} to mux successfully", timestamp2, source_id);
+                    
+                    // Check if data is flowing by adding buffer and event probes
+                    let source_id_probe = source_id;
+                    pad.add_probe(gst::PadProbeType::BUFFER, move |pad, _info| {
+                        let now = std::time::SystemTime::now()
+                            .duration_since(std::time::UNIX_EPOCH)
+                            .unwrap_or_default();
+                        let timestamp = format!("{:.3}", now.as_secs_f64());
+                        println!("[{}] Buffer flowing through source {} pad {}", 
+                            timestamp, source_id_probe, pad.name());
+                        gst::PadProbeReturn::Ok
+                    });
+                    
+                    // Also add caps probe to see negotiation issues
+                    let source_id_caps = source_id;
+                    pad.add_probe(gst::PadProbeType::EVENT_DOWNSTREAM, move |_pad, info| {
+                        if let Some(gst::PadProbeData::Event(ref event)) = info.data {
+                            if let gst::EventView::Caps(caps_event) = event.view() {
+                                let now = std::time::SystemTime::now()
+                                    .duration_since(std::time::UNIX_EPOCH)
+                                    .unwrap_or_default();
+                                let timestamp = format!("{:.3}", now.as_secs_f64());
+                                println!("[{}] Caps negotiated for source {}: {}", 
+                                    timestamp, source_id_caps, caps_event.caps());
+                            }
+                        }
+                        gst::PadProbeReturn::Ok
+                    });
+                }
+                Err(e) => {
+                    eprintln!("[{}] Failed to link source {} to mux: {:?}", timestamp2, source_id, e);
+                }
+            }
         })
     }
     

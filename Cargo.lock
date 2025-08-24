@@ -301,6 +301,29 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "d71b6127be86fdcfddb610f7182ac57211d4b18a3e9c82eb2d17662f2227ad6a"
 
 [[package]]
+name = "cairo-rs"
+version = "0.21.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "1158f326d7b755a9ae2b36c5b5391400e3431f3b77418cedb6d7130126628f10"
+dependencies = [
+ "bitflags 2.9.3",
+ "cairo-sys-rs",
+ "glib",
+ "libc",
+]
+
+[[package]]
+name = "cairo-sys-rs"
+version = "0.21.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "b963177900ec8e783927e5ed99e16c0ec1b723f1f125dff8992db28ef35c62c3"
+dependencies = [
+ "glib-sys",
+ "libc",
+ "system-deps 7.0.5",
+]
+
+[[package]]
 name = "cc"
 version = "1.2.34"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -362,16 +385,6 @@ dependencies = [
  "iana-time-zone",
  "num-traits",
  "windows-link",
-]
-
-[[package]]
-name = "clang"
-version = "2.0.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "84c044c781163c001b913cd018fc95a628c50d0d2dfea8bca77dad71edb16e37"
-dependencies = [
- "clang-sys",
- "libc",
 ]
 
 [[package]]
@@ -465,7 +478,6 @@ dependencies = [
  "image 0.25.6",
  "ndarray",
  "once_cell",
- "opencv",
  "ort",
  "thiserror 2.0.16",
 ]
@@ -570,6 +582,7 @@ dependencies = [
 name = "ds-rs"
 version = "0.1.0"
 dependencies = [
+ "cairo-rs",
  "clap",
  "ctrlc",
  "env_logger",
@@ -585,8 +598,8 @@ dependencies = [
  "ndarray",
  "nix",
  "once_cell",
- "opencv",
  "ort",
+ "parking_lot",
  "rand",
  "serde",
  "tempfile",
@@ -599,12 +612,6 @@ dependencies = [
 [[package]]
 name = "dsl"
 version = "0.1.0"
-
-[[package]]
-name = "dunce"
-version = "1.0.5"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "92773504d58c093f6de2459af4af33faa518c13451eb8f2b5698ed3d36e7c813"
 
 [[package]]
 name = "either"
@@ -2063,41 +2070,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "a4895175b425cb1f87721b59f0f286c2092bd4af812243672510e1ac53e2e0ad"
 
 [[package]]
-name = "opencv"
-version = "0.95.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "0c73b6fccd78797a87cdb885c997351a1a290b0ebde778e996b694dec2a4c04a"
-dependencies = [
- "cc",
- "dunce",
- "jobserver",
- "libc",
- "num-traits",
- "once_cell",
- "opencv-binding-generator",
- "pkg-config",
- "semver",
- "shlex",
- "vcpkg",
- "windows",
-]
-
-[[package]]
-name = "opencv-binding-generator"
-version = "0.97.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "010a78e4cc47ff85cf58fb1cbbbab9dcdb8e5e6718917eac26623f077872d012"
-dependencies = [
- "clang",
- "clang-sys",
- "dunce",
- "once_cell",
- "percent-encoding",
- "regex",
- "shlex",
-]
-
-[[package]]
 name = "option-operations"
 version = "0.5.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2580,12 +2552,6 @@ name = "scopeguard"
 version = "1.2.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "94143f37725109f92c262ed2cf5e59bce7498c01bcc1502d7b9afe439a4e9f49"
-
-[[package]]
-name = "semver"
-version = "1.0.26"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "56e6fa9c48d24d85fb3de5ad847117517440f6beceb7798af16b4a87d616b8d0"
 
 [[package]]
 name = "serde"
@@ -3149,12 +3115,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "vcpkg"
-version = "0.2.15"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "accd4ea62f7bb7a82fe23066fb0957d48ef677f6eeb8215f372f52e48bb32426"
-
-[[package]]
 name = "version-compare"
 version = "0.2.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -3339,16 +3299,6 @@ name = "winapi-x86_64-pc-windows-gnu"
 version = "0.4.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "712e227841d057c1ee1cd2fb22fa7e5a5461ae8e48fa2ca79ec42cfc1931183f"
-
-[[package]]
-name = "windows"
-version = "0.59.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "7f919aee0a93304be7f62e8e5027811bbba96bcb1de84d6618be56e43f8a32a1"
-dependencies = [
- "windows-core",
- "windows-targets 0.53.3",
-]
 
 [[package]]
 name = "windows-core"

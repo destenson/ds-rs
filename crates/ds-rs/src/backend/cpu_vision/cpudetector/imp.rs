@@ -1,3 +1,4 @@
+#![allow(unused)]
 use gstreamer::glib;
 use gstreamer as gst;
 use gstreamer::prelude::*;
@@ -58,6 +59,7 @@ pub struct CpuDetector {
 
 impl CpuDetector {
     fn initialize_detector(&self, settings: &Settings) -> Result<OnnxDetector> {
+        use crate::backend::cpu_vision::detector::{OnnxDetector, DetectorConfig};
         let config = DetectorConfig {
             model_path: Some(settings.model_path.clone()),
             input_width: settings.input_width,
@@ -68,7 +70,7 @@ impl CpuDetector {
             ..Default::default()
         };
         
-        OnnxDetector::new_with_config(config)
+        OnnxDetector::new_with_config(config).map_err(|e| e.into())
     }
     
     fn ensure_detector_loaded(&self) {
@@ -148,7 +150,7 @@ impl CpuDetector {
         }
     }
     
-    fn attach_detection_metadata(&self, buf: &mut gst::BufferRef, detections: &[crate::backend::cpu_vision::detector::Detection]) {
+    fn attach_detection_metadata(&self, _buf: &mut gst::BufferRef, detections: &[crate::backend::cpu_vision::detector::Detection]) {
         // TODO: Attach custom metadata to buffer
         // For now, we could use custom metadata or simply pass through
         // This would be where we'd attach DetectionMeta to the buffer
@@ -171,11 +173,7 @@ impl ObjectSubclass for CpuDetector {
 impl ObjectImpl for CpuDetector {
     fn signals() -> &'static [glib::subclass::Signal] {
         static SIGNALS: LazyLock<Vec<glib::subclass::Signal>> = LazyLock::new(|| {
-            vec![
-                glib::subclass::Signal::builder("inference-result")
-                    .param_types([u64::static_type(), glib::Array::static_type()])
-                    .build(),
-            ]
+            vec![]
         });
         
         SIGNALS.as_ref()
@@ -368,9 +366,8 @@ impl BaseTransformImpl for CpuDetector {
         let info = gst_video::VideoInfo::from_caps(&caps)
             .map_err(|_| gst::FlowError::NotSupported)?;
         
-        // Map buffer for reading (we don't modify the video data)
-        {
-            let map = buf.map_readable().map_err(|_| gst::FlowError::Error)?;
+        // Process frame and get detections
+        let detections = {
             let frame = gst_video::VideoFrameRef::from_buffer_ref_readable(buf, &info)
                 .map_err(|_| gst::FlowError::Error)?;
             
@@ -385,9 +382,6 @@ impl BaseTransformImpl for CpuDetector {
                             // Emit signal with detection results
                             self.emit_inference_results(*frame_count, &detections);
                             
-                            // Attach metadata to buffer
-                            self.attach_detection_metadata(buf, &detections);
-                            
                             // Log detections for debugging
                             for detection in &detections {
                                 gst::trace!(CAT, imp = self,
@@ -397,13 +391,25 @@ impl BaseTransformImpl for CpuDetector {
                                            detection.width, detection.height,
                                            detection.confidence);
                             }
+                            
+                            Some(detections)
                         },
                         Err(e) => {
                             gst::warning!(CAT, imp = self, "Detection failed: {}", e);
+                            None
                         }
                     }
+                } else {
+                    None
                 }
+            } else {
+                None
             }
+        };
+        
+        // Attach metadata to buffer if we have detections
+        if let Some(detections) = detections {
+            self.attach_detection_metadata(buf, &detections);
         }
         
         // Buffer passes through unchanged (identity behavior)

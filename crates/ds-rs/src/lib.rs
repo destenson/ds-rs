@@ -65,8 +65,10 @@ fn register_elements() -> Result<()> {
     use gstreamer as gst;
     
     // Create a temporary plugin for registering elements
-    let plugin = gst::Plugin::load_by_name("coreelements")
-        .map_err(|e| DeepStreamError::GStreamer(e.into()))?;
+    let plugin = match gst::Plugin::load_by_name("coreelements") {
+        Ok(p) => p,
+        Err(_) => return Err(DeepStreamError::Configuration("Failed to load coreelements plugin".to_string()))
+    };
     
     // Register CPU detector element
     backend::cpu_vision::cpudetector::register(&plugin)

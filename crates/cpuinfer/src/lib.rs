@@ -2,7 +2,7 @@ use gstreamer as gst;
 use gstreamer::glib;
 
 mod cpudetector;
-mod detector;
+pub mod detector;
 
 fn plugin_init(plugin: &gst::Plugin) -> Result<(), glib::BoolError> {
     cpudetector::register(plugin)?;

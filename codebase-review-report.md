@@ -5,7 +5,7 @@
 
 ## Executive Summary
 
-The DeepStream Rust port is a mature implementation with 77/78 tests passing (98.7% pass rate), comprehensive cross-platform backend abstraction, and functional dynamic source management. Recent commits show active development on CPU vision features. **Primary recommendation: Fix the Windows file URI test failure, then execute PRP-21 (CPU Object Detection Module) to complete ONNX Runtime integration and enable real AI inference on non-NVIDIA hardware.**
+The DeepStream Rust port has strong foundations with 77/78 tests passing (98.7%), but has **two critical bugs** preventing the main application from functioning: (1) inability to shutdown cleanly when Ctrl+C is pressed or window closed, and (2) video playback freezing on the first frame. These bugs must be fixed immediately before any new features. **Primary recommendation: Fix the critical shutdown and playback bugs in the main application (BUGS.md), then complete ONNX Runtime integration for real AI inference.**
 
 ## Implementation Status
 
@@ -21,10 +21,11 @@ The DeepStream Rust port is a mature implementation with 77/78 tests passing (98
 - **Tracking System** - Centroid tracker with trajectory history - Evidence: 3 tracking tests passing
 
 ### Broken/Incomplete 🚧
+- **Main Application (CRITICAL)** - Cannot shutdown cleanly - Issue: App hangs on Ctrl+C, prints "Received interrupt signal" with each Ctrl+C press (BUGS.md)
+- **Video Playback (CRITICAL)** - Frozen on first frame - Issue: H264 framerate warning "15360.0 exceeds allowed maximum 32.8" (BUGS.md) 
 - **File URI Test** - Windows file URI format issue - Issue: `test_video_source_creation` fails on path format (file:////tmp vs file:///tmp)
 - **ONNX Runtime Integration** - Not fully integrated - Issue: TODO comment at `cpu_backend_tests.rs:33` indicates incomplete testing
 - **DeepStream FFI Bindings** - Metadata extraction returns mock data - Issue: 11+ "for now" comments indicate stubs
-- **Main Demo Application** - Test marked as ignored - Issue: `main_app_test.rs:23` requires actual runtime
 
 ### Missing ❌
 - **Real AI Inference** - ONNX detector creates mock output - Impact: No actual object detection on CPU backend
@@ -51,50 +52,52 @@ The DeepStream Rust port is a mature implementation with 77/78 tests passing (98
 
 ## Recent Development Activity
 
-### Latest Commits (Last 10)
-- Enhanced CPU detector queue to be leaky and adjust buffer settings
-- Fixed Windows file URI format and improved pad linking logic
-- Fixed missing newline at end of file in detector.rs
-- Skipped handling config-file-path in configure_element for CPU detector
+### Latest Commits (Last 15)
+- Update CLAUDE.md to emphasize critical bug checks
+- Add BUGS.md to document current application issues
+- Refactor shutdown handling to use running flag instead of separate channel
+- Implement shutdown flag for graceful application termination
+- Update TODO list with comprehensive scan details
+- Fix CPU detector queue properties to use upstream leaky mode
+- Enhance CPU detector queue to be leaky and adjust buffer settings
+- Fix Windows file URI format and improve pad linking logic
+- Skip handling config-file-path in configure_element for CPU detector
 - Only set tracker-config-file for DeepStream backend
-- Refactored signal handling to use Mutex for graceful shutdown
-- Updated TODO list after ONNX fix attempts
-- Updated YOLO support to include versions 3-12 with auto-detection
-- Refactored ONNX detector for dynamic YOLO version detection
-- Fixed ndarray version from 0.16.1 to 0.15.6
+- Refactor signal handling to use Mutex for graceful shutdown
+- Update YOLO support to include versions 3-12 with auto-detection
 
 ## Recommendation
 
-### Next Action: Fix Test & Complete ONNX Integration (PRP-21)
+### Next Action: Fix Critical Bugs in Main Application
 
-**Immediate Fix** (30 minutes):
-1. Fix Windows file URI test failure in `source/video_source.rs:246`
-2. Remove unused import warning in `cpu_backend_tests.rs:4`
+**Immediate Fixes** (1-2 days):
+1. **Fix shutdown handling** - Debug `app/runner.rs` event loop and signal handling with running flag
+2. **Fix video playback freezing** - Investigate framerate caps negotiation and compositor/streammux setup
+3. **Fix Windows test** - Correct file URI format in `source/video_source.rs:246`
 
-**Primary Focus** (1-2 weeks): Execute PRP-21 (CPU Object Detection Module)
+**Then Execute** (1-2 weeks): PRP-21 (CPU Object Detection Module)
 - Integrate real ONNX Runtime v1.16.3 API
 - Download and test with actual YOLOv5/v8/v12 models
 - Replace mock detection output with real inference
-- Add integration tests with actual model files
 
 **Justification**:
-- **Current capability**: CPU Vision backend structure exists with mock detection
-- **Gap**: No actual AI inference happens - detector returns hardcoded bounding boxes
-- **Impact**: Enables real object detection on non-NVIDIA hardware, validates entire pipeline
+- **Current capability**: Core infrastructure complete, 98.7% tests passing
+- **Gap**: Main demo application is non-functional - cannot be used or tested by users
+- **Impact**: Fixing critical bugs enables a working demo, unblocks all user testing and feedback
 
 ## 90-Day Roadmap
 
-### Week 1-2: ONNX Integration & Testing
-- Fix immediate test failures → All tests green
-- Integrate ONNX Runtime properly → Real inference working
-- Download YOLO models → Test with v5/v8/v12
-- Outcome: **Functional AI inference on CPU**
+### Week 1-2: Fix Critical Bugs & Core Functionality
+- Fix shutdown handling and video playback → Working main application
+- Fix Windows file URI test → All tests green
+- Verify with multiple video sources → Stable runtime behavior
+- Outcome: **Functional main application demo**
 
-### Week 3-4: Main Demo Application (PRP-05)
-- Complete runtime demo matching C reference → Full feature parity
-- Add proper CLI with source management → User-friendly interface
-- Test with multiple concurrent sources → Verify scalability
-- Outcome: **Production-ready demo application**
+### Week 3-4: ONNX Integration & Testing
+- Integrate ONNX Runtime v1.16.3 properly → Real inference working
+- Download YOLO models → Test with v5/v8/v12
+- Complete PRP-21 implementation → CPU object detection
+- Outcome: **Functional AI inference on CPU**
 
 ### Week 5-8: Production Hardening
 - Replace 100 unwrap() calls with proper error handling → No panic risk
@@ -111,11 +114,11 @@ The DeepStream Rust port is a mature implementation with 77/78 tests passing (98
 
 ## Technical Debt Priorities
 
-1. **Windows File URI Test**: [Critical] - [5 min effort] - Blocking CI/CD
-2. **ONNX Runtime Integration**: [High Impact] - [1 week effort] - Enables AI on CPU
-3. **Error Handling (100 unwraps)**: [High Impact] - [3-5 days effort] - Production safety
-4. **DeepStream FFI Bindings**: [Medium Impact] - [1 week effort] - Full NVIDIA support
-5. **Unused Parameters (40+)**: [Low Impact] - [2 days effort] - Code cleanliness
+1. **Shutdown Bug**: [CRITICAL] - [1 day effort] - Application unusable
+2. **Video Playback Bug**: [CRITICAL] - [1 day effort] - Core functionality broken
+3. **Windows File URI Test**: [High] - [30 min effort] - Blocking CI/CD
+4. **ONNX Runtime Integration**: [High Impact] - [1 week effort] - Enables AI on CPU
+5. **Error Handling (102 unwraps)**: [Medium Impact] - [3-5 days effort] - Production safety
 
 ## PRP Status Summary
 
@@ -163,7 +166,8 @@ The DeepStream Rust port is a mature implementation with 77/78 tests passing (98
 - **Test Coverage**: 77/78 tests passing (98.7%)
 - **PRP Progress**: 11/24 complete (46%), 3/24 in progress (12%), 10/24 not started (42%)
 - **Backend Support**: 3 backends (DeepStream/Standard/Mock)
-- **Technical Debt**: 100 unwrap() calls, 11 "for now" comments, 40+ unused parameters
+- **Technical Debt**: 102 unwrap() calls, 11 "for now" comments, 40+ unused parameters
+- **Critical Bugs**: 2 (shutdown handling, video playback freezing)
 - **Build Health**: Release build successful, 1 warning
 - **Recent Activity**: 10 commits in recent history showing active development
 
@@ -174,5 +178,5 @@ The ds-rs project is well-architected with strong foundations but needs completi
 ---
 
 **Last Updated**: 2025-08-23 (Comprehensive Review)  
-**Status**: 98.7% tests passing, active development, ONNX integration needed  
-**Next Steps**: Fix Windows test, complete PRP-21 for real AI inference
+**Status**: 98.7% tests passing, 2 CRITICAL bugs blocking main app functionality  
+**Next Steps**: Fix shutdown/playback bugs, then complete PRP-21 for real AI inference

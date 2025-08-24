@@ -1,8 +1,19 @@
 # TODO List
 
-Last Updated: 2025-08-23 (Comprehensive TODO/FIXME scan)
+Last Updated: 2025-08-24 (Comprehensive TODO/FIXME scan)
 
 ## Critical Priority 🔴
+
+### Critical Bugs (from BUGS.md) - NEW
+- [ ] **Fix application shutdown issue**
+  - Application doesn't respond properly to Ctrl+C or window close
+  - Only displays "Received interrupt signal, shutting down..." repeatedly
+  - Need to implement proper cleanup and signal handling
+  
+- [ ] **Fix video playback freezing**
+  - Video gets stuck after first/last frame
+  - H264 parser warning: "VUI framerate 15360.0 exceeds allowed maximum 32.8"
+  - Caps/framerate handling needs investigation
 
 ### CPU Vision Backend Implementation
 - [x] **Fix ONNX Runtime API compatibility issues** ✅ (2025-08-23 - PRP-24)
@@ -16,13 +27,13 @@ Last Updated: 2025-08-23 (Comprehensive TODO/FIXME scan)
 
 ### DeepStream Integration (PRP-04)
 - [ ] **Implement NvDsMeta extraction with FFI bindings**
-  - `metadata/mod.rs:61,72`: Currently returns mock metadata
+  - `metadata/mod.rs:61,72`: Currently returns mock metadata ("For now" comment)
   - Need to implement actual `gst_buffer_get_nvds_batch_meta` FFI binding
   - Related: Known limitation from CLAUDE.md
 
 - [ ] **Implement stream-specific EOS messages**
-  - `messages/mod.rs:182-184`: Returns mock stream ID (0)
-  - `pipeline/bus.rs:216`: Requires FFI for `gst_nvmessage_is_stream_eos`
+  - `messages/mod.rs:174,181`: Returns mock implementation ("For now" comments)
+  - `pipeline/bus.rs:216`: Requires FFI for `gst_nvmessage_is_stream_eos` ("For now" comment)
   - Need `gst_nvmessage_parse_stream_eos` binding
 
 ### Code Quality & Production Readiness  
@@ -62,10 +73,19 @@ Last Updated: 2025-08-23 (Comprehensive TODO/FIXME scan)
   - `messages/mod.rs:181`: "In real DeepStream, this would call gst_nvmessage_parse_stream_eos"
   - `inference/mod.rs:173-174`: "In a real implementation, this would parse a label file"
   - `inference/mod.rs:214`: "This is simplified - real implementation would parse..."
-  - `inference/config.rs:226`: `from_deepstream_config` takes `_path` - returns mock config
+  - `inference/config.rs:226`: `from_deepstream_config` takes `_path` - returns mock config ("for now" comment)
   - `backend/cpu_vision/elements.rs:41,43,88,172`: Multiple "In a real implementation" comments
+  - `backend/cpu_vision/elements.rs:90`: CPU tracker currently just passes through ("For now" comment)
   - `pipeline/bus.rs:214`: `is_stream_eos` takes `_msg` - returns None (mock)
   - `source/controller.rs:154`: `_event_handler` cloned but not used
+  - `backend/standard.rs`: Tiler comment says "actual tiling is done by the compositor"
+  - `platform.rs:149`: GPU capabilities returns common capabilities ("for now" comment)
+
+### Build Configuration - UPDATED
+- [ ] **Fix workspace configuration**
+  - `Cargo.toml:3`: `# TODO: use the workspace version`
+  - `Cargo.toml:4`: `# TODO: use the workspace edition`
+  - Currently hardcoded as "0.1.0" and "2024"
 
 ## High Priority 🟡
 
@@ -93,10 +113,6 @@ Last Updated: 2025-08-23 (Comprehensive TODO/FIXME scan)
 - [ ] Add memory leak detection tests
 
 ### Configuration & Build Issues
-- [ ] **Fix workspace configuration**
-  - `Cargo.toml:3`: `# TODO: use the workspace version`
-  - `Cargo.toml:4`: `# TODO: use the workspace edition`
-  - Currently hardcoded as "0.1.0" and "2024"
 - [ ] Fix deprecated rand API usage in timer implementations
   - Update to modern thread_rng() patterns
 
@@ -116,7 +132,7 @@ Last Updated: 2025-08-23 (Comprehensive TODO/FIXME scan)
   - Examples: `detection_app.rs:74,180,268` - Unused inference processor and callback parameters
   - Tests: `pipeline_tests.rs:177` - Unused bus callback parameter
   - Source videos: `file.rs:50,136`, `config/watcher.rs:13,34,66,108`, `rtsp/mod.rs:92`, `rtsp/factory.rs:68,109`
-  - Source management: `video_source.rs:66,181`, `synchronization.rs:22,127,138`, `manager.rs:46,210`, `controller.rs:154`
+  - Source management: `video_source.rs:66,181,234`, `synchronization.rs:22,127,138`, `manager.rs:46,210`, `controller.rs:154`
   - CPU Vision: `backend/cpu_vision/elements.rs:86-88` - Unused tracker and buffer parameters
   - Inference: `inference/config.rs:226`, `inference/mod.rs:173`
   - Metadata: `metadata/mod.rs:123,125` - Unused extraction results
@@ -282,32 +298,44 @@ Last Updated: 2025-08-23 (Comprehensive TODO/FIXME scan)
 
 ## Known Issues 🐛
 
-1. **Source Management Tests with Mock Backend**
+1. **Critical: Application Shutdown** - NEW
+   - Application doesn't respond to Ctrl+C or window close
+   - Only displays "Received interrupt signal, shutting down..." repeatedly
+   - Status: CRITICAL BUG
+
+2. **Critical: Video Playback Freezing** - NEW
+   - Video stuck on first/last frame
+   - H264 parser framerate warning
+   - Status: CRITICAL BUG
+
+3. **Source Management Tests with Mock Backend**
    - 10 tests fail when using Mock backend
    - Reason: Mock backend doesn't support uridecodebin
    - Status: Expected behavior - use Standard backend for full testing
 
-2. **Build Warnings**
+4. **Build Warnings**
    - Unused imports after linter added `#![allow(unused)]`
    - Non-snake-case field `bInferDone` (kept for DeepStream compatibility)
    - Unused workspace manifest keys
 
-3. **DeepStream Backend** 
+5. **DeepStream Backend** 
    - Not tested on actual NVIDIA hardware
    - Need validation on Jetson and x86 with GPU
 
-4. **Memory Management**
+6. **Memory Management**
    - Need to verify no leaks, particularly around dynamic source addition/removal
 
 ## Statistics 📊
 
-- **Total TODO items**: ~40 active items
+- **Total TODO items**: ~50 active items (increased from ~40)
+- **Critical Bugs**: 2 NEW (shutdown, video freeze)
 - **Code Quality Issues**: 
   - **unwrap() calls**: 100 occurrences across 27 files
   - **TODO comments**: 3 found (2 in Cargo.toml, 1 in cpu_backend_tests.rs)
   - **NOTE comments**: 4 found (mostly technical notes about YOLO versions)
   - **"For now" comments**: 11 occurrences indicating temporary implementations
   - **"Real implementation" comments**: 9 occurrences indicating stubs
+  - **"actual" comments**: 2 occurrences (tiling, runtime test)
   - **Unused parameters**: 40+ underscore-prefixed variables
   - **Mock backend**: Extensive mock implementation for testing
   - **Build warnings**: 1 warning (unused `create_mock_yolo_output` method)
@@ -349,6 +377,7 @@ Last Updated: 2025-08-23 (Comprehensive TODO/FIXME scan)
 ## Notes
 
 ### Key Technical Debt
+- **CRITICAL BUGS**: Shutdown and video playback issues make app unusable
 - **DeepStream FFI Bindings**: Critical metadata and message handling functions need implementation
 - **Mock/Placeholder Implementations**: 13+ functions return simplified data marked with "for now" comments
   - `inference/mod.rs:175`: Label map loading
@@ -360,14 +389,16 @@ Last Updated: 2025-08-23 (Comprehensive TODO/FIXME scan)
   - `source-videos/src/manager.rs:215`: modify_source_config is placeholder
   - `source-videos/src/runtime/applicator.rs:72,81,88`: Partial implementation for config changes
   - `backend/cpu_vision/elements.rs:94`: Pass-through implementation in tracker
+  - `backend/standard.rs`: Tiler using identity element
 - **Unused Parameters**: 40+ underscore-prefixed variables indicate incomplete implementations
 - **Test Limitations**: Mock backend cannot test uridecodebin-based functionality
 
 ### Priority Focus
+- **IMMEDIATE**: Fix shutdown and video playback critical bugs
 - **Critical**: DeepStream FFI integration for metadata extraction and stream EOS handling
 - **High**: Complete main demo app and config file parsing
 - **New**: CPU Vision Backend implementation for non-NVIDIA systems
-- **Code Quality**: Replace 237 unwrap() calls for production readiness
+- **Code Quality**: Replace 100 unwrap() calls for production readiness
 
 ### Development Patterns Found
 - Mock implementations consistently marked with "for now" comments (13+ occurrences)
@@ -379,18 +410,20 @@ Last Updated: 2025-08-23 (Comprehensive TODO/FIXME scan)
 ## Contributing
 
 When working on any TODO item:
-1. Create a feature branch
-2. Update this TODO.md to mark item as in-progress
-3. Write tests for new functionality
-4. Update documentation as needed
-5. Mark complete in TODO.md when merged
+1. **CHECK BUGS.md FIRST** for critical issues
+2. Create a feature branch
+3. Update this TODO.md to mark item as in-progress
+4. Write tests for new functionality
+5. Update documentation as needed
+6. Mark complete in TODO.md when merged
 
 ---
 
-**Status: Build fixed with conditional nalgebra; Priority on ONNX detector implementation and DeepStream FFI bindings**
+**Status: CRITICAL BUGS - Shutdown and video playback issues need immediate attention**
 
-### Recent Findings (2025-08-23 Update)
-- ONNX Runtime API compatibility issues remain unresolved (detector.rs)
-- 40+ unused parameters across codebase indicate incomplete implementations
-- 13+ placeholder implementations marked with "for now" comments
+### Recent Findings (2025-08-24 Update)
+- 2 CRITICAL BUGS discovered: shutdown not working, video playback frozen
+- 3 TODO comments in Cargo.toml about workspace configuration
+- 11 "for now" placeholder implementations across codebase
+- 40+ unused parameters indicating incomplete implementations
 - Test coverage affected by Mock backend limitations with uridecodebin

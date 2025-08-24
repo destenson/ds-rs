@@ -74,8 +74,18 @@ impl VideoSource {
         let streammux_weak = streammux.downgrade();
         
         let handler_id = self.source_bin.connect_pad_added(move |decodebin, pad| {
+            let now = std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .unwrap_or_default();
+            let timestamp = format!("{:.3}", now.as_secs_f64());
+            println!("[{}] pad-added callback triggered for source {} (pad: {})", 
+                timestamp, source_id, pad.name());
+            
             if let Some(streammux) = streammux_weak.upgrade() {
                 callback(decodebin, pad, source_id, &streammux);
+            } else {
+                eprintln!("[{}] Failed to upgrade streammux weak reference for source {}", 
+                    timestamp, source_id);
             }
         });
         
@@ -84,6 +94,12 @@ impl VideoSource {
     }
     
     pub fn connect_pad_added_default(&mut self, streammux: &gst::Element) -> Result<()> {
+        let now = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .unwrap_or_default();
+        let timestamp = format!("{:.3}", now.as_secs_f64());
+        println!("[{}] Connecting pad-added callback for source {}", timestamp, self.source_id);
+        
         self.connect_pad_added(streammux, |_decodebin, pad, source_id, mux| {
             let caps = pad.current_caps().unwrap_or_else(|| pad.query_caps(None));
             

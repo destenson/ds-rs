@@ -203,6 +203,20 @@ impl Application {
                     }
                     glib::ControlFlow::Continue
                 }
+                MessageView::StreamStart(_) => {
+                    println!("[{}] Stream started", timestamp);
+                    glib::ControlFlow::Continue
+                }
+                MessageView::AsyncDone(_) => {
+                    println!("[{}] Async operation completed", timestamp);
+                    glib::ControlFlow::Continue
+                }
+                MessageView::Element(element) => {
+                    println!("[{}] Element message from {}: {:?}", timestamp,
+                        element.src().map(|s| s.name()).unwrap_or_else(|| "unknown".into()),
+                        element.structure().map(|s| s.name()));
+                    glib::ControlFlow::Continue
+                }
                 _ => glib::ControlFlow::Continue,
             }
         })?;

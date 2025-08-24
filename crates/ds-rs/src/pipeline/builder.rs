@@ -1,3 +1,5 @@
+#![allow(unused)]
+
 use crate::backend::{BackendManager, BackendType};
 use crate::elements::factory::ElementFactory;
 use crate::error::{DeepStreamError, Result};
@@ -401,7 +403,7 @@ impl PipelineBuilder {
                             element,
                             config,
                             metadata_bridge.clone(),
-                            backend_manager.get_backend_type(),
+                            backend_manager.backend_type(),
                         )?;
                     }
                 }

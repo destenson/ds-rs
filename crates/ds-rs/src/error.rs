@@ -35,6 +35,9 @@ pub enum DeepStreamError {
     #[error("Pad linking failed: {0}")]
     PadLinking(String),
     
+    #[error("Pad not found: {element}::{pad}")]
+    PadNotFound { element: String, pad: String },
+    
     #[error("IO error: {0}")]
     Io(#[from] std::io::Error),
     

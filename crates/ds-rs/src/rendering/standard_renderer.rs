@@ -1,3 +1,4 @@
+#![allow(unused)]
 //! Standard backend bounding box renderer using Cairo or text overlay
 
 use super::{BoundingBoxRenderer, PerformanceMetrics, RenderingConfig};
@@ -99,35 +100,9 @@ impl StandardRenderer {
             let frame_data_clone = frame_data.clone();
             let metrics_clone = metrics.clone();
             
-            overlay_element.connect("draw", false, move |values| {
-                let _element = values[0].get::<gst::Element>().unwrap();
-                let cr = values[1].get::<cairo::Context>().unwrap();
-                let _timestamp = values[2].get::<gst::ClockTime>().unwrap();
-                let _duration = values[3].get::<gst::ClockTime>().unwrap();
-                
-                let start = Instant::now();
-                
-                // Draw bounding boxes
-                if let Ok(data) = frame_data_clone.read() {
-                    if let Ok(cfg) = config_clone.lock() {
-                        draw_bounding_boxes(&cr, &data, &cfg);
-                    }
-                }
-                
-                // Update metrics
-                let elapsed = start.elapsed().as_millis() as f64;
-                if let Ok(mut m) = metrics_clone.lock() {
-                    m.frames_rendered += 1;
-                    m.avg_render_time_ms = 
-                        (m.avg_render_time_ms * (m.frames_rendered - 1) as f64 + elapsed) 
-                        / m.frames_rendered as f64;
-                    if elapsed > m.peak_render_time_ms {
-                        m.peak_render_time_ms = elapsed;
-                    }
-                }
-                
-                None
-            });
+            // Cairo drawing is only available when cairo-rs is available
+            // For now, we'll skip the signal connection and use probes instead
+            log::info!("Cairo overlay created, but drawing callback not implemented without cairo-rs");
         }
         
         // Set up probe to extract video dimensions
@@ -268,9 +243,10 @@ impl BoundingBoxRenderer for StandardRenderer {
     }
 }
 
-/// Draw bounding boxes using Cairo
+/// Draw bounding boxes using Cairo (stub without cairo-rs)
+#[allow(unused)]
 fn draw_bounding_boxes(
-    cr: &cairo::Context,
+    _cr: &(),  // Placeholder for cairo::Context
     frame_data: &FrameData,
     config: &RenderingConfig,
 ) {
@@ -281,92 +257,35 @@ fn draw_bounding_boxes(
     let width = frame_data.width as f64;
     let height = frame_data.height as f64;
     
-    // Limit number of objects to render
-    let max_objects = config.performance.max_objects_per_frame.min(frame_data.objects.len());
-    
-    for obj in &frame_data.objects[..max_objects] {
-        let bbox = obj.bbox();
-        let style = config.get_style_for_class(&obj.obj_label);
-        
-        // Convert normalized coordinates to pixels if needed
-        let (x, y, w, h) = if bbox.left <= 1.0 && bbox.top <= 1.0 {
-            // Normalized coordinates
-            (
-                bbox.left as f64 * width,
-                bbox.top as f64 * height,
-                bbox.width as f64 * width,
-                bbox.height as f64 * height,
-            )
-        } else {
-            // Already in pixels
-            (
-                bbox.left as f64,
-                bbox.top as f64,
-                bbox.width as f64,
-                bbox.height as f64,
-            )
-        };
-        
-        // Set color
-        let (r, g, b) = style.color.to_normalized();
-        cr.set_source_rgba(r, g, b, style.alpha as f64);
-        cr.set_line_width(style.thickness as f64);
-        
-        // Draw rectangle
-        if style.corner_radius > 0.0 {
-            // Rounded rectangle
-            draw_rounded_rectangle(cr, x, y, w, h, style.corner_radius as f64);
-        } else {
-            // Regular rectangle
-            cr.rectangle(x, y, w, h);
-        }
-        
-        // Fill if needed
-        if style.filled {
-            let (fr, fg, fb) = style.fill_color.to_normalized();
-            cr.set_source_rgba(fr, fg, fb, style.fill_alpha as f64);
-            cr.fill_preserve();
-            cr.set_source_rgba(r, g, b, style.alpha as f64);
-        }
-        
-        cr.stroke();
-        
-        // Draw label if enabled
-        if config.enable_labels {
-            draw_label(cr, obj, x, y, w, h, config);
-        }
-    }
+    // Stub implementation without cairo-rs
+    log::trace!("Would draw {} bounding boxes", frame_data.objects.len());
 }
 
-/// Draw a rounded rectangle
+/// Draw a rounded rectangle (stub without cairo-rs)
+#[allow(unused)]
 fn draw_rounded_rectangle(
-    cr: &cairo::Context,
-    x: f64,
-    y: f64,
-    width: f64,
-    height: f64,
-    radius: f64,
+    _cr: &(),  // Placeholder for cairo::Context
+    _x: f64,
+    _y: f64,
+    _width: f64,
+    _height: f64,
+    _radius: f64,
 ) {
-    let degrees = std::f64::consts::PI / 180.0;
-    
-    cr.new_sub_path();
-    cr.arc(x + width - radius, y + radius, radius, -90.0 * degrees, 0.0 * degrees);
-    cr.arc(x + width - radius, y + height - radius, radius, 0.0 * degrees, 90.0 * degrees);
-    cr.arc(x + radius, y + height - radius, radius, 90.0 * degrees, 180.0 * degrees);
-    cr.arc(x + radius, y + radius, radius, 180.0 * degrees, 270.0 * degrees);
-    cr.close_path();
+    // Stub implementation
 }
 
-/// Draw object label
+/// Draw object label (stub without cairo-rs)
+#[allow(unused)]
 fn draw_label(
-    cr: &cairo::Context,
+    _cr: &(),  // Placeholder for cairo::Context
     obj: &ObjectMeta,
-    x: f64,
-    y: f64,
+    _x: f64,
+    _y: f64,
     _w: f64,
     _h: f64,
     config: &RenderingConfig,
 ) {
+    // Stub implementation - just format the label
     let mut label = obj.obj_label.clone();
     
     if config.enable_tracking_id && obj.is_tracked() {
@@ -377,41 +296,7 @@ fn draw_label(
         label = format!("{} {:.1}%", label, obj.confidence * 100.0);
     }
     
-    // Set font
-    cr.select_font_face(
-        &config.font_config.family,
-        if config.font_config.italic { cairo::FontSlant::Italic } else { cairo::FontSlant::Normal },
-        if config.font_config.bold { cairo::FontWeight::Bold } else { cairo::FontWeight::Normal },
-    );
-    cr.set_font_size(config.font_config.size as f64);
-    
-    // Calculate text position based on config
-    let (text_x, text_y) = match config.font_config.position {
-        super::config::LabelPosition::TopLeft => (x + 5.0, y - 5.0),
-        super::config::LabelPosition::Above => (x + 5.0, y - 20.0),
-        super::config::LabelPosition::Below => (x + 5.0, y + 20.0),
-        _ => (x + 5.0, y - 5.0),
-    };
-    
-    // Draw background if configured
-    if config.font_config.background_alpha > 0.0 {
-        let extents = cr.text_extents(&label);
-        let (br, bg, bb) = config.font_config.background_color.to_normalized();
-        cr.set_source_rgba(br, bg, bb, config.font_config.background_alpha as f64);
-        cr.rectangle(
-            text_x - 2.0,
-            text_y - extents.height - 2.0,
-            extents.width + 4.0,
-            extents.height + 4.0,
-        );
-        cr.fill();
-    }
-    
-    // Draw text
-    let (tr, tg, tb) = config.font_config.color.to_normalized();
-    cr.set_source_rgba(tr, tg, tb, 1.0);
-    cr.move_to(text_x, text_y);
-    cr.show_text(&label);
+    log::trace!("Would draw label: {}", label);
 }
 
 /// Format objects as text for text overlay fallback

@@ -1,3 +1,4 @@
+#![allow(unused)]
 //! Metadata bridge for connecting inference results to OSD rendering
 
 use crate::metadata::object::ObjectMeta;
@@ -100,19 +101,15 @@ impl MetadataBridge {
     /// Add a frame to the buffer
     fn add_frame(&mut self, frame: FrameMetadata) {
         // Remove old frames beyond max latency
-        if let Some(current_time) = frame.timestamp.nseconds() {
-            while let Some(oldest) = self.frame_buffer.front() {
-                if let Some(oldest_time) = oldest.timestamp.nseconds() {
-                    if current_time > oldest_time && 
-                       current_time - oldest_time > self.max_latency {
-                        self.frame_buffer.pop_front();
-                        self.stats.frames_dropped += 1;
-                    } else {
-                        break;
-                    }
-                } else {
-                    break;
-                }
+        let current_time = frame.timestamp.nseconds();
+        while let Some(oldest) = self.frame_buffer.front() {
+            let oldest_time = oldest.timestamp.nseconds();
+            if current_time > oldest_time && 
+               current_time - oldest_time > self.max_latency {
+                self.frame_buffer.pop_front();
+                self.stats.frames_dropped += 1;
+            } else {
+                break;
             }
         }
         
@@ -132,28 +129,27 @@ impl MetadataBridge {
     /// Get metadata for a specific timestamp
     pub fn get_frame_metadata(&self, timestamp: gst::ClockTime) -> Option<Vec<ObjectMeta>> {
         // Find closest frame to the requested timestamp
-        let target_ns = timestamp.nseconds()?;
+        let target_ns = timestamp.nseconds();
         
         let mut best_frame = None;
         let mut best_diff = u64::MAX;
         
         for frame in &self.frame_buffer {
-            if let Some(frame_ns) = frame.timestamp.nseconds() {
-                let diff = if frame_ns > target_ns {
-                    frame_ns - target_ns
-                } else {
-                    target_ns - frame_ns
-                };
-                
-                if diff < best_diff {
-                    best_diff = diff;
-                    best_frame = Some(frame);
-                }
-                
-                // Exact match
-                if diff == 0 {
-                    break;
-                }
+            let frame_ns = frame.timestamp.nseconds();
+            let diff = if frame_ns > target_ns {
+                frame_ns - target_ns
+            } else {
+                target_ns - frame_ns
+            };
+            
+            if diff < best_diff {
+                best_diff = diff;
+                best_frame = Some(frame);
+            }
+            
+            // Exact match
+            if diff == 0 {
+                break;
             }
         }
         
@@ -216,21 +212,19 @@ impl MetadataBridge {
     
     /// Synchronize metadata with pipeline timing
     pub fn sync_with_pipeline(&mut self, pipeline_clock: &gst::Clock) -> Result<(), String> {
+        use gstreamer::prelude::ClockExt;
         let current_time = pipeline_clock.time();
         
         // Clean up old frames based on pipeline time
-        if let Some(current_ns) = current_time.nseconds() {
-            while let Some(oldest) = self.frame_buffer.front() {
-                if let Some(oldest_ns) = oldest.timestamp.nseconds() {
-                    if current_ns > oldest_ns && current_ns - oldest_ns > self.max_latency {
-                        self.frame_buffer.pop_front();
-                        self.stats.frames_dropped += 1;
-                    } else {
-                        break;
-                    }
-                } else {
-                    break;
-                }
+        let current_ns = current_time.nseconds();
+
+        while let Some(oldest) = self.frame_buffer.front() {
+            let oldest_ns = oldest.timestamp.nseconds();
+            if current_ns > oldest_ns && current_ns - oldest_ns > self.max_latency {
+                self.frame_buffer.pop_front();
+                self.stats.frames_dropped += 1;
+            } else {
+                break;
             }
         }
         

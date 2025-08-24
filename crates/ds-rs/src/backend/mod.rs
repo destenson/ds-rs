@@ -16,6 +16,12 @@ pub enum BackendType {
     Mock,
 }
 
+impl std::fmt::Display for BackendType {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}", self.name())
+    }
+}
+
 impl BackendType {
     pub fn name(&self) -> &'static str {
         match self {

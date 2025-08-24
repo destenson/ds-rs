@@ -1,3 +1,4 @@
+#![allow(unused)]
 //! Real-time bounding box rendering and visualization module
 //! 
 //! This module provides cross-backend rendering capabilities for displaying

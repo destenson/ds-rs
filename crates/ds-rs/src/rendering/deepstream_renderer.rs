@@ -1,3 +1,4 @@
+#![allow(unused)]
 //! DeepStream-specific bounding box renderer using nvdsosd
 
 use super::{BoundingBoxRenderer, PerformanceMetrics, RenderingConfig};

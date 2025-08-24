@@ -94,6 +94,10 @@ impl Backend for StandardBackend {
         // Important: Set compositor to not wait for all pads
         // This allows it to start outputting when any pad has data
         compositor.set_property_from_str("start-time-selection", "first"); // Use first pad's timestamp
+        
+        // Set to ignore inactive pads to ensure continuous output
+        compositor.set_property("ignore-inactive-pads", true);
+        
         // Note: max-threads property may not exist on all compositor versions
 
         Ok(compositor)

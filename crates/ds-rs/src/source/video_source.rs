@@ -30,10 +30,21 @@ impl VideoSource {
         
         // Fix Windows file URI format
         let fixed_uri = if cfg!(target_os = "windows") && uri.starts_with("file://") {
-            // Convert file://C:\... to file:///C:/...
-            let path = uri.strip_prefix("file://").unwrap_or(uri);
-            let path = path.replace('\\', "/");
-            format!("file:///{}", path)
+            // Normalize file URIs on Windows
+            let normalized = if uri.starts_with("file:///") {
+                // Already has three slashes, keep as is
+                uri.to_string()
+            } else {
+                // Has only two slashes, need to add one for absolute paths
+                let path = uri.strip_prefix("file://").unwrap_or(uri);
+                // Only add extra slash if path starts with / (absolute Unix-style path)
+                if path.starts_with('/') {
+                    format!("file://{}", path)
+                } else {
+                    format!("file:///{}", path)
+                }
+            };
+            normalized.replace('\\', "/")
         } else {
             uri.to_string()
         };
@@ -75,41 +86,33 @@ impl VideoSource {
     pub fn connect_pad_added_default(&mut self, streammux: &gst::Element) -> Result<()> {
         self.connect_pad_added(streammux, |_decodebin, pad, source_id, mux| {
             let caps = pad.current_caps().unwrap_or_else(|| pad.query_caps(None));
+            
             let Some(structure) = caps.structure(0) else {
                 eprintln!("Failed to get caps structure for source {}", source_id);
                 return;
             };
-            let name = structure.name().as_str();
             
+            let name = structure.name().as_str();
             println!("New pad {} from source {}", name, source_id);
             
-            if name.starts_with("video/") || name.starts_with("image/") {
-                let pad_name = format!("sink_{}", source_id.0);
-                
-                // Check if the pad already exists
-                let sinkpad = if let Some(existing_pad) = mux.static_pad(&pad_name) {
-                    // Pad already exists, check if it's linked
-                    if existing_pad.is_linked() {
-                        println!("Pad {} already linked, skipping", pad_name);
-                        return;
-                    }
-                    existing_pad
-                } else {
-                    // Request new pad
-                    match mux.request_pad_simple(&pad_name) {
-                        Some(pad) => pad,
-                        None => {
-                            eprintln!("Failed to get request pad {} from streammux", pad_name);
-                            return;
-                        }
-                    }
-                };
-                
-                match pad.link(&sinkpad) {
-                    Ok(_) => println!("Linked source {} to streammux", source_id),
-                    Err(e) => eprintln!("Failed to link source {} to streammux: {:?}", source_id, e),
-                }
+            if !name.starts_with("video/") && !name.starts_with("image/") {
+                return;
             }
+            
+            let pad_name = format!("sink_{}", source_id.0);
+            
+            // Check if the pad already exists or request a new one
+            let Some(sinkpad) = mux.static_pad(&pad_name)
+                .filter(|p| !p.is_linked())
+                .or_else(|| mux.request_pad_simple(&pad_name)) else {
+                eprintln!("Failed to get pad {} from streammux", pad_name);
+                return;
+            };
+            
+            pad.link(&sinkpad)
+                .map(|_| println!("Linked source {} to streammux", source_id))
+                .inspect_err(|e| eprintln!("Failed to link source {} to streammux: {:?}", source_id, e))
+                .ok();
         })
     }
     

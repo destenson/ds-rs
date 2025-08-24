@@ -146,8 +146,8 @@ impl Application {
     
     pub fn add_initial_source(&self) -> Result<()> {
         let controller = self.source_controller.lock().unwrap();
-        controller.add_source(&self.initial_uri)?;
-        println!("Added initial source: {}", self.initial_uri);
+        let source_id = controller.add_source(&self.initial_uri)?;
+        println!("Added initial source: {} (ID: {:?})", self.initial_uri, source_id);
         Ok(())
     }
     
@@ -162,14 +162,15 @@ impl Application {
         self.pipeline.set_state(gst::State::Playing)?;
         
         println!("Now playing: {}", self.initial_uri);
-        println!("Pipeline running...");
+        println!("Pipeline running... Press Ctrl+C to exit");
         
         // Simple loop with mutex check
         let running = self.running.clone();
+        let bus = self.pipeline.bus().unwrap();
+        
         while *running.lock().unwrap() {
-            // Check for messages on the bus
-            let bus = self.pipeline.bus().unwrap();
-            if let Some(msg) = bus.timed_pop(gst::ClockTime::from_mseconds(100)) {
+            // Use timed_pop with short timeout for non-blocking operation
+            if let Some(msg) = bus.timed_pop(gst::ClockTime::from_mseconds(50)) {
                 match msg.view() {
                     gst::MessageView::Eos(..) => {
                         println!("End of stream");
@@ -177,16 +178,26 @@ impl Application {
                     }
                     gst::MessageView::Error(err) => {
                         eprintln!("Error: {}", err.error());
+                        if let Some(debug) = err.debug() {
+                            eprintln!("Debug: {}", debug);
+                        }
                         break;
+                    }
+                    gst::MessageView::Warning(warn) => {
+                        // Log warnings but don't stop playback
+                        if let Some(debug) = warn.debug() {
+                            log::warn!("Warning: {} - {}", warn.error(), debug);
+                        }
                     }
                     _ => {}
                 }
             }
             
-            // Let async runtime do other work
-            tokio::time::sleep(tokio::time::Duration::from_millis(10)).await;
+            // Check running flag more frequently for better shutdown response
+            tokio::time::sleep(tokio::time::Duration::from_millis(50)).await;
         }
         
+        println!("Shutting down pipeline...");
         self.cleanup()?;
         Ok(())
     }

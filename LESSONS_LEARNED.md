@@ -61,16 +61,30 @@
 
 ## Event Loop and GStreamer Integration
 
-### 11. GSTREAMER NEEDS GLIB MAIN LOOP
+### 11. GSTREAMER NEEDS GLIB MAIN CONTEXT (NOT JUST MAIN LOOP)
 - **Problem**: Mixing tokio runtime with GStreamer causes race conditions
-- **Solution**: Use GLib::MainLoop for GStreamer applications
-- **Why**: GStreamer is built on GLib and expects GLib event handling
-- **Reference**: See gstreamer-rs examples like launch_glib_main.rs
+- **Wrong**: Using g_main_loop_run() which blocks completely
+- **Right**: Manually iterate GLib::MainContext to maintain control
+- **Why**: Need to check shutdown flags between iterations
+- **Pattern**: `main_context.iteration(true)` with AtomicBool for shutdown
 
 ### 12. SIGNAL HANDLING MUST INTEGRATE WITH EVENT LOOP
 - **Wrong**: Using ctrlc crate with separate mutex flag
-- **Right**: Use glib::unix_signal_add or platform-specific GLib integration
+- **Right**: Use AtomicBool with main_context.wakeup() to interrupt blocking
 - **Why**: Separate signal handlers conflict with window system events
+
+### 14. NEVER SLEEP IN EVENT LOOPS
+- **WRONG**: `thread::sleep()` in any event loop
+- **RIGHT**: Use `main_context.iteration(true)` which blocks efficiently
+- **Why**: Sleep wastes CPU cycles and adds latency
+- **Pattern**: Let the event system handle waiting with timeouts
+
+### 15. ALWAYS QUIT THE MAIN LOOP PROPERLY
+- **CRITICAL**: Call `main_loop.quit()` before breaking from iteration
+- **Why**: Leaves GLib resources in clean state
+- **Pattern**: quit() -> drain events -> break
+- **Most Robust**: quit() -> run() briefly -> break
+- **Also**: Stop pipeline BEFORE quit to prevent new events
 
 ### 13. ALWAYS CHECK REFERENCE IMPLEMENTATIONS
 - **C Reference**: ../NVIDIA-AI-IOT--deepstream_reference_apps shows correct patterns

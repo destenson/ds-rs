@@ -215,14 +215,41 @@ fn cleanup_and_exit(pipeline: &Pipeline, main_loop: &MainLoop, running: &AtomicB
     // 1. Set shutdown flag
     running.store(false, Ordering::SeqCst);
     
-    // 2. Quit the main loop
-    main_loop.quit();
-    
-    // 3. Stop pipeline
+    // 2. Stop pipeline FIRST (prevents new events)
     pipeline.set_state(gst::State::Null).ok();
+    
+    // 3. Quit the main loop
+    main_loop.quit();
     
     // 4. Wake up context to process the quit
     glib::MainContext::default().wakeup();
+    
+    // 5. Drain remaining events
+    let ctx = glib::MainContext::default();
+    while ctx.pending() {
+        ctx.iteration(false);
+    }
+}
+```
+
+**Most Robust Pattern**:
+```rust
+// The quit-run-break pattern for guaranteed cleanup
+if !running.load(Ordering::SeqCst) {
+    // Tell main loop to quit
+    main_loop.quit();
+    
+    // Run it briefly to process the quit
+    if main_loop.is_running() {
+        // Add immediate timeout to prevent blocking
+        glib::idle_add_once(move || {
+            main_loop_clone.quit();
+        });
+        main_loop.run();  // Returns when quit is processed
+    }
+    
+    // Now safe to break
+    break;
 }
 ```
 

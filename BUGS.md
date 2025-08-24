@@ -1,5 +1,34 @@
 # Current Bugs
 
+## 🔴 ACTIVE: Float16 Model Support Issue
+
+**Status**: ACTIVE - PRP-02 created for fix
+
+**Problem**:
+- YOLO models using float16 (half precision) format fail to load
+- Error: "Float16 models not currently supported due to lifetime issues"
+- The ORT crate supports float16 but implementation has Rust lifetime issues
+
+**Symptoms**:
+```
+Detection failed: Configuration error: Float16 models not currently supported due to lifetime issues
+```
+
+**Root Cause**:
+- Model expects float16 input tensors but code provides float32
+- Lifetime issues when creating ORT Values from float16 arrays
+- The converted f16 data doesn't live long enough for Value::from_array
+
+**Workaround**:
+- Use float32 YOLO models instead of float16
+- Convert models to float32 format using ONNX tools
+
+**Planned Fix** (PRP-02):
+- Implement proper f32→f16 conversion for inputs
+- Fix lifetime issues by managing f16 data ownership correctly
+- Support f16 output tensor extraction and conversion
+- See PRPs/02-float16-model-support.md for implementation plan
+
 ## ✅ FIXED: Shutdown Issues (PRP-25 completed)
 
 **Status**: RESOLVED as of 2025-08-23 via PRP-25 implementation  

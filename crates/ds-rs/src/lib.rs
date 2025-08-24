@@ -11,6 +11,7 @@ pub mod metadata;
 pub mod inference;
 pub mod tracking;
 pub mod messages;
+pub mod rendering;
 
 #[cfg(target_os = "windows")]
 pub mod dll_validator;
@@ -39,6 +40,10 @@ pub use tracking::{
 };
 pub use messages::{
     DSMessageHandler, DSMessageType, StreamEosTracker
+};
+pub use rendering::{
+    BoundingBoxRenderer, RenderingConfig, RendererFactory, MetadataBridge,
+    PerformanceMetrics
 };
 
 /// Get current timestamp in seconds since Unix epoch

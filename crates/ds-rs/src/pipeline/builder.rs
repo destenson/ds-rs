@@ -1,6 +1,7 @@
 use crate::backend::{BackendManager, BackendType};
 use crate::elements::factory::ElementFactory;
 use crate::error::{DeepStreamError, Result};
+use crate::rendering::{RenderingConfig, RendererFactory, MetadataBridge};
 use super::{Pipeline, StateManager};
 use gstreamer as gst;
 use gstreamer::prelude::*;
@@ -19,6 +20,9 @@ pub struct PipelineBuilder {
     auto_flush_bus: bool,
     use_clock: Option<gst::Clock>,
     start_paused: bool,
+    rendering_config: Option<RenderingConfig>,
+    enable_dynamic_rendering: bool,
+    metadata_bridge: Option<Arc<Mutex<MetadataBridge>>>,
 }
 
 #[derive(Debug, Clone)]
@@ -48,6 +52,9 @@ impl PipelineBuilder {
             auto_flush_bus: true,
             use_clock: None,
             start_paused: false,
+            rendering_config: None,
+            enable_dynamic_rendering: false,
+            metadata_bridge: None,
         }
     }
     
@@ -223,6 +230,49 @@ impl PipelineBuilder {
             .set_property(&name, "caps", caps)
     }
     
+    /// Enable dynamic bounding box rendering
+    pub fn with_rendering(mut self, config: RenderingConfig) -> Self {
+        self.rendering_config = Some(config);
+        self.enable_dynamic_rendering = true;
+        self
+    }
+    
+    /// Enable default bounding box rendering
+    pub fn with_default_rendering(mut self) -> Self {
+        self.rendering_config = Some(RenderingConfig::default());
+        self.enable_dynamic_rendering = true;
+        self
+    }
+    
+    /// Enable ball tracking visualization
+    pub fn with_ball_tracking_rendering(mut self) -> Self {
+        self.rendering_config = Some(RenderingConfig::for_ball_tracking());
+        self.enable_dynamic_rendering = true;
+        self
+    }
+    
+    /// Set a custom metadata bridge
+    pub fn with_metadata_bridge(mut self, bridge: Arc<Mutex<MetadataBridge>>) -> Self {
+        self.metadata_bridge = Some(bridge);
+        self
+    }
+    
+    /// Add a dynamic OSD element with rendering support
+    pub fn add_dynamic_osd(mut self, name: impl Into<String>) -> Self {
+        let name = name.into();
+        self.enable_dynamic_rendering = true;
+        
+        // Add OSD element
+        self = self.add_element(&name, "nvdsosd");
+        
+        // If no rendering config is set, use default
+        if self.rendering_config.is_none() {
+            self.rendering_config = Some(RenderingConfig::default());
+        }
+        
+        self
+    }
+    
     /// Build the pipeline
     pub fn build(self) -> Result<Pipeline> {
         // Initialize GStreamer if not already done
@@ -335,6 +385,29 @@ impl PipelineBuilder {
             gst_pipeline.use_clock(Some(&clock));
         }
         
+        // Configure dynamic rendering if enabled
+        if self.enable_dynamic_rendering {
+            // Create metadata bridge if not provided
+            let metadata_bridge = self.metadata_bridge.unwrap_or_else(|| {
+                Arc::new(Mutex::new(MetadataBridge::new()))
+            });
+            
+            // Find OSD elements and configure them
+            for (element_name, element) in &elements_map {
+                if element_name.contains("osd") || element_name.contains("OSD") {
+                    // Configure the OSD element with rendering config
+                    if let Some(ref config) = self.rendering_config {
+                        configure_osd_for_rendering(
+                            element,
+                            config,
+                            metadata_bridge.clone(),
+                            backend_manager.get_backend_type(),
+                        )?;
+                    }
+                }
+            }
+        }
+        
         // Create state manager
         let state_manager = Arc::new(Mutex::new(StateManager::new()));
         
@@ -354,6 +427,47 @@ impl PipelineBuilder {
         
         Ok(pipeline)
     }
+}
+
+/// Configure an OSD element for dynamic rendering
+fn configure_osd_for_rendering(
+    osd_element: &gst::Element,
+    config: &RenderingConfig,
+    metadata_bridge: Arc<Mutex<MetadataBridge>>,
+    backend_type: BackendType,
+) -> Result<()> {
+    use crate::rendering::BoundingBoxRenderer;
+    
+    // Create backend-specific renderer
+    let mut renderer = RendererFactory::create_renderer_with_config(
+        backend_type,
+        Some(&format!("{}-renderer", osd_element.name())),
+        config.clone(),
+    )?;
+    
+    // Connect metadata bridge to renderer
+    renderer.connect_metadata_source(metadata_bridge)?;
+    
+    // Configure OSD element based on rendering config
+    if config.enable_bbox {
+        osd_element.set_property("display-bbox", 1i32);
+    }
+    
+    if config.enable_labels {
+        osd_element.set_property("display-text", 1i32);
+        
+        // Set font configuration if supported
+        let font_desc = format!("{} {}", 
+            config.font_config.family,
+            config.font_config.size as i32
+        );
+        osd_element.set_property("font-desc", &font_desc);
+    }
+    
+    log::info!("Configured OSD element '{}' for dynamic rendering with {} backend",
+              osd_element.name(), backend_type);
+    
+    Ok(())
 }
 
 /// Builder extensions for DeepStream-specific pipelines

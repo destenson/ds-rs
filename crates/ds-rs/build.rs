@@ -1,11 +1,14 @@
 use std::env;
 use std::fs;
-use std::path::{Path, PathBuf};
+use std::path::PathBuf;
 
 fn main() {
     // Only run this when ort feature is enabled and we're on Windows
     #[cfg(all(feature = "ort", target_os = "windows"))]
     copy_onnx_dlls();
+    
+    // Also set up a rerun trigger for when ort completes
+    println!("cargo:rerun-if-env-changed=ORT_STRATEGY");
 }
 
 #[cfg(all(feature = "ort", target_os = "windows"))]

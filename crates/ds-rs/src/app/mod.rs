@@ -157,7 +157,6 @@ impl Application {
         
         // Get the bus for message handling
         let bus = self.pipeline.bus().unwrap();
-        let pipeline_clone = Arc::clone(&self.pipeline);
         
         // Add bus watch for GStreamer messages  
         let _bus_watch = bus.add_watch(move |_, msg| {
@@ -193,16 +192,18 @@ impl Application {
         })?;
         
         // Add SIGINT handler using GLib's signal handling
-        let main_loop_signal = main_loop.clone();
         #[cfg(unix)]
-        let _signal_handler = glib::unix_signal_add(
-            glib::Signal::SIGINT,
-            move || {
-                println!("\nReceived interrupt signal, shutting down...");
-                main_loop_signal.quit();
-                glib::ControlFlow::Break
-            }
-        );
+        {
+            let main_loop_signal = main_loop.clone();
+            let _signal_handler = glib::unix_signal_add(
+                glib::Signal::SIGINT,
+                move || {
+                    println!("\nReceived interrupt signal, shutting down...");
+                    main_loop_signal.quit();
+                    glib::ControlFlow::Break
+                }
+            );
+        }
         
         // On Windows, we'll still use ctrlc as glib unix signals don't work
         #[cfg(windows)]

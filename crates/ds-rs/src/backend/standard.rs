@@ -90,10 +90,35 @@ impl Backend for StandardBackend {
     }
     
     fn create_inference(&self, name: Option<&str>, config_path: &str) -> Result<gst::Element> {
+        // Determine model path - try config_path first, then fallback to default model
+        let model_path = if std::path::Path::new(config_path).exists() {
+            config_path
+        } else {
+            // Try to find the bundled YOLOv5n model
+            let default_model = "models/yolov5n.onnx";
+            if std::path::Path::new(default_model).exists() {
+                default_model
+            } else {
+                // Try relative to crate root
+                let crate_model = "crates/ds-rs/models/yolov5n.onnx";
+                if std::path::Path::new(crate_model).exists() {
+                    crate_model
+                } else {
+                    log::warn!("No ONNX model found, will use mock detector");
+                    ""
+                }
+            }
+        };
+        
         // Try to create CPU detector with ONNX model
-        match super::cpu_vision::elements::create_cpu_detector(name, Some(config_path)) {
+        let model_to_use = if model_path.is_empty() { None } else { Some(model_path) };
+        match super::cpu_vision::elements::create_cpu_detector(name, model_to_use) {
             Ok(detector) => {
-                log::info!("Standard backend: Using CPU detector for inference");
+                if let Some(path) = model_to_use {
+                    log::info!("Standard backend: Using CPU detector with model: {}", path);
+                } else {
+                    log::info!("Standard backend: Using CPU detector with mock inference");
+                }
                 Ok(detector)
             }
             Err(e) => {

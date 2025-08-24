@@ -2,6 +2,7 @@ pub mod detector;
 #[cfg(feature = "nalgebra")]
 pub mod tracker;
 pub mod elements;
+pub mod metadata;
 
 use crate::error::Result;
 

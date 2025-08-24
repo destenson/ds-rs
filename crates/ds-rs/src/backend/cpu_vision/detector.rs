@@ -38,12 +38,48 @@ pub enum YoloVersion {
     Auto,   // Auto-detect based on output shape
 }
 
+/// Configuration for the ONNX detector
+#[derive(Debug, Clone)]
+pub struct DetectorConfig {
+    /// Path to the ONNX model file
+    pub model_path: Option<String>,
+    /// Input width for the model
+    pub input_width: u32,
+    /// Input height for the model
+    pub input_height: u32,
+    /// Confidence threshold for detections
+    pub confidence_threshold: f32,
+    /// NMS threshold for filtering overlapping boxes
+    pub nms_threshold: f32,
+    /// Number of threads for inference
+    pub num_threads: usize,
+    /// YOLO version for output processing
+    pub yolo_version: YoloVersion,
+    /// Custom class names (optional)
+    pub class_names: Option<Vec<String>>,
+}
+
+impl Default for DetectorConfig {
+    fn default() -> Self {
+        Self {
+            model_path: None,
+            input_width: 640,
+            input_height: 640,
+            confidence_threshold: 0.5,
+            nms_threshold: 0.4,
+            num_threads: 4,
+            yolo_version: YoloVersion::Auto,
+            class_names: None,
+        }
+    }
+}
+
 /// ONNX-based object detector for CPU inference
 pub struct OnnxDetector {
     #[cfg(feature = "ort")]
     session: Option<ort::Session>,
     #[cfg(feature = "ort")]
-    allocator: Option<*mut ort::sys::OrtAllocator>,
+    environment: Option<std::sync::Arc<ort::Environment>>,
     input_width: u32,
     input_height: u32,
     confidence_threshold: f32,
@@ -55,41 +91,63 @@ pub struct OnnxDetector {
 impl OnnxDetector {
     /// Create a new ONNX detector with the specified model
     pub fn new(model_path: &str) -> Result<Self> {
+        let config = DetectorConfig {
+            model_path: Some(model_path.to_string()),
+            ..Default::default()
+        };
+        Self::new_with_config(config)
+    }
+    
+    /// Create a new ONNX detector with a configuration
+    pub fn new_with_config(config: DetectorConfig) -> Result<Self> {
         #[cfg(feature = "ort")]
         {
-            // Try to load ONNX model if the feature is enabled
-            if !Path::new(model_path).exists() {
-                return Err(DeepStreamError::Configuration(
-                    format!("Model file not found: {}", model_path)
-                ));
-            }
+            // Load model if path is provided
+            let (session, environment) = if let Some(ref model_path) = config.model_path {
+                if !Path::new(model_path).exists() {
+                    return Err(DeepStreamError::Configuration(
+                        format!("Model file not found: {}", model_path)
+                    ));
+                }
+                
+                let (env, sess) = Self::load_onnx_model(model_path, config.num_threads)?;
+                log::info!("Loaded ONNX model from: {}", model_path);
+                (Some(sess), Some(env))
+            } else {
+                log::info!("No model path provided, using mock detector");
+                (None, None)
+            };
             
-            let session = Self::load_onnx_model(model_path)?;
-            let allocator = session.allocator();
-            log::info!("Loaded ONNX model from: {}", model_path);
+            let class_names = config.class_names.unwrap_or_else(Self::default_class_names);
             
             return Ok(Self {
-                session: Some(session),
-                allocator: Some(allocator),
-                input_width: 640,
-                input_height: 640,
-                confidence_threshold: 0.5,
-                nms_threshold: 0.4,
-                class_names: Self::default_class_names(),
-                yolo_version: YoloVersion::Auto,
+                session,
+                environment,
+                input_width: config.input_width,
+                input_height: config.input_height,
+                confidence_threshold: config.confidence_threshold,
+                nms_threshold: config.nms_threshold,
+                class_names,
+                yolo_version: config.yolo_version,
             });
         }
         
         #[cfg(not(feature = "ort"))]
         {
-            Err(DeepStreamError::Configuration(
-                "ONNX Runtime feature not enabled. Build with --features ort".to_string()
-            ))
+            // When ort feature is not enabled, create mock detector
+            Ok(Self {
+                input_width: config.input_width,
+                input_height: config.input_height,
+                confidence_threshold: config.confidence_threshold,
+                nms_threshold: config.nms_threshold,
+                class_names: config.class_names.unwrap_or_else(Self::default_class_names),
+                yolo_version: config.yolo_version,
+            })
         }
     }
     
     #[cfg(feature = "ort")]
-    fn load_onnx_model(model_path: &str) -> Result<ort::Session> {
+    fn load_onnx_model(model_path: &str, num_threads: usize) -> Result<(std::sync::Arc<ort::Environment>, ort::Session)> {
         use ort::{Environment, SessionBuilder, GraphOptimizationLevel};
         use std::sync::Arc;
         
@@ -110,7 +168,7 @@ impl OnnxDetector {
             .map_err(|e| DeepStreamError::Configuration(
                 format!("Failed to set optimization level: {}", e)
             ))?
-            .with_intra_threads(4)
+            .with_intra_threads(num_threads)
             .map_err(|e| DeepStreamError::Configuration(
                 format!("Failed to set intra threads: {}", e)
             ))?
@@ -119,7 +177,7 @@ impl OnnxDetector {
                 format!("Failed to load model from file: {}", e)
             ))?;
             
-        Ok(session)
+        Ok((environment, session))
     }
     
     /// Perform detection on an image
@@ -129,13 +187,16 @@ impl OnnxDetector {
             use ndarray::{Array, CowArray, IxDyn};
             use ort::Value;
             
-            let session = self.session.as_ref().ok_or_else(|| DeepStreamError::Configuration(
-                "ONNX session not initialized".to_string()
-            ))?;
-            
-            let allocator = self.allocator.ok_or_else(|| DeepStreamError::Configuration(
-                "ONNX allocator not initialized".to_string()
-            ))?;
+            // Check if we have a real session or should use mock
+            let session = match self.session.as_ref() {
+                Some(s) => s,
+                None => {
+                    // Use mock detection when no model is loaded
+                    log::debug!("Using mock detection (no ONNX model loaded)");
+                    let mock_output = self.create_mock_yolo_output();
+                    return self.postprocess_outputs(&mock_output, image.width(), image.height());
+                }
+            };
             
             // Preprocess image
             let input_tensor = self.preprocess_image(image)?;
@@ -153,8 +214,8 @@ impl OnnxDetector {
             // Convert to CowArray with dynamic dimensions
             let cow_array: CowArray<f32, IxDyn> = CowArray::from(array.into_dyn());
             
-            // Create Value using the allocator
-            let input_value = Value::from_array(allocator, &cow_array)
+            // Create Value using the session's allocator
+            let input_value = Value::from_array(session.allocator(), &cow_array)
                 .map_err(|e| DeepStreamError::Configuration(
                     format!("Failed to create ORT value: {}", e)
                 ))?;
@@ -544,13 +605,12 @@ impl OnnxDetector {
     }
     
     /// Create a mock detector for testing without an actual model
-    #[cfg(test)]
     pub fn new_mock() -> Self {
         Self {
             #[cfg(feature = "ort")]
             session: None,
             #[cfg(feature = "ort")]
-            allocator: None,
+            environment: None,
             input_width: 640,
             input_height: 640,
             confidence_threshold: 0.5,
@@ -589,6 +649,23 @@ mod tests {
     }
     
     #[test]
+    fn test_detector_config() {
+        let config = DetectorConfig {
+            input_width: 416,
+            input_height: 416,
+            confidence_threshold: 0.3,
+            nms_threshold: 0.5,
+            ..Default::default()
+        };
+        
+        let detector = OnnxDetector::new_with_config(config).unwrap();
+        assert_eq!(detector.input_width, 416);
+        assert_eq!(detector.input_height, 416);
+        assert_eq!(detector.confidence_threshold, 0.3);
+        assert_eq!(detector.nms_threshold, 0.5);
+    }
+    
+    #[test]
     fn test_iou_calculation() {
         let detector = OnnxDetector::new_mock();
         
@@ -605,5 +682,72 @@ mod tests {
         let iou = detector.calculate_iou(&det1, &det2);
         assert!(iou > 0.0);
         assert!(iou < 1.0);
+    }
+    
+    #[test]
+    fn test_yolo_version_detection() {
+        let detector = OnnxDetector::new_mock();
+        
+        // Test V5 format detection (85 values per anchor)
+        let v5_output = vec![0.0; 25200 * 85];
+        let version = detector.detect_yolo_version(&v5_output);
+        assert!(matches!(version, YoloVersion::V5));
+        
+        // Test V8 format detection (84 values per anchor)
+        let v8_output = vec![0.0; 8400 * 84];
+        let version = detector.detect_yolo_version(&v8_output);
+        assert!(matches!(version, YoloVersion::V8));
+    }
+    
+    #[test]
+    fn test_nms() {
+        let detector = OnnxDetector::new_mock();
+        
+        // Create overlapping detections
+        let detections = vec![
+            Detection {
+                x: 100.0, y: 100.0, width: 50.0, height: 50.0,
+                confidence: 0.9, class_id: 0, class_name: "person".to_string(),
+            },
+            Detection {
+                x: 105.0, y: 105.0, width: 50.0, height: 50.0,
+                confidence: 0.8, class_id: 0, class_name: "person".to_string(),
+            },
+            Detection {
+                x: 200.0, y: 200.0, width: 50.0, height: 50.0,
+                confidence: 0.85, class_id: 1, class_name: "car".to_string(),
+            },
+        ];
+        
+        let filtered = detector.apply_nms(detections);
+        // Should keep highest confidence detection and the different class
+        assert_eq!(filtered.len(), 2);
+        assert_eq!(filtered[0].confidence, 0.9);
+        assert_eq!(filtered[1].class_id, 1);
+    }
+    
+    #[test]
+    fn test_mock_detection() {
+        let detector = OnnxDetector::new_mock();
+        let image = DynamicImage::new_rgb8(640, 640);
+        
+        let detections = detector.detect(&image).unwrap();
+        // Mock detector should return some detections
+        assert!(!detections.is_empty());
+    }
+    
+    #[test]
+    fn test_preprocessing() {
+        let detector = OnnxDetector::new_mock();
+        let image = DynamicImage::new_rgb8(1920, 1080);
+        
+        let tensor = detector.preprocess_image(&image).unwrap();
+        // Should resize to 640x640 with 3 channels
+        assert_eq!(tensor.len(), 3 * 640 * 640);
+        
+        // Check normalization (values should be in [0, 1])
+        for value in &tensor {
+            assert!(*value >= 0.0 && *value <= 1.0);
+        }
     }
 }

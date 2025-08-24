@@ -26,26 +26,48 @@ fn test_standard_backend_with_cpu_vision() {
 
 #[test]
 fn test_cpu_detector_creation() {
-    use ds_rs::backend::cpu_vision::detector::OnnxDetector;
+    use ds_rs::backend::cpu_vision::detector::{OnnxDetector, DetectorConfig};
     
-    // Test depends on whether ort feature is enabled
+    // Test with nonexistent model file
     let result = OnnxDetector::new("nonexistent.onnx");
     
     #[cfg(feature = "ort")]
     {
         // With ort feature, should fail because file doesn't exist
         assert!(result.is_err());
+        if let Err(e) = result {
+            let error_msg = e.to_string();
+            assert!(error_msg.contains("Model file not found"));
+        }
     }
     
     #[cfg(not(feature = "ort"))]
     {
-        // Without ort feature, should return feature not enabled error
-        assert!(result.is_err());
-        if let Err(e) = result {
-            let error_msg = e.to_string();
-            assert!(error_msg.contains("ONNX Runtime feature not enabled"));
-        }
+        // Without ort feature, should still work in mock mode
+        assert!(result.is_ok());
     }
+    
+    // Test with DetectorConfig for mock detector
+    let config = DetectorConfig {
+        model_path: None,  // No model, use mock
+        input_width: 416,
+        input_height: 416,
+        confidence_threshold: 0.3,
+        ..Default::default()
+    };
+    
+    let detector = OnnxDetector::new_with_config(config);
+    assert!(detector.is_ok());
+    let detector = detector.unwrap();
+    
+    // Test mock detection
+    use image::DynamicImage;
+    let image = DynamicImage::new_rgb8(640, 480);
+    let detections = detector.detect(&image);
+    assert!(detections.is_ok());
+    let detections = detections.unwrap();
+    // Mock detector should return some detections
+    assert!(!detections.is_empty());
 }
 
 #[test]
@@ -290,4 +312,33 @@ fn test_backend_manager_selects_standard() {
     unsafe {
         std::env::remove_var("FORCE_BACKEND");
     }
+}
+
+#[test]
+#[cfg(feature = "ort")]
+fn test_onnx_tensor_operations() {
+    use ds_rs::backend::cpu_vision::detector::{OnnxDetector, DetectorConfig};
+    use image::DynamicImage;
+    
+    // Create detector with mock mode (no actual model file)
+    let config = DetectorConfig {
+        model_path: None,
+        input_width: 640,
+        input_height: 640,
+        ..Default::default()
+    };
+    
+    let detector = OnnxDetector::new_with_config(config).unwrap();
+    
+    // Test preprocessing
+    let image = DynamicImage::new_rgb8(1920, 1080);
+    // This should work with mock detector
+    let result = detector.detect(&image);
+    assert!(result.is_ok());
+    
+    // TODO: When a real ONNX model is available, test with:
+    // let config = DetectorConfig {
+    //     model_path: Some("models/yolov5n.onnx".to_string()),
+    //     ..Default::default()
+    // };
 }

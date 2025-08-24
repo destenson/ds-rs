@@ -172,6 +172,19 @@ Key differences from C version:
 3. **Mock backend** - Cannot test uridecodebin-based source management
 4. **Workspace warnings** - Cargo.toml has unused workspace.edition/version keys
 
+## CRITICAL: Check BUGS.md Before Working
+
+**ALWAYS read `BUGS.md` at the start of any work session** to understand current critical bugs that need fixing. This file contains:
+- Active bugs that break core functionality
+- Specific error messages and symptoms
+- Reproduction steps
+
+When fixing bugs:
+- DO NOT break existing functionality
+- DO NOT introduce new bugs  
+- Test thoroughly after each fix
+- Reference implementations in ../NVIDIA-AI-IOT--deepstream_reference_apps/ for correct patterns
+
 ## Environment Variables
 
 ```bash
@@ -209,4 +222,69 @@ gst-inspect-1.0 uridecodebin
 ```
 
 `gstreamer-rs` is the Rust bindings for GStreamer. See https://crates.io/crates/gstreamer for documentation and examples.
-The source code for `gstreamer-rs` is locally available in `../gstreamer-rs`.
+
+## CRITICAL: Reference Local Source Code
+
+**NEVER make assumptions about library code. ALWAYS check the actual implementation in these local repositories:**
+
+### Available Source Repositories
+The following repositories are available locally for reference:
+
+- **`../gstreamer-rs/`** - GStreamer Rust bindings source code
+  - Check actual API signatures, trait implementations, and usage patterns
+  - Reference: `gstreamer/src/`, `gstreamer-app/src/`, `gstreamer-video/src/`
+  
+- **`../gst-plugins-rs/`** - GStreamer plugins written in Rust
+  - Example implementations of custom elements and plugins
+  - Reference for creating new GStreamer elements in Rust
+  
+- **`../MultimediaTechLab--YOLO/`** - YOLO implementation examples
+  - Integration patterns for object detection in video pipelines
+  
+- **`../pykeio--ort/`** - ONNX Runtime Rust bindings
+  - For ML inference integration patterns
+  
+- **`../NVIDIA-AI-IOT--deepstream_reference_apps/`** - Original DeepStream C/C++ implementations
+  - The C reference for this port is in `runtime_source_add_delete/`
+  - Check for correct DeepStream API usage and patterns
+  
+- **`../prominenceai--deepstream-services-library/`** - DeepStream Services Library
+  - High-level DeepStream abstractions and utilities
+  - Reference for DeepStream best practices
+
+### How to Use These References
+
+Before implementing any functionality:
+1. **Search the relevant repository** for existing implementations or similar patterns
+2. **Read the actual source code** to understand correct API usage
+3. **Check examples** in the repositories for working code patterns
+4. **Verify function signatures** and trait requirements from the source
+
+**IMPORTANT: Always use tools (Grep, Glob, Read) instead of bash commands for searching:**
+
+Example workflow:
+```
+# When working with GStreamer elements, check actual implementation:
+Use Grep tool: pattern="ElementFactory" path="../gstreamer-rs/"
+Use Grep tool: pattern="pad_added" path="../gstreamer-rs/examples/"
+
+# When implementing DeepStream features, reference the C code:
+Use Grep tool: pattern="nvstreammux" path="../NVIDIA-AI-IOT--deepstream_reference_apps/"
+Use Grep tool: pattern="source_bin" path="../prominenceai--deepstream-services-library/"
+
+# For custom plugin patterns:
+Use LS tool: path="../gst-plugins-rs/video/"
+Use Grep tool: pattern="impl ElementImpl" path="../gst-plugins-rs/"
+```
+
+**DO NOT:**
+- Guess API signatures or method names
+- Assume how a library works without checking
+- Create wrapper types that might already exist
+- Implement functionality that's already available in these libraries
+
+**ALWAYS:**
+- Reference the actual source code before implementing
+- Use existing patterns from the reference repositories
+- Check for helper functions or utilities that already exist
+- Validate against working examples in the repositories

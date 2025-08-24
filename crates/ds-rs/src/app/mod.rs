@@ -9,7 +9,8 @@ use crate::backend::BackendManager;
 use crate::elements::factory::ElementFactory;
 use gstreamer as gst;
 use gstreamer::prelude::*;
-use std::sync::{Arc, Mutex};
+use gstreamer::glib;
+use std::sync::{Arc, Mutex, atomic::{AtomicBool, Ordering}};
 
 /// Main application demonstrating runtime source addition/deletion
 pub struct Application {
@@ -17,7 +18,6 @@ pub struct Application {
     source_controller: Arc<Mutex<SourceController>>,
     backend_manager: Arc<BackendManager>,
     initial_uri: String,
-    running: Arc<Mutex<bool>>,
 }
 
 impl Application {
@@ -32,13 +32,9 @@ impl Application {
             ))),
             backend_manager,
             initial_uri: uri,
-            running: Arc::new(Mutex::new(false)),
         })
     }
     
-    pub fn get_running_flag(&self) -> Arc<Mutex<bool>> {
-        self.running.clone()
-    }
     
     pub fn init(&mut self) -> Result<()> {
         println!("Initializing pipeline with {} backend...", self.backend_manager.backend_type().name());
@@ -151,12 +147,8 @@ impl Application {
         Ok(())
     }
     
-    pub async fn run(&mut self) -> Result<()> {
-        {
-            let mut running = self.running.lock().unwrap();
-            *running = true;
-        }
-        
+    pub fn run_with_main_context(&mut self, running: Arc<AtomicBool>) -> Result<()> {
+        // Start the pipeline
         self.pipeline.set_state(gst::State::Paused)?;
         self.add_initial_source()?;
         self.pipeline.set_state(gst::State::Playing)?;
@@ -164,37 +156,49 @@ impl Application {
         println!("Now playing: {}", self.initial_uri);
         println!("Pipeline running... Press Ctrl+C to exit");
         
-        // Simple loop with mutex check
-        let running = self.running.clone();
+        // Get the bus for message handling
         let bus = self.pipeline.bus().unwrap();
+        let running_clone = running.clone();
         
-        while *running.lock().unwrap() {
-            // Use timed_pop with short timeout for non-blocking operation
-            if let Some(msg) = bus.timed_pop(gst::ClockTime::from_mseconds(50)) {
-                match msg.view() {
-                    gst::MessageView::Eos(..) => {
-                        println!("End of stream");
-                        break;
-                    }
-                    gst::MessageView::Error(err) => {
-                        eprintln!("Error: {}", err.error());
-                        if let Some(debug) = err.debug() {
-                            eprintln!("Debug: {}", debug);
-                        }
-                        break;
-                    }
-                    gst::MessageView::Warning(warn) => {
-                        // Log warnings but don't stop playback
-                        if let Some(debug) = warn.debug() {
-                            log::warn!("Warning: {} - {}", warn.error(), debug);
-                        }
-                    }
-                    _ => {}
-                }
-            }
+        // Add bus watch for GStreamer messages  
+        let _bus_watch = bus.add_watch(move |_, msg| {
+            use gst::MessageView;
             
-            // Check running flag more frequently for better shutdown response
-            tokio::time::sleep(tokio::time::Duration::from_millis(50)).await;
+            match msg.view() {
+                MessageView::Eos(..) => {
+                    println!("End of stream");
+                    running_clone.store(false, Ordering::SeqCst);
+                    glib::MainContext::default().wakeup();
+                    glib::ControlFlow::Break
+                }
+                MessageView::Error(err) => {
+                    eprintln!("Error: {}", err.error());
+                    if let Some(debug) = err.debug() {
+                        eprintln!("Debug: {}", debug);
+                    }
+                    running_clone.store(false, Ordering::SeqCst);
+                    glib::MainContext::default().wakeup();
+                    glib::ControlFlow::Break
+                }
+                MessageView::Warning(warn) => {
+                    // Log warnings but don't stop playback
+                    if let Some(debug) = warn.debug() {
+                        log::warn!("Warning: {} - {}", warn.error(), debug);
+                    }
+                    glib::ControlFlow::Continue
+                }
+                _ => glib::ControlFlow::Continue,
+            }
+        })?;
+        
+        // Get the main context for manual iteration
+        let main_context = glib::MainContext::default();
+        
+        // Main event loop with manual iteration
+        while running.load(Ordering::SeqCst) {
+            // Always process at least one iteration
+            // Use false for non-blocking so we can check running flag frequently
+            main_context.iteration(false);
         }
         
         println!("Shutting down pipeline...");
@@ -202,11 +206,6 @@ impl Application {
         Ok(())
     }
     
-    pub fn stop(&self) -> Result<()> {
-        let mut running = self.running.lock().unwrap();
-        *running = false;
-        Ok(())
-    }
     
     fn cleanup(&self) -> Result<()> {
         println!("Returned, stopping playback");

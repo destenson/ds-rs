@@ -4,11 +4,11 @@ Last Updated: 2025-08-23 (Fresh comprehensive scan of current state)
 
 ## Critical Priority 🔴
 
-### Critical Bugs (from BUGS.md) - NEW
-- [ ] **Fix application shutdown issue**
-  - Application doesn't respond properly to Ctrl+C or window close
-  - Only displays "Received interrupt signal, shutting down..." repeatedly
-  - Need to implement proper cleanup and signal handling
+### Critical Bugs (from BUGS.md) - UPDATED
+- [x] **Fix application shutdown issue** ✅ (2025-08-23 - PRP-25 completed)
+  - FIXED: Application now shuts down properly on Ctrl+C
+  - FIXED: No more repeated "shutting down..." messages  
+  - Solution: Replaced mixed event systems with GLib MainContext manual iteration
   
 - [ ] **Fix video playback freezing**
   - Video gets stuck after first/last frame
@@ -239,6 +239,7 @@ Last Updated: 2025-08-23 (Fresh comprehensive scan of current state)
 - PRP-14: Backend Integration
 - PRP-15: Element Discovery
 - PRP-16: Runtime Configuration Management
+- PRP-25: Fix Shutdown Window Race Condition ✅ (2025-08-23)
 
 ## In Progress PRPs 🔄
 - PRP-20: CPU Vision Backend (partial - detector/tracker stubs exist)

@@ -1,8 +1,8 @@
 #![allow(unused)]
 use clap::Parser;
 use ds_rs::{init, app::Application};
-use std::sync::Arc;
-use tokio::runtime::Runtime;
+use std::sync::{Arc, atomic::{AtomicBool, Ordering}};
+use gstreamer::glib;
 
 #[derive(Parser, Debug)]
 #[command(
@@ -49,31 +49,24 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     println!("DeepStream Rust - Runtime Source Addition/Deletion Demo");
     println!("========================================================\n");
     
-    // Create the runtime for async operations
-    let runtime = Runtime::new()?;
+    // Create and initialize the application
+    let mut app = Application::new(args.uri)?;
+    app.init()?;
     
-    // Create and run the application
-    runtime.block_on(async {
-        let mut app = Application::new(args.uri)?;
-        
-        // Initialize the pipeline
-        app.init()?;
-        
-        // Get the running flag for the signal handler
-        let running_flag = app.get_running_flag();
-        
-        // Set up signal handler for graceful shutdown
-        ctrlc::set_handler(move || {
-            println!("\nReceived interrupt signal, shutting down...");
-            let mut running = running_flag.lock().unwrap();
-            *running = false;
-        })?;
-        
-        // Run the application
-        app.run().await?;
-        
-        Ok::<(), Box<dyn std::error::Error>>(())
+    // Create atomic flag for shutdown signaling
+    let running = Arc::new(AtomicBool::new(true));
+    let running_clone = running.clone();
+    
+    // Set up signal handler for graceful shutdown
+    ctrlc::set_handler(move || {
+        println!("\nReceived interrupt signal, shutting down...");
+        running_clone.store(false, Ordering::SeqCst);
+        // Wake up the main context so it checks the flag
+        glib::MainContext::default().wakeup();
     })?;
+    
+    // Run the application with manual main context iteration
+    app.run_with_main_context(running)?;
     
     println!("\nApplication exited successfully");
     Ok(())

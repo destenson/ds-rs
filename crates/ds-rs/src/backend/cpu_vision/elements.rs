@@ -1,3 +1,4 @@
+#![allow(unused)]
 use crate::error::{DeepStreamError, Result};
 use gstreamer as gst;
 use gstreamer::prelude::*;

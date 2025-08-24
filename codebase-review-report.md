@@ -26,9 +26,9 @@ The ds-rs project has achieved significant stability with all critical bugs reso
 
 ### 🟡 Broken/Incomplete Components
 - **Source Management with Mock**: 10/13 tests fail - Issue: Mock backend doesn't support uridecodebin (documented, expected)
-- **DeepStream Metadata**: Returns mock data - Issue: 15+ "for now" placeholder implementations
-- **Config Parsing**: DeepStream configs return mocks - Issue: inference/config.rs:226, inference/mod.rs:173
-- **GPU Detection**: Returns hardcoded capabilities - Issue: platform.rs:149 "for now" comment
+- **DeepStream Metadata**: Returns mock data - Issue: 15+ "for now" placeholder implementations - **WARNING: Must fail at runtime, not return fake data**
+- **Config Parsing**: DeepStream configs return mocks - Issue: inference/config.rs:226, inference/mod.rs:173 - **WARNING: Must fail at runtime, not return fake data**
+- **GPU Detection**: Returns hardcoded capabilities - Issue: platform.rs:149 "for now" comment - **WARNING: Must fail at runtime, not return fake data**
 
 ### ❌ Missing Components
 - **Visual Output**: No bounding box rendering - Impact: Can't see detection results visually
@@ -67,10 +67,11 @@ The ds-rs project has achieved significant stability with all critical bugs reso
 4. Week 9-12: [PRP-04 DeepStream FFI] → Full NVIDIA hardware acceleration
 
 ### Technical Debt Priorities
-1. **Error Handling**: Replace 124 unwrap() calls - High Impact - Medium Effort
-2. **Placeholder Implementations**: Replace 15+ mocks - High Impact - High Effort
-3. **Documentation**: Add API docs for public interfaces - Medium Impact - Low Effort
-4. **Test Coverage**: Fix source management for Standard backend - Low Impact - Medium Effort
+1. **Mock Backend Safety**: Ensure Mock NEVER runs in production and fails loudly - CRITICAL Impact - High Effort
+2. **Error Handling**: Replace 124 unwrap() calls - High Impact - Medium Effort
+3. **Placeholder Implementations**: Replace 15+ mocks with proper errors - High Impact - High Effort
+4. **Documentation**: Add API docs for public interfaces - Medium Impact - Low Effort
+5. **Test Coverage**: Fix source management for Standard backend - Low Impact - Medium Effort
 
 ## Key Architectural Decisions
 
@@ -93,6 +94,7 @@ The ds-rs project has achieved significant stability with all critical bugs reso
 - **Decision**: Implement mock elements for testing
 - **Rationale**: Enables testing without hardware dependencies
 - **Result**: 93% test coverage despite hardware limitations
+- **CRITICAL**: Mock backend should ONLY be enabled for tests and NEVER silently fail or provide fake data at runtime
 
 ### 5. ONNX Runtime Integration
 - **Decision**: Support multiple YOLO versions with auto-detection
@@ -146,6 +148,7 @@ The ds-rs project has achieved significant stability with all critical bugs reso
 - **Low Risk**: Core functionality stable with 137/147 tests passing
 - **Medium Risk**: Mock backend limitations affect 10 tests
 - **High Risk**: DeepStream FFI complexity may require significant effort
+- **CRITICAL Risk**: Mock backend returning fake data in production - Must ensure Mock is NEVER used outside tests and fails loudly if accidentally enabled at runtime
 
 ## Conclusion
 

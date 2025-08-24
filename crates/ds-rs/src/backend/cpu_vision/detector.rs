@@ -225,13 +225,37 @@ impl OnnxDetector {
             // Check if model expects float16 input
             let is_f16_input = format!("{:?}", session.inputs[0].input_type).contains("Float16");
             
-            // Check if model expects float16 - simplify for now to avoid lifetime issues
-            if is_f16_input {
+            // Run the model - handle f16 vs f32 inputs
+            let outputs: Vec<Value> = if is_f16_input {
                 #[cfg(feature = "half")]
                 {
-                    return Err(DetectorError::Configuration(
-                        "Float16 models not currently supported due to lifetime issues".to_string()
-                    ));
+                    use half::f16;
+                    
+                    // Convert f32 tensor to f16
+                    let f16_tensor: Vec<f16> = input_tensor
+                        .iter()
+                        .map(|&v| f16::from_f32(v))
+                        .collect();
+                    
+                    // Create ndarray with f16 data
+                    let array = Array::from_shape_vec(shape.clone(), f16_tensor)
+                        .map_err(|e| DetectorError::Configuration(
+                            format!("Failed to create f16 ndarray: {}", e)
+                        ))?
+                        .into_dyn();
+                    
+                    // Convert to CowArray and create Value
+                    let cow_array: CowArray<f16, IxDyn> = array.into();
+                    let value = Value::from_array(session.allocator(), &cow_array)
+                        .map_err(|e| DetectorError::Configuration(
+                            format!("Failed to create f16 ORT value: {}", e)
+                        ))?;
+                    
+                    // Run inference
+                    session.run(vec![value])
+                        .map_err(|e| DetectorError::Configuration(
+                            format!("Failed to run ONNX inference: {}", e)
+                        ))?
                 }
                 #[cfg(not(feature = "half"))]
                 {
@@ -239,35 +263,65 @@ impl OnnxDetector {
                         "Model requires float16 but half feature is not enabled".to_string()
                     ));
                 }
-            }
+            } else {
+                // Use f32 input
+                let array = Array::from_shape_vec(shape.clone(), input_tensor)
+                    .map_err(|e| DetectorError::Configuration(
+                        format!("Failed to create f32 ndarray: {}", e)
+                    ))?
+                    .into_dyn();
+                
+                // Convert to CowArray and create Value
+                let cow_array: CowArray<f32, IxDyn> = array.into();
+                let value = Value::from_array(session.allocator(), &cow_array)
+                    .map_err(|e| DetectorError::Configuration(
+                        format!("Failed to create f32 ORT value: {}", e)
+                    ))?;
+                
+                // Run inference
+                session.run(vec![value])
+                    .map_err(|e| DetectorError::Configuration(
+                        format!("Failed to run ONNX inference: {}", e)
+                    ))?
+            };
+            // Check if output is float16
+            let is_f16_output = session.outputs.get(0)
+                .map(|output| format!("{:?}", output.output_type).contains("Float16"))
+                .unwrap_or(false);
             
-            // Use f32 input
-            let array = Array::from_shape_vec(shape.clone(), input_tensor)
-                .map_err(|e| DetectorError::Configuration(
-                    format!("Failed to create f32 ndarray: {}", e)
-                ))?
-                .into_dyn();
-            let array = array.into();
-            let inputs = vec![Value::from_array(session.allocator(), &array)
-                .map_err(|e| DetectorError::Configuration(
-                    format!("Failed to create f32 ORT value: {}", e)
-                ))?];
-            
-            // Run the model
-            let outputs: Vec<Value> = session.run(inputs)
-                .map_err(|e| DetectorError::Configuration(
-                    format!("Failed to run ONNX inference: {}", e)
-                ))?;
-            
-            // Extract output tensor using try_extract
-            let output_tensor: ort::tensor::OrtOwnedTensor<f32, _> = outputs[0].try_extract()
-                .map_err(|e| DetectorError::Configuration(
-                    format!("Failed to extract output tensor: {}", e)
-                ))?;
-            
-            // Get view and convert to Vec
-            let output_view = output_tensor.view();
-            let output: Vec<f32> = output_view.iter().cloned().collect();
+            // Extract output tensor based on type
+            let output: Vec<f32> = if is_f16_output {
+                #[cfg(feature = "half")]
+                {
+                    use half::f16;
+                    
+                    // Extract as f16 tensor
+                    let output_tensor: ort::tensor::OrtOwnedTensor<f16, _> = outputs[0].try_extract()
+                        .map_err(|e| DetectorError::Configuration(
+                            format!("Failed to extract f16 output tensor: {}", e)
+                        ))?;
+                    
+                    // Convert f16 to f32 for postprocessing
+                    let output_view = output_tensor.view();
+                    output_view.iter().map(|&v| v.to_f32()).collect()
+                }
+                #[cfg(not(feature = "half"))]
+                {
+                    return Err(DetectorError::Configuration(
+                        "Output is float16 but half feature is not enabled".to_string()
+                    ));
+                }
+            } else {
+                // Extract as f32 tensor
+                let output_tensor: ort::tensor::OrtOwnedTensor<f32, _> = outputs[0].try_extract()
+                    .map_err(|e| DetectorError::Configuration(
+                        format!("Failed to extract f32 output tensor: {}", e)
+                    ))?;
+                
+                // Get view and convert to Vec
+                let output_view = output_tensor.view();
+                output_view.iter().cloned().collect()
+            };
             
             // Postprocess outputs
             return self.postprocess_outputs(&output, image.width(), image.height());
@@ -624,5 +678,127 @@ impl OnnxDetector {
             class_names: Self::default_class_names(),
             yolo_version: YoloVersion::Auto,
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    
+    #[test]
+    #[cfg(feature = "half")]
+    fn test_f16_conversion() {
+        use half::f16;
+        
+        // Test f32 to f16 conversion
+        let f32_values = vec![0.0f32, 1.0, -1.0, 0.5, 100.0];
+        let f16_values: Vec<f16> = f32_values.iter().map(|&v| f16::from_f32(v)).collect();
+        
+        // Test f16 to f32 conversion
+        let f32_recovered: Vec<f32> = f16_values.iter().map(|&v| v.to_f32()).collect();
+        
+        // Check values are approximately equal (some precision loss is expected)
+        for (original, recovered) in f32_values.iter().zip(f32_recovered.iter()) {
+            let diff = (original - recovered).abs();
+            // f16 has limited precision, so we allow some tolerance
+            assert!(diff < 0.01 || (original.abs() > 10.0 && diff / original.abs() < 0.01),
+                    "Value {} converted to f16 and back differs by {}", original, diff);
+        }
+    }
+    
+    #[test]
+    fn test_mock_detector_creation() {
+        let detector = OnnxDetector::new_mock();
+        assert_eq!(detector.input_width, 640);
+        assert_eq!(detector.input_height, 640);
+        assert_eq!(detector.confidence_threshold, 0.5);
+        assert_eq!(detector.nms_threshold, 0.4);
+    }
+    
+    #[test]
+    fn test_detector_config() {
+        let config = DetectorConfig {
+            model_path: Some("test.onnx".to_string()),
+            input_width: 416,
+            input_height: 416,
+            confidence_threshold: 0.6,
+            nms_threshold: 0.5,
+            num_threads: 2,
+            yolo_version: YoloVersion::V8,
+            class_names: Some(vec!["test_class".to_string()]),
+        };
+        
+        let detector = OnnxDetector::new_with_config(config).unwrap();
+        assert_eq!(detector.input_width, 416);
+        assert_eq!(detector.input_height, 416);
+        assert_eq!(detector.confidence_threshold, 0.6);
+        assert_eq!(detector.nms_threshold, 0.5);
+    }
+    
+    #[test]
+    fn test_yolo_version_detection() {
+        let detector = OnnxDetector::new_mock();
+        
+        // Test v5 format detection (85 values per anchor)
+        let v5_output = vec![0.0; 25200 * 85];
+        let version = detector.detect_yolo_version(&v5_output);
+        assert!(matches!(version, YoloVersion::V5));
+        
+        // Test v8 format detection (84 values per anchor)
+        let v8_output = vec![0.0; 8400 * 84];
+        let version = detector.detect_yolo_version(&v8_output);
+        assert!(matches!(version, YoloVersion::V8));
+    }
+    
+    #[test]
+    fn test_iou_calculation() {
+        let detector = OnnxDetector::new_mock();
+        
+        let det1 = Detection {
+            x: 100.0, y: 100.0, width: 100.0, height: 100.0,
+            confidence: 0.9, class_id: 0, class_name: "test".to_string(),
+        };
+        
+        // Same box should have IoU of 1.0
+        let det2 = det1.clone();
+        assert_eq!(detector.calculate_iou(&det1, &det2), 1.0);
+        
+        // Non-overlapping boxes should have IoU of 0.0
+        let det3 = Detection {
+            x: 300.0, y: 300.0, width: 100.0, height: 100.0,
+            confidence: 0.9, class_id: 0, class_name: "test".to_string(),
+        };
+        assert_eq!(detector.calculate_iou(&det1, &det3), 0.0);
+        
+        // Partially overlapping boxes
+        let det4 = Detection {
+            x: 150.0, y: 150.0, width: 100.0, height: 100.0,
+            confidence: 0.9, class_id: 0, class_name: "test".to_string(),
+        };
+        let iou = detector.calculate_iou(&det1, &det4);
+        assert!(iou > 0.0 && iou < 1.0);
+    }
+    
+    #[test]
+    #[cfg(feature = "half")]
+    fn test_f16_ndarray_creation() {
+        use half::f16;
+        use ndarray::Array;
+        
+        // Create a small test tensor
+        let f32_data = vec![1.0f32, 2.0, 3.0, 4.0, 5.0, 6.0];
+        let f16_data: Vec<f16> = f32_data.iter().map(|&v| f16::from_f32(v)).collect();
+        
+        // Create ndarray with f16 data
+        let shape = vec![1, 2, 3];
+        let array = Array::from_shape_vec(shape, f16_data.clone()).unwrap();
+        
+        // Verify shape and data
+        assert_eq!(array.shape(), &[1, 2, 3]);
+        assert_eq!(array.len(), 6);
+        
+        // Check that values can be accessed
+        let flat_view: Vec<f16> = array.iter().cloned().collect();
+        assert_eq!(flat_view, f16_data);
     }
 }

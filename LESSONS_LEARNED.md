@@ -59,9 +59,28 @@
 
 ---
 
+## Event Loop and GStreamer Integration
+
+### 11. GSTREAMER NEEDS GLIB MAIN LOOP
+- **Problem**: Mixing tokio runtime with GStreamer causes race conditions
+- **Solution**: Use GLib::MainLoop for GStreamer applications
+- **Why**: GStreamer is built on GLib and expects GLib event handling
+- **Reference**: See gstreamer-rs examples like launch_glib_main.rs
+
+### 12. SIGNAL HANDLING MUST INTEGRATE WITH EVENT LOOP
+- **Wrong**: Using ctrlc crate with separate mutex flag
+- **Right**: Use glib::unix_signal_add or platform-specific GLib integration
+- **Why**: Separate signal handlers conflict with window system events
+
+### 13. ALWAYS CHECK REFERENCE IMPLEMENTATIONS
+- **C Reference**: ../NVIDIA-AI-IOT--deepstream_reference_apps shows correct patterns
+- **Rust Examples**: ../gstreamer-rs/examples has working implementations
+- **Key Pattern**: g_main_loop_new/run/quit is the standard GStreamer pattern
+
 ## REMEMBER: 
 - Test the actual bug, not something vaguely related
 - Never ignore failing tests
 - Use real, valid test data for the platform
 - Critical bugs before new features
 - Read and understand what the user is actually asking for
+- Check reference implementations before guessing at solutions

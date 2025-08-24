@@ -5,7 +5,7 @@ edition = "2024" # TODO: use the workspace edition
 description = "Powerful library to control nVidia DeepStream AI processing framework"
 
 [features]
-default = ["std", "onnx", "cpu_vision"]
+default = ["std", "onnx", "cpu_vision", "gst_v1_26"]
 std = []
 onnx = ["ort", "ndarray", "half"]
 cpu_vision = ["nalgebra", "onnx"]

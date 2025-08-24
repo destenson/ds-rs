@@ -282,8 +282,9 @@ impl OnnxDetector {
             // Create ndarray with correct shape for YOLO (batch, channels, height, width)
             let shape = vec![1, 3, self.input_height as usize, self.input_width as usize];
             
+            use ort::tensor::TensorElementDataType::{Float16, Bfloat16};
             // Check if model expects float16 input
-            let is_f16_input = session.inputs[0].input_type.to_string().contains("Float16");
+            let is_f16_input = matches!(session.inputs[0].input_type, Float16 | Bfloat16);
             
             let inputs = if is_f16_input {
                 // Convert f32 to f16 and create input tensor

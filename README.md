@@ -4,6 +4,13 @@ A Rust port of NVIDIA's DeepStream runtime source addition/deletion reference ap
 
 ## Recent Updates
 
+### 2025-08-24: Real-time Bounding Box Rendering (PRP-11)
+- ✅ **Implemented real-time bounding box visualization** - Dynamic rendering of detection results
+- ✅ **Created cross-backend rendering system** - Works with DeepStream (nvdsosd) and Standard (Cairo/text overlay)
+- ✅ **Added metadata bridge** - Connects inference results to OSD rendering pipeline
+- ✅ **Enhanced pipeline builder** - Dynamic OSD configuration with rendering presets
+- ✅ **Created ball tracking example** - Demonstrates real-time object tracking with visual feedback
+
 ### 2025-08-24: Critical Bug Fixes and Improvements
 - ✅ **Fixed f16/f32 array conversion issue** in cpuinfer - Resolved lifetime issues with ONNX tensor arrays
 - ✅ **Fixed Application test compilation errors** - Updated tests to reflect correct API methods
@@ -23,8 +30,9 @@ A Rust port of NVIDIA's DeepStream runtime source addition/deletion reference ap
 - **Type-Safe GStreamer Bindings**: Leverages official gstreamer-rs for robust pipeline management
 - **Dynamic Source Management**: Add and remove video sources at runtime without pipeline interruption
 - **CPU Object Detection**: Custom GStreamer plugin with ONNX Runtime support for YOLOv3-v12
+- **Real-time Bounding Box Rendering**: Visual feedback showing detected objects with configurable styles
 - **Configuration System**: Support for DeepStream configuration files and TOML-based settings
-- **Pipeline Builder**: Fluent API for constructing complex GStreamer pipelines
+- **Pipeline Builder**: Fluent API for constructing complex GStreamer pipelines with dynamic OSD
 - **Comprehensive Test Infrastructure**: Self-contained testing with RTSP server and video generation
 
 ## Architecture

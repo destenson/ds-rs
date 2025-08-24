@@ -147,7 +147,7 @@ The project includes a custom GStreamer plugin (`cpuinfer`) for CPU-based object
 ### Features
 - **ONNX Runtime Support**: YOLOv3-v12 models with automatic version detection
 - **Multiple Backends**: ONNX (default), OpenCV DNN, or mock detection
-- **Float32 Support**: Full precision inference (Float16 models currently unsupported due to lifetime constraints)
+- **Float16/Float32 Support**: Full support for both half-precision (f16) and full precision (f32) models
 - **Passthrough Architecture**: Identity element behavior with signal emission
 
 ### Building the Plugin
@@ -357,7 +357,6 @@ The library can parse standard DeepStream configuration files:
 - **Test Suite**: 200+ tests across all modules
 
 ### Current Limitations
-- **Float16 Models**: Not supported due to ONNX Runtime lifetime constraints
 - **Mock Backend**: Cannot test uridecodebin-based source management (10 tests fail as expected)
 - **DeepStream Metadata**: Mock implementations for non-NVIDIA systems
 - **Code Quality**: Some unwrap() calls need proper error handling
@@ -439,9 +438,9 @@ cd crates/cpuinfer && cargo test
    - Check build output for "Successfully copied" messages
    - Manual fix: Copy from `target\debug\` to `target\debug\examples\`
 
-3. **"Float16 models not currently supported"**
-   - Use Float32 YOLO models instead
-   - This is a known limitation with current ONNX Runtime integration
+3. **Model precision mismatch**
+   - Both Float16 and Float32 models are now supported
+   - The detector automatically handles conversion between f16 and f32 as needed
 
 4. **Source management test failures**
    - Mock backend doesn't support uridecodebin

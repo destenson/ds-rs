@@ -225,7 +225,12 @@ impl OnnxDetector {
             // Check if model expects float16 input
             let is_f16_input = format!("{:?}", session.inputs[0].input_type).contains("Float16");
             
-            // Run the model - handle f16 vs f32 inputs
+            // Handle both f32 and f16 models
+            // We need to hold the arrays outside to ensure proper lifetimes
+            #[cfg(feature = "half")]
+            let f16_array: CowArray<half::f16, IxDyn>;
+            let f32_array: CowArray<f32, IxDyn>;
+            
             let outputs: Vec<Value> = if is_f16_input {
                 #[cfg(feature = "half")]
                 {
@@ -237,21 +242,20 @@ impl OnnxDetector {
                         .map(|&v| f16::from_f32(v))
                         .collect();
                     
-                    // Create ndarray with f16 data
-                    let array = Array::from_shape_vec(shape.clone(), f16_tensor)
+                    // Create and store the array
+                    f16_array = Array::from_shape_vec(shape.clone(), f16_tensor)
                         .map_err(|e| DetectorError::Configuration(
                             format!("Failed to create f16 ndarray: {}", e)
                         ))?
-                        .into_dyn();
+                        .into_dyn()
+                        .into();
                     
-                    // Convert to CowArray and create Value
-                    let cow_array: CowArray<f16, IxDyn> = array.into();
-                    let value = Value::from_array(session.allocator(), &cow_array)
+                    // Create Value and run
+                    let value = Value::from_array(session.allocator(), &f16_array)
                         .map_err(|e| DetectorError::Configuration(
                             format!("Failed to create f16 ORT value: {}", e)
                         ))?;
                     
-                    // Run inference
                     session.run(vec![value])
                         .map_err(|e| DetectorError::Configuration(
                             format!("Failed to run ONNX inference: {}", e)
@@ -265,20 +269,18 @@ impl OnnxDetector {
                 }
             } else {
                 // Use f32 input
-                let array = Array::from_shape_vec(shape.clone(), input_tensor)
+                f32_array = Array::from_shape_vec(shape.clone(), input_tensor)
                     .map_err(|e| DetectorError::Configuration(
                         format!("Failed to create f32 ndarray: {}", e)
                     ))?
-                    .into_dyn();
+                    .into_dyn()
+                    .into();
                 
-                // Convert to CowArray and create Value
-                let cow_array: CowArray<f32, IxDyn> = array.into();
-                let value = Value::from_array(session.allocator(), &cow_array)
+                let value = Value::from_array(session.allocator(), &f32_array)
                     .map_err(|e| DetectorError::Configuration(
                         format!("Failed to create f32 ORT value: {}", e)
                     ))?;
                 
-                // Run inference
                 session.run(vec![value])
                     .map_err(|e| DetectorError::Configuration(
                         format!("Failed to run ONNX inference: {}", e)

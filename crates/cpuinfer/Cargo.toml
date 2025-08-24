@@ -13,6 +13,7 @@ static = []
 capi = []
 half = ["dep:half"]
 darknet = ["dep:darknet"]
+ort = ["dep:ort"]
 
 [lib]
 name = "gstcpuinfer"

@@ -284,9 +284,11 @@ impl OnnxDetector {
             
             use ort::tensor::TensorElementDataType::{Float16, Bfloat16};
             // Check if model expects float16 input
-            let is_f16_input = matches!(session.inputs[0].input_type, Float16 | Bfloat16);
-            
-            let inputs = if is_f16_input {
+            #[cfg(feature = "half")]
+            let mut cow_array: CowArray<half::f16, IxDyn>;
+            #[cfg(not(feature = "half"))]
+            let mut cow_array: CowArray<f32, IxDyn>;
+            let inputs = if matches!(session.inputs[0].input_type, Float16 | Bfloat16) {
                 // Convert f32 to f16 and create input tensor
                 #[cfg(feature = "half")]
                 {
@@ -299,9 +301,8 @@ impl OnnxDetector {
                         .map_err(|e| DetectorError::Configuration(
                             format!("Failed to create f16 ndarray: {}", e)
                         ))?;
-                    
-                    let cow_array: CowArray<f16, IxDyn> = CowArray::from(array.into_dyn());
-                    
+                    cow_array = array.into_dyn().into();
+
                     vec![Value::from_array(session.allocator(), &cow_array)
                         .map_err(|e| DetectorError::Configuration(
                             format!("Failed to create f16 ORT value: {}", e)
@@ -320,7 +321,8 @@ impl OnnxDetector {
                         format!("Failed to create f32 ndarray: {}", e)
                     ))?;
                 
-                let cow_array: CowArray<f32, IxDyn> = CowArray::from(array.into_dyn());
+                let ca = array.into_dyn();
+                cow_array = ca.into();
                 
                 vec![Value::from_array(session.allocator(), &cow_array)
                     .map_err(|e| DetectorError::Configuration(

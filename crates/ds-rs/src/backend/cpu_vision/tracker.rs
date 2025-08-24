@@ -1,3 +1,4 @@
+#![allow(unused)]
 #![cfg(feature = "nalgebra")]
 
 use super::detector::Detection;

@@ -101,6 +101,12 @@ ds-rs/
 - ONNX Runtime 1.16.3 (automatically downloaded by build)
 - YOLO models (.onnx format) from Ultralytics or official repos
 
+#### Windows-Specific Requirements
+- **Visual C++ Redistributables**: Required for ONNX Runtime
+  - Download from: https://aka.ms/vs/17/release/vc_redist.x64.exe
+  - Both MSVCP140.dll and VCRUNTIME140.dll must be present in System32
+- **DLL Setup**: The build script automatically copies ONNX Runtime DLLs to the correct locations
+
 ### Building
 
 ```bash
@@ -414,8 +420,24 @@ cd crates/cpuinfer && cargo test
 
 2. **"ONNX Runtime DLL not found" (Windows)**
    - This warning is normal during build
-   - DLLs are downloaded automatically at runtime
-   - Ensure internet connection for first run
+   - DLLs are downloaded automatically by the ort crate
+   - The build script copies them to target directories
+
+### Windows-Specific Issues
+
+1. **Error 0xc000007b when running examples**
+   - This indicates a DLL loading issue
+   - **Solution 1**: Ensure Visual C++ Redistributables are installed
+     - Download: https://aka.ms/vs/17/release/vc_redist.x64.exe
+   - **Solution 2**: Run `cargo clean && cargo build --features ort`
+     - This triggers the build script to copy DLLs properly
+   - **Solution 3**: Set ORT_DYLIB_PATH to ONNX Runtime location
+     - `set ORT_DYLIB_PATH=C:\path\to\onnxruntime.dll`
+
+2. **DLLs not found in examples directory**
+   - The build.rs script should copy DLLs automatically
+   - Check build output for "Successfully copied" messages
+   - Manual fix: Copy from `target\debug\` to `target\debug\examples\`
 
 3. **"Float16 models not currently supported"**
    - Use Float32 YOLO models instead

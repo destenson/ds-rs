@@ -12,6 +12,9 @@ pub mod inference;
 pub mod tracking;
 pub mod messages;
 
+#[cfg(target_os = "windows")]
+pub mod dll_validator;
+
 pub use error::{DeepStreamError, Result};
 pub use platform::{Platform, PlatformInfo};
 pub use backend::{Backend, BackendType, BackendCapabilities, BackendManager};

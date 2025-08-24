@@ -22,6 +22,11 @@ Last Updated: 2025-08-24 (Updated after comprehensive scan of current state)
   - Successfully fixed all ONNX Runtime v1.16.3 API issues
   - Supports YOLOv3-v12 and YOLO-RD with automatic version detection
   - Model files available from Ultralytics and official YOLO repos
+- [x] **Fix ONNX Runtime DLL loading on Windows** ✅ (2025-08-24 - PRP-01)
+  - Fixed 0xc000007b error when running examples
+  - Enhanced build.rs to properly find and copy ONNX Runtime DLLs
+  - Added comprehensive DLL validation and diagnostic module
+  - Updated documentation with Windows-specific troubleshooting
 - [ ] **Complete ONNX detector integration tests**
   - `crates/ds-rs/tests/cpu_backend_tests.rs:342`: TODO comment - test with actual ONNX model file
   - Need to download and test with real YOLOv5/v8/v12 models

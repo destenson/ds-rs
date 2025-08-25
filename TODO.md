@@ -4,9 +4,23 @@ Last Updated: 2025-08-24 (Complete codebase scan and update)
 
 ## Critical Priority 🔴
 
+### Production Reliability Issues
+- [ ] **Enhanced Error Recovery** (PRP-34)
+  - Implement retry mechanisms with exponential backoff
+  - Add stream isolation with error boundaries
+  - Create circuit breaker pattern for failure prevention
+  - Add health monitoring for proactive detection
+  - Automatic reconnection for RTSP/network sources
+  
+- [ ] **Multi-stream Fault Tolerance** (PRP-12 Enhancement + PRP-34)
+  - Streams fail permanently on transient errors
+  - No retry mechanisms for network interruptions
+  - Sources not isolated - one failure affects others
+  - Need exponential backoff and circuit breakers
+
 ### Active Critical Issues
-✅ **ALL CRITICAL ISSUES RESOLVED** - Application is fully functional!
-✅ **ALL TESTS PASSING** - 140/140 tests pass (100% pass rate achieved!)
+✅ **Core functionality working** - Application demonstrates basic features
+⚠️ **Production readiness pending** - Needs fault tolerance for real deployments
 
 ### Known Issues (Non-Critical)
 - [ ] **Float16 Model Support** (See BUGS.md)
@@ -166,6 +180,7 @@ Last Updated: 2025-08-24 (Complete codebase scan and update)
 - PRP-29: TensorFlow Lite Backend
 - PRP-30: Darknet Native Backend
 - PRP-31: Advanced Tracking Algorithms
+- PRP-34: Enhanced Error Recovery ⭐ (Ready for implementation)
 
 ## Statistics 📊
 
@@ -211,12 +226,20 @@ Last Updated: 2025-08-24 (Complete codebase scan and update)
 ## Priority Focus
 
 ### Immediate Next Steps
-1. **Fix broken example**: Repair ball_tracking_visualization compilation errors
-2. **DeepStream FFI**: Implement metadata extraction for real object detection
-   - `rendering/deepstream_renderer.rs`: TODO comments for actual processing
-   - `backend/cpu_vision/cpudetector/imp.rs`: TODO for metadata attachment
-3. **Testing**: Add ONNX model integration tests with real YOLO models
-4. **Remove tokio dependency**: `source-videos/Cargo.toml:20` has TODO comment
+1. **Multi-stream Fault Tolerance** (PRP-12): Add retry mechanisms and stream isolation
+   - Implement exponential backoff for source reconnection
+   - Add circuit breaker pattern for failing sources
+   - Isolate stream failures to prevent cascade
+   - Add health monitoring for each source
+   
+2. **Error Recovery Patterns**: Implement production-grade error handling
+   - Retry logic with configurable attempts
+   - Automatic RTSP reconnection
+   - Network timeout handling
+   - Graceful degradation on partial failures
+
+3. **Float16 Support** (PRP-02): Fix ONNX Runtime lifetime issues
+4. **DeepStream FFI** (PRP-04): Hardware acceleration support
 
 ### Technical Debt
 - Mock implementations need replacement with real functionality

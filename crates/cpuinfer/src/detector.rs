@@ -422,7 +422,7 @@ impl OnnxDetector {
             let num_anchors = len / 85;
             if num_anchors > 1000 {
                 // Likely v3-v7 format
-                println!("Detected YOLOv3-v7 format with {} anchors", num_anchors);
+                // println!("Detected YOLOv3-v7 format with {} anchors", num_anchors);
                 return YoloVersion::V5; // Use v5 processing for v3-v7
             }
         }
@@ -449,14 +449,14 @@ impl OnnxDetector {
         let output_size = 85; // 4 bbox + 1 objectness + 80 classes
         let num_anchors = outputs.len() / output_size;
         
-        // Debug: Check the range of values to understand the format
-        let mut min_val = f32::MAX;
-        let mut max_val = f32::MIN;
-        for &v in outputs.iter().take(1000) {
-            if v < min_val { min_val = v; }
-            if v > max_val { max_val = v; }
-        }
-        println!("Output value range: [{:.3}, {:.3}]", min_val, max_val);
+        // Debug: Check the range of values to understand the format (commented out for production)
+        // let mut min_val = f32::MAX;
+        // let mut max_val = f32::MIN;
+        // for &v in outputs.iter().take(1000) {
+        //     if v < min_val { min_val = v; }
+        //     if v > max_val { max_val = v; }
+        // }
+        // println!("Output value range: [{:.3}, {:.3}]", min_val, max_val);
         
         // Scale factors to convert from model coordinates to image coordinates
         let x_scale = img_width as f32 / self.input_width as f32;
@@ -465,16 +465,24 @@ impl OnnxDetector {
         // Check if format is transposed [1, 85, 25200] instead of [1, 25200, 85]
         // In transposed format, all x coords are together, then all y coords, etc.
         let is_transposed = {
-            // Check a few objectness scores using both interpretations
-            let obj_normal = outputs[4]; // First anchor's objectness in normal format
-            let obj_transposed = outputs[4 * num_anchors]; // First anchor's objectness in transposed format
+            // Check objectness scores at different positions
+            let obj_positions = vec![
+                outputs[4],              // Normal: first anchor objectness
+                outputs[85 + 4],         // Normal: second anchor objectness
+                outputs[4 * num_anchors], // Transposed: first anchor objectness
+                outputs[4 * num_anchors + 1], // Transposed: second anchor objectness
+            ];
             
-            // Transposed format likely has very different values
-            println!("Checking format - Normal obj[0]: {:.6}, Transposed obj[0]: {:.6}", obj_normal, obj_transposed);
+            // Uncomment for debugging format issues:
+            // println!("Format detection:");
+            // println!("  If normal [25200,85]: obj[0]={:.6}, obj[1]={:.6}", obj_positions[0], obj_positions[1]);
+            // println!("  If transposed [85,25200]: obj[0]={:.6}, obj[1]={:.6}", obj_positions[2], obj_positions[3]);
             
-            // If normal format objectness is very low, probably transposed
-            obj_normal < 0.0001
+            // If normal format has very low objectness, it's probably transposed
+            obj_positions[0] < 0.001 && obj_positions[1] < 0.001
         };
+        
+        // println!("Using {} format", if is_transposed { "TRANSPOSED" } else { "NORMAL" });
         
         // Process each anchor/detection
         for i in 0..num_anchors {
@@ -505,29 +513,37 @@ impl OnnxDetector {
                 continue;
             }
             
-            // Debug first few high-confidence detections
-            if objectness > 0.5 && i < 10 {
-                println!("Anchor {}: cx={:.1}, cy={:.1}, w={:.1}, h={:.1}, obj={:.3}", 
-                         i, cx, cy, w, h, objectness);
-            }
+            // Debug first few high-confidence detections (commented out for production)
+            // if objectness > 0.5 && i < 10 {
+            //     println!("Anchor {}: cx={:.1}, cy={:.1}, w={:.1}, h={:.1}, obj={:.3}", 
+            //              i, cx, cy, w, h, objectness);
+            // }
             
             // Find best class
             let mut max_class_score = 0.0;
             let mut best_class_id = 0;
             
             for class_id in 0..num_classes {
-                let class_score = outputs[offset + 5 + class_id];
+                let class_score = if is_transposed {
+                    // Transposed: class scores at position [5+class_id][i]
+                    outputs[(5 + class_id) * num_anchors + i]
+                } else {
+                    // Normal: class scores at position [i][5+class_id]
+                    let offset = i * output_size;
+                    outputs[offset + 5 + class_id]
+                };
+                
                 if class_score > max_class_score {
                     max_class_score = class_score;
                     best_class_id = class_id;
                 }
             }
             
-            // Debug: Print top classes for high-confidence detections
-            if objectness > 0.7 && i < 5 {
-                println!("High conf detection: obj={:.2}, best_class={} ({:.2})", 
-                         objectness, best_class_id, max_class_score);
-            }
+            // Debug: Print top classes for high-confidence detections (commented out for production)
+            // if objectness > 0.7 && i < 5 {
+            //     println!("High conf detection: obj={:.2}, best_class={} ({:.2})", 
+            //              objectness, best_class_id, max_class_score);
+            // }
             
             // Combined confidence
             let confidence = objectness * max_class_score;

@@ -61,6 +61,9 @@ pub enum DeepStreamError {
     #[error("Processing failed: {reason}")]
     ProcessingFailed { reason: String },
     
+    #[error("Resource limit: {0}")]
+    ResourceLimit(String),
+    
     #[error("Unknown error: {0}")]
     Unknown(String),
 }

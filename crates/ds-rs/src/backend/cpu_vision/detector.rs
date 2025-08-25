@@ -39,7 +39,7 @@ pub struct Detection {
 }
 
 /// YOLO model version for output format handling
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone, Copy, serde::Serialize, serde::Deserialize)]
 pub enum YoloVersion {
     V3,     // Output: [1, num_anchors, 85] classic format
     V4,     // Output: Similar to V3 with improvements
@@ -56,7 +56,7 @@ pub enum YoloVersion {
 }
 
 /// Configuration for the ONNX detector
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub struct DetectorConfig {
     /// Path to the ONNX model file
     pub model_path: Option<String>,

@@ -12,6 +12,7 @@ pub mod inference;
 pub mod tracking;
 pub mod messages;
 pub mod rendering;
+pub mod multistream;
 
 #[cfg(target_os = "windows")]
 pub mod dll_validator;
@@ -26,7 +27,7 @@ pub use pipeline::{Pipeline, PipelineBuilder, PipelineState, StateManager, BusWa
 pub use source::{
     SourceId, SourceState, SourceInfo, SourceManager, VideoSource,
     SourceAddition, SourceRemoval, SourceEvent, SourceEventHandler,
-    SourceSynchronizer, SourceController,
+    SourceSynchronizer, SourceController, FaultTolerantSourceController,
     // Recovery and fault tolerance exports
     RecoveryConfig, RecoveryManager, RecoveryState, RecoveryStats,
     HealthConfig, HealthMonitor, HealthStatus, SourceHealthMonitor,
@@ -50,6 +51,13 @@ pub use messages::{
 pub use rendering::{
     BoundingBoxRenderer, RenderingConfig, RendererFactory, MetadataBridge,
     PerformanceMetrics
+};
+pub use multistream::{
+    MultiStreamManager, PipelinePool, DetectionPipeline,
+    StreamCoordinator, StreamPriority,
+    ResourceManager, ResourceLimits,
+    MultiStreamConfig, MultiStreamConfigBuilder, StreamMetrics, MetricsCollector,
+    MultiStreamStats, MultiStreamEvent
 };
 
 /// Get current timestamp in seconds since Unix epoch

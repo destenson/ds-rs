@@ -29,4 +29,6 @@ uuid = { version = "1.18.0", features = ["v4"] }
 walkdir = "2.5"
 
 [dev-dependencies]
+axum-test = "0.18.1"
 tempfile = "3.8"
+tokio-test = "0.4"

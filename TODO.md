@@ -1,6 +1,6 @@
 # TODO List
 
-Last Updated: 2025-08-25 (Post-Refactoring Update)
+Last Updated: 2025-08-25 (Comprehensive Scan Update)
 
 ## Recent Achievements ✅
 
@@ -14,6 +14,19 @@ Last Updated: 2025-08-25 (Post-Refactoring Update)
   - ✅ Updated all imports to use consolidated gstcpuinfer crate
   - ✅ All crates compile successfully with improved maintainability
 
+- **COMPLETED**: Critical Runtime Panic Fixes (2025-08-25)
+  - ✅ **Fixed all 4 unimplemented!() property handlers** - No more guaranteed runtime panics
+  - ✅ Replaced with proper warning logging and safe fallback handling
+  - ✅ Both cpuinfer and ds-rs crates now handle unknown GStreamer properties gracefully
+  - ✅ Production stability significantly improved
+
+- **COMPLETED**: PRP-02 Float16 Model Support (2025-08-25)
+  - ✅ **Fixed f16/f32 array conversion issue** in cpuinfer - Resolved lifetime issues with ONNX tensor arrays
+  - ✅ Full f16/f32 conversion implemented in cpuinfer crate
+  - ✅ Proper lifetime management using CowArray
+  - ✅ Comprehensive unit tests for f16 operations
+  - ✅ Both float16 and float32 YOLO models work seamlessly
+
 - **COMPLETED**: PRP-38 Advanced CLI Options for Source-Videos (2025-08-25)
   - ✅ Enhanced CLI with 4 new serving modes: serve-files, playlist, monitor, simulate
   - ✅ Advanced filtering system with include/exclude patterns, format/duration/date filters
@@ -24,6 +37,12 @@ Last Updated: 2025-08-25 (Post-Refactoring Update)
   - ✅ Production features: daemon mode, PID files, status intervals, metrics output
   - ✅ Multiple output formats (text, JSON, CSV) and dry run mode for automation
 
+- **COMPLETED**: PRP-39 Enhanced REPL Mode (2025-08-25)
+  - ✅ Enhanced interactive REPL with rustyline, command completion, and comprehensive features
+  - ✅ Full command system with source management, network control, monitoring
+  - ✅ Command completion and history support
+  - ✅ Multiple output formats and structured help system
+
 - **COMPLETED**: PRP-41 Source-Videos Control API for Automation (2025-08-25)
   - ✅ Complete REST API with axum 0.8.4 and all CRUD operations
   - ✅ Source management, server control, configuration, network simulation endpoints
@@ -33,38 +52,18 @@ Last Updated: 2025-08-25 (Post-Refactoring Update)
   - ✅ Health checks, metrics, and comprehensive error handling
   - ✅ Integration tests and automation examples
 
-- **COMPLETED**: PRP-40 Network Simulation Integration (2025-08-25)
-  - ✅ Full network simulation integrated with source-videos
-  - ✅ Added 4 new network profiles: NoisyRadio, IntermittentSatellite, DroneUrban, DroneMountain
-  - ✅ CLI integration with --network-profile, --packet-loss, --latency, --bandwidth flags
-  - ✅ Per-source network conditions with --per-source-network
-  - ✅ Time-based network scenarios with interpolation
-  - ✅ RTSP server integration with GStreamer simulation elements
-  - ✅ Created drone communication examples and YAML scenarios
-  - ✅ 13/13 network simulation tests passing
-
-- **COMPLETED**: PRP-36 File Watching and Auto-reload (2025-08-25)
-  - ✅ Directory and file watching infrastructure implemented
-  - ✅ WatcherManager coordinates multiple watchers
-  - ✅ Auto-repeat/looping functionality with LoopingVideoSource
-  - ✅ Fixed channel connection bug between watchers and manager
-  - ✅ 11/11 file watching tests passing
-  - ✅ CLI integration with --watch, --auto-repeat flags
-
 ## Critical Priority TODOs 🔴
 
 ### 1. Excessive unwrap() Usage - Production Risk
-**Status**: CRITICAL - 753 unwrap() calls across 86 files (IMPROVED from 796/93) 
+**Status**: CRITICAL - 753 unwrap() calls across 86 files (STABLE count - previous scan showed similar)
 - **Impact**: Any call could cause production panic
-- **Progress**: 43 fewer unwrap() calls and 7 fewer files affected since last scan
-- **Recommendation**: Systematic replacement sprint
 - **Priority**: Must address before production deployment  
 - **Target**: Replace 200 critical unwrap() calls per week
-- **Latest Count**: 753 occurrences found in post-refactoring scan
-- **High-Risk Files**: Tests still account for majority, but production code cleanup needed
+- **High-Risk Files**: Production code needs systematic cleanup - tests account for majority but production code needs attention
+- **Approach**: Implement proper error propagation with `Result<T, E>` types
 
 ### 2. Remove Global State in Error Classification
-**Location**: `src/error/classification.rs:309`
+**Location**: `crates/ds-rs/src/error/classification.rs:309`
 - GET RID OF THIS GLOBAL & dependency on lazy_static
 - Replace with proper dependency injection
 - **Impact**: Architecture smell, testing difficulties
@@ -79,7 +78,7 @@ Last Updated: 2025-08-25 (Post-Refactoring Update)
 - **Completed**: 2025-08-25 - All handlers now use proper error handling with warnings
 
 ### 4. Active TODO Comments in Code
-**Status**: CRITICAL - 2 active todo!() calls + 11 TODO comments requiring implementation
+**Status**: CRITICAL - 2 active todo!() calls + 9 TODO comments requiring implementation
 **Active Panics**:
 - `crates/dsl/src/lib.rs:9` - DSL crate placeholder with single todo!()
 - `crates/ds-rs/src/metadata/mod.rs:92` - Metadata extraction with todo!("Real metadata extraction not implemented")
@@ -95,7 +94,7 @@ Last Updated: 2025-08-25 (Post-Refactoring Update)
 - `crates/source-videos/src/main.rs:1279` - Get actual metrics TODO
 - `crates/source-videos/src/file_utils.rs:128` - Actual metadata extraction TODO
 
-**Impact**: 2 runtime panics when executed, 11 incomplete implementations
+**Impact**: 2 runtime panics when executed, 9 incomplete implementations
 
 ## High Priority TODOs 🟠
 
@@ -106,25 +105,13 @@ Last Updated: 2025-08-25 (Post-Refactoring Update)
 - ✅ Comprehensive unit tests added
 - **PRP**: PRP-02 completed as of 2025-08-25
 
-### 6. REPL Mode Implementation
-**PRP-39**: Interactive command interface with completion
-- Leverage PRP-41 API endpoints for command execution
-- **Impact**: Developer experience improvement
-
-### 7. ✅ Float16 Model Support (COMPLETED - PRP-02) 
-**Issue**: YOLO f16 models fail due to lifetime issues - **RESOLVED**
-- ✅ Implementation completed in crates/cpuinfer/src/detector.rs
-- ✅ Both f16 input and f16 output models fully supported  
-- ✅ Automatic type detection and conversion
-- **PRP**: PRP-02 completed as of 2025-08-25
-
-### 8. DeepStream FFI Bindings
+### 6. DeepStream FFI Bindings
 **PRP**: PRP-04
 - Extract NvDsMeta from hardware inference
 - Enable hardware acceleration features
 - **Impact**: Full DeepStream capabilities
 
-### 9. Code Quality Maintenance (Post-Refactoring)
+### 7. Code Quality Maintenance (Post-Refactoring)
 **Status**: HIGH - Maintain recent refactoring improvements
 - **Monitor**: Prevent re-introduction of code duplication
 - **Watch**: Ensure proper feature flags on cpuinfer usage
@@ -133,106 +120,103 @@ Last Updated: 2025-08-25 (Post-Refactoring Update)
 
 ## Medium Priority TODOs 🟡
 
-### 10. DeepStream Metadata Processing
-**Location**: `src/rendering/deepstream_renderer.rs:190,222`
+### 8. DeepStream Metadata Processing
+**Location**: `crates/ds-rs/src/rendering/deepstream_renderer.rs:190,222`
 - Implement actual DeepStream metadata processing
 - Create and attach actual NvDsObjectMeta
 - **Impact**: Critical for hardware acceleration features
 - **Blocked by**: Need DeepStream FFI bindings (PRP-04)
 
-### 11. Placeholder Implementations Requiring "Actual" Logic
+### 9. Placeholder Implementations Requiring "Actual" Logic
 **Updated locations with "for now", "actual", "simplified", or incomplete implementations**:
-- `crates/source-videos/src/file_utils.rs:128` - Actual metadata extraction using GStreamer discoverer
+
+**API Route Placeholders**:
 - `crates/source-videos/src/api/routes/sources.rs:126` - Source update not fully implemented
 - `crates/source-videos/src/api/routes/server.rs:110,130,147` - Simplified server state management
 - `crates/source-videos/src/api/routes/operations.rs:137` - Simplified watcher state check
+
+**Processing Placeholders**:
+- `crates/source-videos/src/file_utils.rs:128` - Actual metadata extraction using GStreamer discoverer
 - `crates/source-videos/src/multistream/manager.rs:228` - Simulated processing
 - `crates/source-videos/src/main.rs:1543` - Simplified playlist source creation
+- `crates/ds-rs/src/backend/cpu_vision/elements.rs:109` - Metadata attachment placeholder
+- `crates/ds-rs/src/rendering/standard_renderer.rs:104` - Cairo drawing callback not implemented
+- `crates/ds-rs/src/inference/mod.rs:175` - Default label map instead of parsing label file
 
-**New Findings**:
-- Multiple "Simplified" implementations in API routes needing actual state management
-- Temporary file management and progressive loading placeholders
-- Network simulation metrics tracking needs actual vs simulated condition comparison
-- Various "for now" comments indicating temporary solutions across codebase
+**Platform Detection**:
+- `crates/ds-rs/src/platform.rs:149` - GPU capabilities detection needs actual nvidia-smi/CUDA calls
+- `crates/ds-rs/src/messages/mod.rs:182` - Mock stream ID instead of real DeepStream parsing
 
-### 12. Remove Tokio Dependency
+**State Management**:
+- `crates/source-videos/src/manager.rs:229` - In-place modification not yet supported
+- `crates/source-videos/src/runtime/applicator.rs:72,81,88` - Server restart logic not implemented
+
+### 10. Remove Tokio Dependency
 **Locations**:
-- `crates/ds-rs/Cargo.toml:54` - ds-rs crate with TODO comment
-- `crates/source-videos/Cargo.toml:28` - source-videos crate with TODO comment
+- `crates/ds-rs/Cargo.toml:55` - ds-rs crate with TODO comment
+- `crates/source-videos/Cargo.toml:33` - source-videos crate with TODO comment
 - Comment: "TODO: we should not use tokio (async is ok though)"
 - **Impact**: Reduce dependencies, simpler runtime
-- **Note**: Both locations have explicit TODO comments about removing tokio usage
 
-### 13. Mock Backend Conditional Compilation
-**Location**: `src/backend/mock.rs:48`
+### 11. Mock Backend Conditional Compilation
+**Location**: `crates/ds-rs/src/backend/mock.rs:48`
 - Only include mock backend for testing with #[cfg(test)]
 - **Impact**: Smaller production binaries
 
-### 14. Progressive/Lazy Loading Implementation
+### 12. Progressive/Lazy Loading Implementation
 **Locations**: 
-- `source-videos/src/manager.rs:319` - Progressive loading for large directories
-- `source-videos/src/manager.rs:366` - Lazy loading for memory efficiency
+- `crates/source-videos/src/manager.rs:319` - Progressive loading for large directories
+- `crates/source-videos/src/manager.rs:366` - Lazy loading for memory efficiency
 - Currently placeholder comments
 - **Impact**: Performance with large video catalogs and memory usage
 
-### 15. CLI Command Completion
-**Status**: Some advanced features need completion
-**Locations**:
-- `source-videos/src/main.rs:1223` - Get actual metrics in simulate command
-- `source-videos/src/main.rs:1543` - Simplified playlist source creation  
-- **Impact**: Full CLI functionality for production use
-
-### 16. Test Infrastructure Issues
-**Status**: 2 test failures in cpuinfer crate
-**Failing Tests**:
-- `detector::onnx_tests::test_detector_config` - No valid ONNX model loaded error
-- `detector::onnx_tests::test_onnx_runtime_graceful_fallback` - Same model loading issue
-**Root Cause**: Tests require actual ONNX model files that aren't present
-**Impact**: CI/CD pipeline reliability, development confidence
-
-### 17. Code Quality Warnings
-**Status**: Multiple compiler warnings detected
-**Warning Types**:
-- 7 async_fn_in_trait warnings in source-videos crate
-- 6 dead_code warnings in ds-rs multistream module 
-- Multiple unused_imports, unused_variables, unused_mut across examples and tests
-**Impact**: Code maintainability, potential future compilation issues
-
 ## Low Priority TODOs 🔵
 
-### 18. DSL Crate Implementation
+### 13. DSL Crate Implementation
 **Location**: `crates/dsl/src/lib.rs:9`
 - DeepStream Services Library implementation
 - Single todo!() in test
 - **Impact**: High-level API
 
-### 19. Test with Real ONNX Model
+### 14. Test with Real ONNX Model
 **Location**: `crates/ds-rs/tests/cpu_backend_tests.rs:343`
 - When real ONNX model available, add proper tests
 - **Impact**: Test coverage
 
-### 20. Directory Scanning Optimization
+### 15. Directory Scanning Optimization
 **Location**: `crates/source-videos/src/directory.rs:63`
 - Replace synchronous scanning with async implementation
 - Currently "for now" comment
 - **Impact**: Performance for large directories
 
-### 21. Export/Streaming Integration
+### 16. Export/Streaming Integration
 **PRP**: PRP-13
 - MQTT/Kafka integration for detection results
 - **Impact**: Production deployment features
 
+### 17. Custom Metadata and Signal Emission
+**Locations**:
+- `crates/ds-rs/src/backend/cpu_vision/cpudetector/imp.rs:146,154` - Signal emission and metadata attachment
+- `crates/ds-rs/src/backend/cpu_vision/cpudetector/mod.rs:21` - Custom signal registration
+- **Impact**: Better GStreamer integration
+
+### 18. Runtime Control Enhancements
+**Locations**:
+- `crates/source-videos/src/main.rs:1072` - Unix socket server for runtime control
+- `crates/source-videos/src/main.rs:1279` - Get actual metrics instead of placeholder values
+- **Impact**: Better operational capabilities
+
 ## Technical Debt 🔧
 
-### Code Quality Issues (Updated Post-Refactoring Scan)
-- **unwrap() Usage**: 753 occurrences across 86 files - CRITICAL production risk (IMPROVED: -43 calls, -7 files)
+### Code Quality Issues (Updated Comprehensive Scan)
+- **unwrap() Usage**: 753 occurrences across 86 files - CRITICAL production risk (STABLE: similar to previous scans)
 - **unimplemented!() Usage**: ✅ 0 occurrences in property handlers - CRITICAL runtime panic risk RESOLVED (was 4)  
-- **todo!() Usage**: 2 active calls + 11 TODO comments requiring implementation
+- **todo!() Usage**: 2 active calls + 9 TODO comments requiring implementation (IMPROVED: was 11 TODO comments)
 - **"For now" comments**: 25+ occurrences indicating temporary solutions  
 - **Placeholder implementations**: Multiple locations needing actual logic
 - **Tokio usage**: 2 locations with explicit TODO comments for removal
-- **Code duplication**: ELIMINATED major ONNX detector duplication (~800 lines consolidated)
-- **Compiler Warnings**: 13+ warning types across async traits, dead code, unused imports
+- **Code duplication**: ✅ ELIMINATED major ONNX detector duplication (~800 lines consolidated)
+- **Mock/Simplified implementations**: 25+ locations with placeholder logic
 
 ### Test Coverage Status (Updated)
 - **Overall**: Workspace tests show mixed results with some failures
@@ -240,12 +224,21 @@ Last Updated: 2025-08-25 (Post-Refactoring Update)
   - 2 failures: `test_detector_config` and `test_onnx_runtime_graceful_fallback`
   - Root cause: Missing ONNX model files for testing
 - **Other Crates**: Need full test run to determine exact status
-- **Warning**: Multiple compiler warnings may indicate technical debt in tests
+
+### Temporary Implementation Patterns
+**High-frequency "for now" implementations** found in:
+- API route handlers (simplified state management)
+- Video processing (mock data/capabilities)  
+- Platform detection (hardcoded fallbacks)
+- Network simulation (placeholder metrics)
+- File metadata extraction (stub implementations)
+- DeepStream integration (mock metadata)
+- Signal emission (logging instead of actual signals)
 
 ## Project Statistics 📊
 
 ### Implementation Status
-- **PRPs Completed**: 25/41 (61% completion with PRP-38)
+- **PRPs Completed**: 26/41 (63.4% completion - Major milestone with API foundation)
 - **Working Examples**: 8/8 (all examples working)
 - **Crates Building**: 4/4
 - **API Integration**: Full REST API with automation capabilities
@@ -261,39 +254,40 @@ Last Updated: 2025-08-25 (Post-Refactoring Update)
 - Advanced CLI with multiple serving modes
 - Shell completions for major shells
 - Live display integration with GStreamer
+- Enhanced REPL with comprehensive commands
 
-⚠️ **Production Blockers** (Updated Post-Refactoring):
-- 753 unwrap() calls requiring systematic replacement (IMPROVED: was 796)
+⚠️ **Production Blockers** (Updated Post-Comprehensive Scan):
+- 753 unwrap() calls requiring systematic replacement (STABLE: consistent across scans)
 - ✅ 4 unimplemented!() property handlers RESOLVED (was causing guaranteed runtime panics)
 - 2 active todo!() calls that will panic when executed
-- 11 TODO comments requiring implementation for complete functionality
+- 9 TODO comments requiring implementation for complete functionality (IMPROVED: was 11)
+- 25+ "for now" placeholder implementations need actual logic
 - Missing error propagation in critical paths
-- Multiple compiler warnings indicating code quality issues
-- ✅ Code duplication eliminated (~800 lines consolidated)
+- Multiple temporary/simplified implementations across codebase
 
 ## Next Sprint Focus 🎯
 
 ### Immediate Actions (Week 1-2)
-1. **HIGH PRIORITY**: REPL mode implementation (PRP-39) - leverages completed API foundation
+1. **HIGH PRIORITY**: Address 2 active todo!() panic calls - immediate crash risk
 2. **Critical**: ✅ Fix 4 unimplemented!() property handlers - COMPLETED (was guaranteed panics)
-3. **Critical**: Complete 2 active todo!() implementations  
-4. **Critical**: Fix 2 failing cpuinfer tests for CI/CD reliability
-5. **High**: Start unwrap() replacement sprint - target 200 calls from 753 (improved base)
+3. **Critical**: Complete 9 remaining TODO comment implementations  
+4. **High**: Start unwrap() replacement sprint - target 150 calls from 753 (stable base)
+5. **High**: Replace "for now" implementations with actual logic in critical paths
 
 ### Short-term (Week 3-6)  
 6. **High**: Maintain refactoring improvements - prevent code duplication regression
-7. **Medium**: Address compiler warnings (async traits, dead code, unused imports)
-8. **Medium**: Remove global state in error classification
-9. **Medium**: Complete 11 remaining TODO comment implementations
-10. **Medium**: Implement actual metadata extraction logic
-11. **Medium**: Remove tokio dependency from both crates
+7. **Medium**: Remove global state in error classification
+8. **Medium**: Remove tokio dependency from both crates
+9. **Medium**: Implement actual metadata extraction logic
+10. **Medium**: Replace simplified API route implementations with actual state management
+11. **Medium**: Implement progressive/lazy loading optimizations
 
 ### Mid-term (Week 7-12)
 12. **High**: DeepStream FFI bindings (PRP-04) 
-13. **Medium**: Progressive/lazy loading optimizations  
-14. **Medium**: Complete placeholder API implementations
+13. **Medium**: Complete placeholder platform detection implementations  
+14. **Medium**: Implement actual signal emission instead of logging
 15. **Low**: Directory scanning async optimization
-16. **Low**: Clean up compiler warnings in examples and tests
+16. **Low**: DSL crate implementation beyond placeholder
 
 ## Production Readiness Assessment 🏭
 
@@ -304,25 +298,27 @@ Last Updated: 2025-08-25 (Post-Refactoring Update)
 - REST API for automation
 - Advanced CLI with comprehensive options
 - Shell completions and automation support
+- Enhanced REPL interface
 - Comprehensive test coverage (98.6%)
 
-### 🚨 Critical Blockers (Updated Post-Refactoring)
-- **753 unwrap() calls** - Must be addressed for production stability (IMPROVED: was 796)
-- **4 unimplemented property handlers** - Runtime panic risk  
+### 🚨 Critical Blockers (Updated Post-Comprehensive Scan)
+- **753 unwrap() calls** - Must be addressed for production stability (STABLE: consistent count)
 - **2 active todo!() calls** - Will panic when executed
+- **25+ "for now" implementations** - Temporary logic in critical paths
 - **Missing proper error propagation** - Silent failures possible
 - ✅ **Code duplication eliminated** - Major architectural improvement (~800 lines consolidated)
+- ✅ **Runtime panic handlers fixed** - No more unimplemented!() property crashes
 
-### 📈 Recommendation (Updated Post-Refactoring)
-With major code refactoring complete, PRP-38 delivered, and strong API foundation from PRP-41, continue building on improved codebase architecture:
+### 📈 Recommendation (Updated Post-Comprehensive Scan)
+With recent critical fixes completed (unimplemented!() handlers, Float16 support, major refactoring), focus on:
 
-**Priority 1**: REPL mode implementation (PRP-39) - leverages completed API foundation for immediate value
-**Priority 2**: ✅ Fix 4 unimplemented!() handlers COMPLETED and 2 todo!() panics (guaranteed failures)
-**Priority 3**: Address 753 unwrap() calls systematically (improved from 796)  
-**Priority 4**: Maintain refactoring improvements - prevent code duplication regression
-**Priority 5**: Complete 11 remaining TODO implementations for full functionality
+**Priority 1**: Fix 2 active todo!() panics - immediate crash risk when executed
+**Priority 2**: Replace 25+ "for now" placeholder implementations with actual logic  
+**Priority 3**: Address 753 unwrap() calls systematically (stable count suggests manageable scope)
+**Priority 4**: Complete 9 remaining TODO implementations for full functionality
+**Priority 5**: Maintain refactoring improvements - prevent code duplication regression
 
-The codebase has excellent architectural foundations (61% complete) and should focus on delivering valuable user-facing features while systematically addressing technical debt.
+The codebase has excellent architectural foundations (63.4% complete) with strong API infrastructure. Recent fixes eliminated major crash risks, but production deployment requires addressing the remaining placeholder implementations and systematic error handling improvements.
 
 ## Development Guidelines 📝
 
@@ -339,3 +335,4 @@ When working on any TODO item:
 - Network simulation framework enables comprehensive testing
 - Multi-stream capabilities support scaling to production workloads
 - API-first design enables integration with monitoring and CI/CD systems
+- Recent critical fixes significantly improved production stability

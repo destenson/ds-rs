@@ -206,7 +206,8 @@ impl SourceController {
     
     pub fn has_capacity(&self) -> Result<bool> {
         let num_sources = self.manager.num_sources()?;
-        Ok(num_sources < super::MAX_NUM_SOURCES)
+        // Use the actual max_sources from the manager, not the global constant
+        Ok(num_sources < self.manager.get_max_sources())
     }
 }
 

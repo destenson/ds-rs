@@ -86,12 +86,19 @@ impl SourceManager {
         self.streammux = Some(streammux);
     }
     
+    pub fn get_max_sources(&self) -> usize {
+        self.max_sources
+    }
+    
     pub fn generate_source_id(&self) -> Result<SourceId> {
-        let enabled = self.source_enabled.read()
+        // Lock for write to make this atomic - prevent concurrent threads from getting same ID
+        let mut enabled = self.source_enabled.write()
             .map_err(|_| DeepStreamError::Unknown("Failed to lock source_enabled".to_string()))?;
         
         for i in 0..self.max_sources {
             if !enabled[i] {
+                // Mark as enabled immediately to prevent race conditions
+                enabled[i] = true;
                 return Ok(SourceId(i));
             }
         }
@@ -126,7 +133,7 @@ impl SourceManager {
         }
         
         sources.insert(id, info);
-        self.mark_source_enabled(id, true)?;
+        // No need to mark as enabled here - already done in generate_source_id()
         Ok(())
     }
     
@@ -139,6 +146,7 @@ impl SourceManager {
                 format!("Source {} not found", id)
             ))?;
         
+        // Mark as disabled to free the slot
         self.mark_source_enabled(id, false)?;
         Ok(info)
     }

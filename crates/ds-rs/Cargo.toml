@@ -1,8 +1,8 @@
 [package]
 name = "ds-rs"
-version = "0.1.0" # TODO: use the workspace version
-edition = "2024" # TODO: use the workspace edition
-description = "Powerful library to control nVidia DeepStream AI processing framework"
+version.workspace = true
+edition.workspace = true
+description.workspace = true
 
 [features]
 default = ["std", "onnx", "cpu_vision", "gst_v1_26"]

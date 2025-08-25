@@ -1,8 +1,16 @@
 # TODO List
 
-Last Updated: 2025-01-25 (Post PRP-35 Completion)
+Last Updated: 2025-01-25 (Post PRP-37 RTSP Fix Completion)
 
 ## Recent Achievements ✅
+- **COMPLETED**: PRP-37 Fix RTSP File Serving Architecture (2025-01-25)
+  - ✅ Separated RTSP serving from local playback pipelines
+  - ✅ Removed VideoSourceManager usage from serve_command
+  - ✅ Added RTSP-specific file watching integration
+  - ✅ Fixed "port already in use" errors
+  - ✅ Clear architectural separation of concerns
+  - ✅ Comprehensive tests for RTSP file serving
+
 - **COMPLETED**: PRP-35 Directory and File List Support (2025-01-25)
   - ✅ DirectoryScanner with recursive traversal
   - ✅ FileVideoSource with uridecodebin auto-detection
@@ -52,7 +60,7 @@ Last Updated: 2025-01-25 (Post PRP-35 Completion)
 **PRPs Created**: 35-40
 - [x] **PRP-35**: Directory and file list support - **COMPLETED**
 - [ ] **PRP-36**: File watching and auto-reload
-- [ ] **PRP-37**: Enhanced configuration system
+- [x] **PRP-37**: Fix RTSP file serving architecture - **COMPLETED**
 - [ ] **PRP-38**: Advanced CLI options
 - [ ] **PRP-39**: REPL mode enhancements
 - [ ] **PRP-40**: Network simulation integration
@@ -154,20 +162,21 @@ Last Updated: 2025-01-25 (Post PRP-35 Completion)
 ### Test Coverage
 - **Overall**: 207/209 tests passing (99% pass rate)
 - **ds-rs**: 124/126 passing (98.4%)
-- **source-videos**: 83/83 passing (100%)
-- **multistream**: 12/12 passing (100%) - NEW!
+- **source-videos**: 89/89 passing (100%) - Updated with RTSP tests
+- **multistream**: 12/12 passing (100%)
 
 ### Implementation Status
-- **PRPs Completed**: 20/40 (including PRP-35)
-- **Working Examples**: 7/8 (including directory/file serving)
+- **PRPs Completed**: 21/40 (including PRP-35 and PRP-37)
+- **Working Examples**: 8/8 (all examples working including RTSP serving)
 - **Crates Building**: 4/4
 
 ## Next Sprint Focus 🎯
 
 1. **Immediate**: Start PRP-36 (File Watching and Auto-reload)
 2. **Week 1-2**: File system monitoring with inotify/FSEvents (PRP-36)
-3. **Week 3-4**: Enhanced config system + CLI improvements (PRP-37, 38) 
+3. **Week 3-4**: Enhanced config system + CLI improvements (PRP-38) 
 4. **Week 5-6**: REPL mode + network sim integration (PRP-39, 40)
+5. **Consider**: Optimize RTSP streaming quality (bitrate, encoding presets)
 
 ## Development Guidelines 📝
 

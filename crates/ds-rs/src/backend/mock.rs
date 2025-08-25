@@ -44,7 +44,8 @@ impl MockBackend {
         
         Ok(element)
     }
-    
+
+    // TODO: only include this for testing #[cfg(test)]
     fn create_mock_bin(name: &str, internal_elements: usize) -> Result<gst::Element> {
         let bin = gst::Bin::builder()
             .name(name)

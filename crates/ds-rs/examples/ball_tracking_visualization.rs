@@ -6,7 +6,7 @@
 
 use ds_rs::{
     init, timestamp, Result, DeepStreamError,
-    BackendManager, PipelineBuilder, MetadataBridge,
+    BackendManager, BackendType, PipelineBuilder, MetadataBridge,
     SourceController, SourceEvent, SourceId,
 };
 use gstreamer as gst;
@@ -38,35 +38,71 @@ impl BallTrackingApp {
         let metadata_bridge = Arc::new(Mutex::new(MetadataBridge::new()));
         
         // Build pipeline with ball tracking rendering
-        let pipeline = PipelineBuilder::new("ball-tracking-viz")
+        let mut builder = PipelineBuilder::new("ball-tracking-viz")
             .backend(backend_manager.backend_type())
             // Source mux for multiple video inputs
-            .add_element("streammux", "nvstreammux")
-            .set_property("streammux", "width", 1920i32)
-            .set_property("streammux", "height", 1080i32)
-            .set_property("streammux", "batch-size", 1i32)
-            .set_property("streammux", "batched-push-timeout", 40000i32)
-            // Object detection
-            .add_element("detector", "nvinfer")
-            .set_property_from_str("detector", "config-file-path", "models/ball_detection_config.txt")
-            // Object tracking
-            .add_element("tracker", "nvtracker")
-            .set_property_from_str("tracker", "ll-lib-file", "/opt/nvidia/deepstream/deepstream/lib/libnvds_nvmultiobjecttracker.so")
-            .set_property_from_str("tracker", "ll-config-file", "tracker_config.yml")
+            .add_element("streammux", "nvstreammux");
+        
+        // Configure properties based on backend type
+        // Standard backend uses compositor which doesn't have width/height properties
+        if backend_manager.backend_type() == BackendType::DeepStream {
+            builder = builder
+                .set_property("streammux", "width", 1920i32)
+                .set_property("streammux", "height", 1080i32)
+                .set_property("streammux", "batch-size", 1i32)
+                .set_property("streammux", "batched-push-timeout", 40000i32);
+        }
+        
+        // Object detection
+        builder = builder.add_element("detector", "nvinfer");
+        
+        // Only set config-file-path for DeepStream backend
+        // Standard backend CPU detector doesn't have this property
+        if backend_manager.backend_type() == BackendType::DeepStream {
+            builder = builder
+                .set_property_from_str("detector", "config-file-path", "models/ball_detection_config.txt");
+        }
+        
+        // Object tracking  
+        builder = builder.add_element("tracker", "nvtracker");
+        
+        // Only set tracker properties for DeepStream backend
+        if backend_manager.backend_type() == BackendType::DeepStream {
+            builder = builder
+                .set_property_from_str("tracker", "ll-lib-file", "/opt/nvidia/deepstream/deepstream/lib/libnvds_nvmultiobjecttracker.so")
+                .set_property_from_str("tracker", "ll-config-file", "tracker_config.yml");
+        }
+        
+        builder = builder
             // Video conversion
             .add_element("converter", "nvvideoconvert")
             // OSD with dynamic rendering
             .add_dynamic_osd("osd")
             // Tiler for multiple streams
-            .add_element("tiler", "nvtiler")
-            .set_property("tiler", "rows", 2i32)
-            .set_property("tiler", "columns", 2i32)
-            .set_property("tiler", "width", 1920i32)
-            .set_property("tiler", "height", 1080i32)
+            .add_element("tiler", "nvtiler");
+        
+        // Only set tiler width/height for DeepStream backend
+        if backend_manager.backend_type() == BackendType::DeepStream {
+            builder = builder
+                .set_property("tiler", "rows", 2i32)
+                .set_property("tiler", "columns", 2i32)
+                .set_property("tiler", "width", 1920i32)
+                .set_property("tiler", "height", 1080i32);
+        }
+
+        // Use platform-appropriate sink
+        let sink_type = if cfg!(target_os = "windows") {
+            "d3dvideosink"
+        } else {
+            "nveglglessink"
+        };
+
+        
+        let pipeline = builder
             // Output conversion
             .add_element("converter2", "nvvideoconvert")
             // Sink
-            .add_element("sink", "nveglglessink")
+            .add_element("sink", sink_type)
             .set_property("sink", "sync", false)
             // Link elements
             .link("streammux", "detector")

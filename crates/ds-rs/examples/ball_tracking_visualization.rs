@@ -323,12 +323,23 @@ fn main() -> Result<()> {
     let app = BallTrackingApp::new()?;
     
     // Add video sources (RTSP streams or files)
-    // For test patterns, use a special URI format that will be handled
-    app.add_source("videotestsrc://")?;
+    // Use the downloaded test video with people and cars
+    let video_path = std::env::current_dir()
+        .unwrap()
+        .join("crates")
+        .join("ds-rs")
+        .join("tests")
+        .join("test_video.mp4");
+    
+    let video_uri = format!("file:///{}", video_path.display().to_string().replace("\\", "/"));
+    log::info!("Using video: {}", video_uri);
+    app.add_source(&video_uri)?;
+    
+    // For test patterns:
+    // app.add_source("videotestsrc://")?;
     
     // For RTSP streams from source-videos server:
     // app.add_source("rtsp://127.0.0.1:8554/test1")?;
-    // app.add_source("rtsp://127.0.0.1:8554/test2")?;
     
     // For video files:
     // app.add_source("file:///path/to/video.mp4")?;
@@ -336,17 +347,17 @@ fn main() -> Result<()> {
     // Start pipeline
     app.start()?;
     
-    // Add another source after 5 seconds (demonstrates dynamic addition)
-    thread::spawn({
-        let app_controller = app.source_controller.clone();
-        move || {
-            thread::sleep(Duration::from_secs(5));
-            log::info!("[{:.3}] Adding second source dynamically", timestamp());
-            let _ = app_controller.add_source(
-                "videotestsrc://"
-            );
-        }
-    });
+    // Optional: Add another source after 5 seconds (demonstrates dynamic addition)
+    // thread::spawn({
+    //     let app_controller = app.source_controller.clone();
+    //     move || {
+    //         thread::sleep(Duration::from_secs(5));
+    //         log::info!("[{:.3}] Adding second source dynamically", timestamp());
+    //         let _ = app_controller.add_source(
+    //             "videotestsrc://"
+    //         );
+    //     }
+    // });
     
     // Run main loop
     app.run()?;

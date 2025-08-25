@@ -26,7 +26,7 @@ const DEFAULT_CONFIDENCE_THRESHOLD: f64 = 0.5;
 const DEFAULT_NMS_THRESHOLD: f64 = 0.4;
 const DEFAULT_INPUT_WIDTH: u32 = 640;
 const DEFAULT_INPUT_HEIGHT: u32 = 640;
-const DEFAULT_PROCESS_EVERY_N_FRAMES: u32 = 1;
+const DEFAULT_PROCESS_EVERY_N_FRAMES: u32 = 10;
 
 #[derive(Debug, Clone)]
 struct Settings {
@@ -166,7 +166,20 @@ impl CpuDetector {
         self.obj().emit_by_name::<()>("inference-results", &[&frame_num, &json_string]);
         
         if !detections.is_empty() {
-            log::debug!("Frame {}: {} detections emitted via signal", frame_num, detections.len());
+            log::info!("🎆 Frame {}: Emitting {} detections via signal", frame_num, detections.len());
+            
+            // Log detailed detection information
+            for (i, detection) in detections.iter().enumerate() {
+                log::info!("  ➡️ Detection {}: {} (class_id={}) at ({:.1}, {:.1}) size={}x{} conf={:.2}",
+                          i + 1,
+                          detection.class_name,
+                          detection.class_id,
+                          detection.x,
+                          detection.y,
+                          detection.width,
+                          detection.height,
+                          detection.confidence);
+            }
         }
     }
     

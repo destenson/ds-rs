@@ -7,6 +7,9 @@ use gstreamer::prelude::*;
 use gstreamer_video as gst_video;
 use std::sync::{Arc, Mutex};
 use image::{DynamicImage, RgbImage};
+use crate::rendering::metadata_bridge::MetadataBridge;
+#[cfg(feature = "cairo-rs")]
+use cairo;
 #[cfg(feature = "nalgebra")]
 use super::tracker::CentroidTracker;
 
@@ -260,7 +263,10 @@ pub fn create_cpu_tracker(name: Option<&str>) -> Result<gst::Element> {
 }
 
 /// Create a CPU OSD (On-Screen Display) element for drawing bounding boxes
-pub fn create_cpu_osd(name: Option<&str>) -> Result<gst::Element> {
+pub fn create_cpu_osd(
+    name: Option<&str>,
+    metadata_bridge: Option<Arc<Mutex<MetadataBridge>>>,
+) -> Result<gst::Element> {
     let bin = gst::Bin::builder()
         .name(name.unwrap_or("cpu-osd"))
         .build();
@@ -311,14 +317,322 @@ pub fn create_cpu_osd(name: Option<&str>) -> Result<gst::Element> {
     
     // If using cairooverlay, set up drawing callback
     if overlay.type_().name() == "GstCairoOverlay" {
-        // In a real implementation, we would set up the draw signal
-        // to draw bounding boxes from metadata
         log::info!("CPU OSD using Cairo for rendering");
+        
+        if let Some(bridge) = metadata_bridge {
+            #[cfg(feature = "cairo-rs")]
+            {
+                // Track video dimensions for coordinate transformation
+                let video_info = Arc::new(Mutex::new(None::<(u32, u32)>));
+                let video_info_clone = video_info.clone();
+                
+                // Connect caps-changed signal to track video dimensions
+                overlay.connect("caps-changed", false, move |args| {
+                if let Ok(caps) = args[1].get::<gst::Caps>() {
+                    if let Ok(video_info_from_caps) = gst_video::VideoInfo::from_caps(&caps) {
+                        let width = video_info_from_caps.width();
+                        let height = video_info_from_caps.height();
+                        *video_info_clone.lock().unwrap() = Some((width, height));
+                        log::debug!("Cairo overlay video dimensions: {}x{}", width, height);
+                    }
+                }
+                None
+            });
+            
+            // Connect draw signal for rendering bounding boxes
+            #[cfg(feature = "cairo-rs")]
+            overlay.connect("draw", false, move |args| {
+                // Get the cairo context and timestamp
+                let cr = args[1].get::<cairo::Context>().ok()?;
+                let timestamp = args[2].get::<gst::ClockTime>().ok()?;
+                
+                // Get current video dimensions
+                let (width, height) = match *video_info.lock().unwrap() {
+                    Some(dims) => dims,
+                    None => return None, // Skip if we don't know dimensions yet
+                };
+                
+                // Get detections from metadata bridge
+                let detections = bridge.lock().unwrap().get_frame_metadata(timestamp);
+                
+                if let Some(objects) = detections {
+                    if !objects.is_empty() {
+                        log::debug!("Drawing {} detections at timestamp {:?}", objects.len(), timestamp);
+                    }
+                    
+                    // Set drawing properties
+                    cr.set_line_width(3.0);
+                    
+                    for obj in objects {
+                        // Get detection bounding box
+                        let detection_bbox = &obj.detector_bbox_info;
+                        let confidence = obj.confidence;
+                        let class_name = obj.class_name();
+                        let class_id = obj.class_id;
+                        
+                        // Log detection details for debugging
+                        log::trace!("Drawing box for {}: ({:.1}, {:.1}) {}x{} conf={:.2}",
+                                   class_name,
+                                   detection_bbox.left, detection_bbox.top,
+                                   detection_bbox.width, detection_bbox.height,
+                                   confidence);
+                        
+                        // Convert normalized coordinates to pixel coordinates if needed
+                        // Detection coordinates might be in pixels already (0-width, 0-height)
+                        // or normalized (0-1). Check and convert if needed.
+                        let (x, y, w, h) = if detection_bbox.left <= 1.0 && detection_bbox.top <= 1.0 
+                                           && detection_bbox.width <= 1.0 && detection_bbox.height <= 1.0 {
+                            // Normalized coordinates - convert to pixels
+                            (
+                                detection_bbox.left * width as f32,
+                                detection_bbox.top * height as f32,
+                                detection_bbox.width * width as f32,
+                                detection_bbox.height * height as f32,
+                            )
+                        } else {
+                            // Already in pixels
+                            (
+                                detection_bbox.left,
+                                detection_bbox.top,
+                                detection_bbox.width,
+                                detection_bbox.height,
+                            )
+                        };
+                        
+                        // Set color based on class or confidence
+                        // Use different colors for different classes
+                        let (r, g, b) = match class_id % 6 {
+                            0 => (1.0, 0.0, 0.0),  // Red
+                            1 => (0.0, 1.0, 0.0),  // Green
+                            2 => (0.0, 0.0, 1.0),  // Blue
+                            3 => (1.0, 1.0, 0.0),  // Yellow
+                            4 => (1.0, 0.0, 1.0),  // Magenta
+                            _ => (0.0, 1.0, 1.0),  // Cyan
+                        };
+                        
+                        // Set color with alpha based on confidence
+                        cr.set_source_rgba(r, g, b, 0.8);
+                        
+                        // Draw the bounding box
+                        cr.rectangle(x as f64, y as f64, w as f64, h as f64);
+                        cr.stroke().unwrap_or_default();
+                        
+                        // Draw the label background
+                        let label = format!("{}: {:.0}%", class_name, confidence * 100.0);
+                        let label_height = 20.0;
+                        let label_padding = 4.0;
+                        
+                        // Create text extents to measure label size
+                        cr.set_font_size(14.0);
+                        // Get text extents or use default width
+                        let text_width = cr.text_extents(&label)
+                            .map(|te| te.width())
+                            .unwrap_or(100.0);
+                        let label_width = text_width + label_padding * 2.0;
+                        
+                        // Draw label background
+                        cr.set_source_rgba(r, g, b, 0.9);
+                        cr.rectangle(
+                            x as f64,
+                            (y as f64) - label_height,
+                            label_width,
+                            label_height,
+                        );
+                        cr.fill().unwrap_or_default();
+                        
+                        // Draw label text
+                        cr.set_source_rgba(1.0, 1.0, 1.0, 1.0); // White text
+                        cr.move_to(
+                            (x as f64) + label_padding,
+                            (y as f64) - label_padding,
+                        );
+                        cr.show_text(&label).unwrap_or_default();
+                    }
+                }
+                
+                None
+            });
+            }
+            #[cfg(not(feature = "cairo-rs"))]
+            {
+                log::warn!("Cairo rendering disabled - cairo-rs feature not enabled");
+            }
+        } else {
+            log::warn!("CPU OSD created without metadata bridge - no detections will be rendered");
+        }
     } else {
         log::info!("CPU OSD using text overlay fallback");
     }
     
     Ok(bin.upcast())
+}
+
+/// Connect a metadata bridge to an existing CPU OSD element
+/// This allows connecting the bridge after the element has been created
+pub fn connect_metadata_bridge_to_cpu_osd(
+    osd_bin: &gst::Element,
+    metadata_bridge: Arc<Mutex<MetadataBridge>>,
+) -> Result<()> {
+    // Check if this is actually a bin
+    let bin = osd_bin.downcast_ref::<gst::Bin>()
+        .ok_or_else(|| DeepStreamError::Configuration(
+            "OSD element is not a bin".to_string()
+        ))?;
+    
+    // Get the cairooverlay element from the bin
+    let overlay = bin.by_name("osd-overlay")
+        .ok_or_else(|| DeepStreamError::Configuration(
+            "Could not find osd-overlay element in bin".to_string()
+        ))?;
+    
+    // Only proceed if it's actually a cairooverlay element
+    if overlay.type_().name() != "GstCairoOverlay" {
+        log::warn!("OSD overlay is not Cairo-based, cannot connect metadata bridge");
+        return Ok(());
+    }
+    
+    log::info!("Connecting metadata bridge to CPU OSD Cairo overlay");
+    
+    #[cfg(feature = "cairo-rs")]
+    {
+        // Track video dimensions for coordinate transformation
+        let video_info = Arc::new(Mutex::new(None::<(u32, u32)>));
+        let video_info_clone = video_info.clone();
+        
+        // Connect caps-changed signal to track video dimensions
+        overlay.connect("caps-changed", false, move |args| {
+        if let Ok(caps) = args[1].get::<gst::Caps>() {
+            if let Ok(video_info_from_caps) = gst_video::VideoInfo::from_caps(&caps) {
+                let width = video_info_from_caps.width();
+                let height = video_info_from_caps.height();
+                *video_info_clone.lock().unwrap() = Some((width, height));
+                log::debug!("Cairo overlay video dimensions: {}x{}", width, height);
+            }
+        }
+        None
+    });
+    
+    // Connect draw signal for rendering bounding boxes
+    #[cfg(feature = "cairo-rs")]
+    overlay.connect("draw", false, move |args| {
+        // Get the cairo context and timestamp
+        let cr = args[1].get::<cairo::Context>().ok()?;
+        let timestamp = args[2].get::<gst::ClockTime>().ok()?;
+        
+        // Get current video dimensions
+        let (width, height) = match *video_info.lock().unwrap() {
+            Some(dims) => dims,
+            None => return None, // Skip if we don't know dimensions yet
+        };
+        
+        // Get detections from metadata bridge
+        let detections = metadata_bridge.lock().unwrap().get_frame_metadata(timestamp);
+        
+        if let Some(objects) = detections {
+            if !objects.is_empty() {
+                log::info!("🎯 Drawing {} detections at timestamp {:?}", objects.len(), timestamp);
+            }
+            
+            // Set drawing properties
+            cr.set_line_width(3.0);
+            
+            for obj in objects {
+                // Get detection bounding box
+                let detection_bbox = &obj.detector_bbox_info;
+                let confidence = obj.confidence;
+                let class_name = obj.class_name();
+                let class_id = obj.class_id;
+                
+                // Log detection details for debugging
+                log::debug!("Drawing box for {}: ({:.1}, {:.1}) {}x{} conf={:.2}",
+                           class_name,
+                           detection_bbox.left, detection_bbox.top,
+                           detection_bbox.width, detection_bbox.height,
+                           confidence);
+                
+                // Convert normalized coordinates to pixel coordinates if needed
+                // Detection coordinates might be in pixels already (0-width, 0-height)
+                // or normalized (0-1). Check and convert if needed.
+                let (x, y, w, h) = if detection_bbox.left <= 1.0 && detection_bbox.top <= 1.0 
+                                   && detection_bbox.width <= 1.0 && detection_bbox.height <= 1.0 {
+                    // Normalized coordinates - convert to pixels
+                    (
+                        detection_bbox.left * width as f32,
+                        detection_bbox.top * height as f32,
+                        detection_bbox.width * width as f32,
+                        detection_bbox.height * height as f32,
+                    )
+                } else {
+                    // Already in pixels
+                    (
+                        detection_bbox.left,
+                        detection_bbox.top,
+                        detection_bbox.width,
+                        detection_bbox.height,
+                    )
+                };
+                
+                // Set color based on class or confidence
+                // Use different colors for different classes
+                let (r, g, b) = match class_id % 6 {
+                    0 => (1.0, 0.0, 0.0),  // Red
+                    1 => (0.0, 1.0, 0.0),  // Green
+                    2 => (0.0, 0.0, 1.0),  // Blue
+                    3 => (1.0, 1.0, 0.0),  // Yellow
+                    4 => (1.0, 0.0, 1.0),  // Magenta
+                    _ => (0.0, 1.0, 1.0),  // Cyan
+                };
+                
+                // Set color with alpha based on confidence
+                cr.set_source_rgba(r, g, b, 0.8);
+                
+                // Draw the bounding box
+                cr.rectangle(x as f64, y as f64, w as f64, h as f64);
+                cr.stroke().unwrap_or_default();
+                
+                // Draw the label background
+                let label = format!("{}: {:.0}%", class_name, confidence * 100.0);
+                let label_height = 20.0;
+                let label_padding = 4.0;
+                
+                // Create text extents to measure label size
+                cr.set_font_size(14.0);
+                // Get text extents or use default width
+                let text_width = cr.text_extents(&label)
+                    .map(|te| te.width())
+                    .unwrap_or(100.0);
+                let label_width = text_width + label_padding * 2.0;
+                
+                // Draw label background
+                cr.set_source_rgba(r, g, b, 0.9);
+                cr.rectangle(
+                    x as f64,
+                    (y as f64) - label_height,
+                    label_width,
+                    label_height,
+                );
+                cr.fill().unwrap_or_default();
+                
+                // Draw label text
+                cr.set_source_rgba(1.0, 1.0, 1.0, 1.0); // White text
+                cr.move_to(
+                    (x as f64) + label_padding,
+                    (y as f64) - label_padding,
+                );
+                cr.show_text(&label).unwrap_or_default();
+            }
+        }
+        
+        None
+    });
+    }
+    
+    #[cfg(not(feature = "cairo-rs"))]
+    {
+        log::warn!("Cairo rendering disabled - cairo-rs feature not enabled");
+    }
+    
+    Ok(())
 }
 
 /// Create a complete CPU vision pipeline bin
@@ -333,7 +647,8 @@ pub fn create_cpu_vision_pipeline(
     // Create elements
     let detector = create_cpu_detector(Some("detector"), model_path)?;
     let tracker = create_cpu_tracker(Some("tracker"))?;
-    let osd = create_cpu_osd(Some("osd"))?;
+    // Note: For complete pipeline, metadata_bridge should be passed from pipeline builder
+    let osd = create_cpu_osd(Some("osd"), None)?;
     
     // Add to bin
     bin.add_many([&detector, &tracker, &osd])?;
@@ -382,7 +697,7 @@ mod tests {
     fn test_create_cpu_osd() {
         gst::init().unwrap();
         
-        let osd = create_cpu_osd(Some("test-osd")).unwrap();
+        let osd = create_cpu_osd(Some("test-osd"), None).unwrap();
         assert_eq!(osd.name(), "test-osd");
         assert!(osd.static_pad("sink").is_some());
         assert!(osd.static_pad("src").is_some());

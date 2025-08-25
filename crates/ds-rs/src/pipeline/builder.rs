@@ -504,7 +504,7 @@ fn configure_osd_for_rendering(
     )?;
     
     // Connect metadata bridge to renderer
-    renderer.connect_metadata_source(metadata_bridge)?;
+    renderer.connect_metadata_source(metadata_bridge.clone())?;
     
     // Configure OSD element based on rendering config
     // Only set properties if this is a DeepStream nvdsosd element
@@ -523,10 +523,19 @@ fn configure_osd_for_rendering(
             );
             osd_element.set_property("font-desc", &font_desc);
         }
+    } else if backend_type == crate::backend::BackendType::Standard {
+        // For Standard backend with CPU OSD, connect the metadata bridge for Cairo drawing
+        if let Err(e) = crate::backend::cpu_vision::elements::connect_metadata_bridge_to_cpu_osd(
+            osd_element,
+            metadata_bridge.clone(),
+        ) {
+            log::warn!("Failed to connect metadata bridge to CPU OSD: {}", e);
+        } else {
+            log::info!("Successfully connected metadata bridge to CPU OSD for Cairo rendering");
+        }
     } else {
-        // For Standard backend, the OSD configuration is handled differently
-        // The CPU OSD or text overlay doesn't use these properties
-        log::debug!("Standard backend OSD doesn't support display-bbox/display-text properties");
+        // For other backends
+        log::debug!("Backend {} OSD configuration not implemented", backend_type);
     }
     
     log::info!("Configured OSD element '{}' for dynamic rendering with {} backend",

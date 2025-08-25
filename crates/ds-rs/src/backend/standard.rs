@@ -153,7 +153,7 @@ impl Backend for StandardBackend {
     
     fn create_osd(&self, name: Option<&str>) -> Result<gst::Element> {
         // Try to create CPU OSD for bounding box rendering
-        match super::cpu_vision::elements::create_cpu_osd(name) {
+        match super::cpu_vision::elements::create_cpu_osd(name, None) {
             Ok(osd) => {
                 log::info!("Standard backend: Using CPU OSD for visualization");
                 Ok(osd)

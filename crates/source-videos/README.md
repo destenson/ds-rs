@@ -8,17 +8,25 @@ The `source-videos` crate provides a comprehensive solution for generating test 
 
 ## Features
 
+### Core Functionality
 - **Test Pattern Generation**: 25+ built-in test patterns (SMPTE, ball animation, noise, etc.)
 - **RTSP Server**: Embedded RTSP server serving multiple test streams simultaneously
 - **File Generation**: Generate test video files in common formats (MP4, MKV, WebM)
-- **Directory Serving**: Serve all video files from a directory as RTSP streams (NEW!)
-- **File List Support**: Serve specific video files by providing file paths (NEW!)
-- **Recursive Directory Scanning**: Automatically discover videos in subdirectories (NEW!)
-- **File Filtering**: Include/exclude patterns and extension filtering (NEW!)
 - **Dynamic Source Management**: Runtime addition/removal of video sources
-- **CLI Application**: User-friendly command-line interface with directory support
 - **Configuration Support**: TOML-based configuration files
 - **Cross-Platform**: Works on Windows, Linux, and macOS
+
+### Advanced CLI Features (NEW in PRP-38)
+- **Multiple Serving Modes**: Files, playlist, monitoring, and network simulation
+- **Advanced File Serving**: Enhanced `serve-files` command with sophisticated filtering
+- **Playlist Mode**: Sequential, random, or shuffle playback with repeat options
+- **Directory Monitoring**: Real-time file system watching with metrics
+- **Network Simulation Integration**: Test resilience with various network profiles
+- **Shell Completions**: Auto-completion for Bash, Zsh, Fish, and PowerShell
+- **Advanced Filtering**: Include/exclude patterns, format filters, duration filters, date filters
+- **Daemon Mode**: Background operation with PID file management
+- **Multiple Output Formats**: Text, JSON, and CSV output for automation
+- **Dry Run Mode**: Preview operations without starting servers
 
 ## Quick Start
 
@@ -60,41 +68,134 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 }
 ```
 
-### CLI Usage
+### Command Line Usage
 
+#### Basic Commands
 ```bash
 # List available test patterns
-cargo run -- list
+source-videos list
 
-# Start RTSP server with default test patterns
-cargo run -- serve --port 8554
+# Traditional serve with patterns
+source-videos serve --patterns smpte,ball,snow
 
-# Start server with specific patterns
-cargo run -- serve --patterns smpte,ball,snow
+# Generate test video file
+source-videos generate --pattern smpte --duration 10 --output test.mp4
 
-# Generate a test video file
-cargo run -- generate --pattern smpte --duration 10 --output test.mp4
-
-# Interactive mode
-cargo run -- interactive
+# Interactive REPL mode
+source-videos interactive
 
 # Run comprehensive test suite
-cargo run -- test --port 8554
+source-videos test --port 8554
+```
 
-# NEW: Serve video files from a directory
-cargo run -- serve --directory /path/to/videos --port 8554
+#### Advanced Commands (PRP-38)
 
-# NEW: Serve videos recursively from directory
-cargo run -- serve --directory /path/to/videos --recursive --port 8554
+##### serve-files: Enhanced File Serving
+```bash
+# Basic directory serving
+source-videos serve-files -d /path/to/videos
 
-# NEW: Serve specific video files
-cargo run -- serve --files video1.mp4,video2.avi,/path/to/video3.mkv --port 8554
+# Advanced filtering and controls
+source-videos serve-files -d /path/to/videos \
+  --recursive \
+  --include "*.mp4" "*.mkv" \
+  --exclude "*test*" "*backup*" \
+  --format mp4 \
+  --min-duration 60 \
+  --max-duration 3600 \
+  --modified-since 2024-01-01 \
+  --max-streams 10
 
-# NEW: Filter videos by pattern
-cargo run -- serve --directory /videos --include "*.mp4,*test*" --exclude "*.tmp,backup_*"
+# Production features
+source-videos serve-files -d /path/to/videos \
+  --daemon \
+  --pid-file /var/run/source-videos.pid \
+  --status-interval 30 \
+  --metrics \
+  --output-format json
 
-# NEW: Mixed sources (patterns + files)
-cargo run -- serve --patterns smpte,ball --directory /videos --files extra.mp4
+# Preview without starting
+source-videos serve-files -d /path/to/videos --dry-run
+```
+
+##### playlist: Sequential Video Playback
+```bash
+# Sequential playlist
+source-videos playlist -d /path/to/videos --playlist-mode sequential
+
+# Random playlist with repeat
+source-videos playlist -d /path/to/videos \
+  --playlist-mode shuffle \
+  --playlist-repeat all \
+  --transition-duration 2.0 \
+  --crossfade
+
+# From playlist file
+source-videos playlist \
+  --playlist-file /path/to/playlist.m3u \
+  --playlist-mode random
+```
+
+##### monitor: Real-time Directory Monitoring
+```bash
+# Basic monitoring
+source-videos monitor -d /path/to/videos --recursive
+
+# With metrics and structured output
+source-videos monitor -d /path/to/videos \
+  --metrics \
+  --output-format json \
+  --watch-interval 500 \
+  --list-streams
+```
+
+##### simulate: Network Condition Testing
+```bash
+# Test with network profiles
+source-videos simulate --network-profile 3g -d /path/to/videos
+source-videos simulate --network-profile satellite --patterns ball,smpte
+
+# Custom network conditions
+source-videos simulate --network-profile custom \
+  --packet-loss 5.0 --latency 250 --bandwidth 2000
+
+# Duration-limited testing with metrics
+source-videos simulate --network-profile poor \
+  --duration 300 --metrics
+```
+
+##### completions: Shell Integration
+```bash
+# Generate bash completions
+source-videos completions bash > /etc/bash_completion.d/source-videos
+
+# Other shells
+source-videos completions zsh > ~/.zsh/completions/_source-videos
+source-videos completions fish > ~/.config/fish/completions/source-videos.fish
+source-videos completions powershell > source-videos.ps1
+```
+
+#### Global Options
+```bash
+# Verbose logging (stackable)
+source-videos -v serve-files -d /videos    # info level
+source-videos -vv serve-files -d /videos   # debug level
+source-videos -vvv serve-files -d /videos  # trace level
+
+# Configuration file
+source-videos -c config.toml serve -d /videos
+
+# Quiet mode
+source-videos serve-files -d /videos --quiet
+```
+
+#### REST API Integration
+```bash
+# Enable API with any command
+source-videos serve-files -d /videos --api --api-port 3000
+source-videos playlist -d /videos --api
+
+# API endpoints available at http://localhost:3000/api/
 ```
 
 ## Test Patterns
@@ -447,16 +548,64 @@ Install GStreamer plugins:
 
 ## Examples
 
+### Real-world Usage Examples
+
+#### Video Collection Server
+```bash
+# Serve large video collection with smart filtering
+source-videos serve-files -d /media/videos \
+  --recursive \
+  --include "*.mp4" "*.mkv" "*.avi" \
+  --exclude "*sample*" "*trailer*" "*temp*" \
+  --max-streams 20 \
+  --daemon \
+  --metrics
+```
+
+#### Playlist Testing
+```bash
+# Create shuffled playlist of high-quality videos
+source-videos playlist -d /media/hd-content \
+  --playlist-mode shuffle \
+  --playlist-repeat all \
+  --include "*1080p*.mp4" "*4k*.mkv" \
+  --transition-duration 1.5
+```
+
+#### Development Monitoring
+```bash
+# Monitor video development directory with JSON output
+source-videos monitor -d /dev/video-assets \
+  --recursive \
+  --output-format json \
+  --metrics \
+  --list-streams > video-changes.json
+```
+
+#### Network Testing
+```bash
+# Test streaming under poor network conditions
+source-videos simulate --network-profile poor \
+  -d /test-videos \
+  --duration 600 \
+  --metrics
+```
+
+### Code Examples
+
 See the `examples/` directory for:
-- `directory_server.rs` - Serve video files from a directory (NEW!)
-- `batch_file_server.rs` - Serve specific video files from a list (NEW!)
-- `mixed_sources.rs` - Combine test patterns, directory files, and explicit files (NEW!)
+- `directory_server.rs` - Serve video files from a directory
+- `batch_file_server.rs` - Serve specific video files from a list
+- `mixed_sources.rs` - Combine test patterns, directory files, and explicit files
+- `drone_network_demo.rs` - Network simulation with drone profiles
+- `watched_directory.rs` - File system monitoring with auto-reload
 - Basic RTSP server setups and integration patterns
 
 ## Architecture
 
 The crate follows a modular architecture:
 
+### Core Modules
 - **Config** - TOML configuration parsing and validation
 - **Patterns** - Test pattern definitions and utilities
 - **Pipeline** - GStreamer pipeline construction and management
@@ -464,9 +613,23 @@ The crate follows a modular architecture:
 - **Manager** - Thread-safe source registry and lifecycle management
 - **RTSP** - Embedded RTSP server with media factories
 - **File** - Video file generation with encoding support
-- **Directory** - Directory scanning and video file discovery (NEW!)
-- **FileUtils** - Video file detection and mount point generation (NEW!)
-- **FileSource** - Direct file-based video source implementation (NEW!)
+
+### Advanced Features (PRP-38)
+- **CLI** - Advanced command-line interface with multiple modes
+- **Directory** - Directory scanning and video file discovery
+- **FileUtils** - Video file detection and mount point generation
+- **FileSource** - Direct file-based video source implementation
+- **Watch** - File system monitoring and auto-reload functionality
+- **Network** - Network simulation and testing infrastructure
+- **API** - REST API for remote control and automation
+- **Runtime** - Dynamic configuration and signal handling
+
+### CLI Command Architecture
+- **serve-files** - Enhanced file serving with advanced filtering
+- **playlist** - Sequential/random playback with repeat modes
+- **monitor** - Real-time directory monitoring with metrics
+- **simulate** - Network condition testing with profiles
+- **completions** - Shell auto-completion generation
 
 ## License
 
@@ -475,9 +638,12 @@ This project is part of the ds-rs codebase and follows the same licensing terms.
 ## Contributing
 
 1. Ensure all tests pass: `cargo test`
-2. Add appropriate tests for new features
-3. Run clippy: `cargo clippy`
-4. Format code: `cargo fmt`
+2. Test new CLI features: `cargo run -- --help`
+3. Add appropriate tests for new features
+4. Run clippy: `cargo clippy`
+5. Format code: `cargo fmt`
+6. Test shell completions: `source-videos completions bash | head -20`
+7. Validate against PRP requirements in `PRPs/38-source-videos-cli-enhancements.md`
 
 ## Performance Notes
 

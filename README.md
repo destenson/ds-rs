@@ -4,6 +4,17 @@ A Rust port of NVIDIA's DeepStream runtime source addition/deletion reference ap
 
 ## Recent Updates
 
+### 2025-08-25: Advanced CLI Options Complete (PRP-38)
+- ✅ **IMPLEMENTED: Enhanced CLI with multiple serving modes** - serve-files, playlist, monitor, simulate commands
+- ✅ **ADDED: Advanced filtering system** - Include/exclude patterns, format filters, duration/date filtering  
+- ✅ **CREATED: Playlist functionality** - Sequential, random, shuffle modes with repeat options
+- ✅ **BUILT: Directory monitoring** - Real-time file system watching with metrics and structured output
+- ✅ **INTEGRATED: Network simulation CLI** - Easy testing with predefined and custom network profiles
+- ✅ **GENERATED: Shell completions** - Full auto-completion for Bash, Zsh, Fish, and PowerShell
+- ✅ **ADDED: Production features** - Daemon mode, PID files, status intervals, metrics output
+- ✅ **IMPLEMENTED: Multiple output formats** - Text, JSON, CSV for automation and monitoring
+- ✅ **CREATED: Dry run mode** - Preview operations without starting servers
+
 ### 2025-08-25: Network Simulation Integration Complete (PRP-40)
 - ✅ **INTEGRATED: Network simulation with source-videos** - Full network condition simulation for testing
 - ✅ **ADDED: Multiple network profiles** - NoisyRadio, IntermittentSatellite, DroneUrban, DroneMountain

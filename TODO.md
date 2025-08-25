@@ -4,6 +4,16 @@ Last Updated: 2025-08-25 (Post PRP-41 Source-Videos Control API)
 
 ## Recent Achievements ✅
 
+- **COMPLETED**: PRP-38 Advanced CLI Options for Source-Videos (2025-08-25)
+  - ✅ Enhanced CLI with 4 new serving modes: serve-files, playlist, monitor, simulate
+  - ✅ Advanced filtering system with include/exclude patterns, format/duration/date filters
+  - ✅ Playlist functionality with sequential/random/shuffle modes and repeat options
+  - ✅ Directory monitoring with real-time file system watching and structured output
+  - ✅ Network simulation CLI integration with predefined and custom profiles
+  - ✅ Shell completions for Bash, Zsh, Fish, and PowerShell with auto-generation
+  - ✅ Production features: daemon mode, PID files, status intervals, metrics output
+  - ✅ Multiple output formats (text, JSON, CSV) and dry run mode for automation
+
 - **COMPLETED**: PRP-41 Source-Videos Control API for Automation (2025-08-25)
   - ✅ Complete REST API with axum 0.8.4 and all CRUD operations
   - ✅ Source management, server control, configuration, network simulation endpoints
@@ -62,10 +72,11 @@ Last Updated: 2025-08-25 (Post PRP-41 Source-Videos Control API)
 
 ## High Priority TODOs 🟠
 
-### 5. Advanced CLI Options
-**PRP-38**: Enhanced configuration, presets, profiles
-- Build on PRP-41 API foundation for configuration management
-- **Impact**: Better user experience and automation
+### 5. Float16 Model Support (MOVED UP)
+**Issue**: YOLO f16 models fail due to lifetime issues
+- Workaround exists (use f32 models)
+- **Location**: ONNX integration
+- **PRP**: PRP-02 planned
 
 ### 6. REPL Mode Implementation
 **PRP-39**: Interactive command interface with completion
@@ -169,7 +180,7 @@ Last Updated: 2025-08-25 (Post PRP-41 Source-Videos Control API)
 ## Project Statistics 📊
 
 ### Implementation Status
-- **PRPs Completed**: 24/40 (60% completion with PRP-41)
+- **PRPs Completed**: 25/41 (61% completion with PRP-38)
 - **Working Examples**: 8/8 (all examples working)
 - **Crates Building**: 4/4
 - **API Integration**: Full REST API with automation capabilities

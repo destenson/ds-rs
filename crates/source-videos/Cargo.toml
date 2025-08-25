@@ -5,6 +5,8 @@ edition.workspace = true
 description = "Dynamic video source generation infrastructure for testing ds-rs"
 
 [dependencies]
+anyhow = "1.0"
+axum = "0.8.4"
 clap = { version = "4.5.45", features = ["derive"] }
 env_logger = "0.11.8"
 gstreamer.workspace = true
@@ -12,19 +14,17 @@ gstreamer-app.workspace = true
 gstreamer-rtsp = "0.24.0"
 gstreamer-rtsp-server = "0.24.1"
 log = "0.4.27"
+mime_guess = "2.0"
 notify = { version = "8.2.0", default-features = false, features = ["mio", "fsevent-sys", "crossbeam-channel", "flume"] }
 once_cell = "1.21.3"
+rand = "0.8"
 serde = { version = "1.0.219", features = ["derive"] }
 serde_json = "1.0"
 thiserror = "2.0.16"
 tokio = { version = "1.47.1", features = ["full"] } # TODO: we should not use tokio (async is ok though)
 toml = "0.9.5"
 uuid = { version = "1.18.0", features = ["v4"] }
-rand = "0.8"
-anyhow = "1.0"
 walkdir = "2.5"
-mime_guess = "2.0"
-axum = "0.8.4"
 
 [dev-dependencies]
 tempfile = "3.8"

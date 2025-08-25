@@ -16,10 +16,11 @@ The ds-rs project is a functional Rust port with working video pipeline, YOLO ob
 - **Pipeline State Management**: Video playback reaches PLAYING state correctly - Evidence: shutdown_test passes
 - **Backend Abstraction**: Three-tier system auto-detects hardware - Evidence: cross_platform example runs
 - **Dynamic Source Management**: Runtime add/remove without interruption - Evidence: source_management tests pass
+- **Timer-based Automation**: Sources added every 10s, removed after MAX_NUM_SOURCES - Evidence: GLib timers implemented
 - **CPU Vision Backend**: ONNX YOLOv5 detection working - Evidence: cpu_detection_demo runs successfully
 - **Rendering System**: Real-time bounding boxes with Cairo - Evidence: Standard renderer creates overlays
 - **Test Infrastructure**: 140 tests exist, all passing - Note: Many tests use Mock backend, limiting coverage
-- **Main Application**: Graceful Ctrl+C handling - Evidence: shutdown completes in <5s
+- **Main Application**: Full demo matching C reference - Evidence: Timer-based source management working
 - **Build System**: All 4 crates build successfully - Evidence: cargo build --release works
 - **Examples**: 5/5 examples compile and run - Evidence: cross_platform example executes
 
@@ -43,25 +44,25 @@ The ds-rs project is a functional Rust port with working video pipeline, YOLO ob
 
 ## Recommendation
 
-**Next Action**: Execute PRP-05 (Main Application Demo)
+**Next Action**: Execute PRP-02 (Float16 Model Support)
 
 **Justification**:
-- Current capability: Core pipeline works, YOLO detection functional
-- Gap: Main app lacks timer-based source management matching C reference
-- Impact: Complete demo showcases all features and validates architecture
+- Current capability: Main demo complete, YOLO f32 models work
+- Gap: Float16 models fail due to ONNX Runtime lifetime issues
+- Impact: Enables broader YOLO model compatibility and better performance
 
 **90-Day Roadmap**:
-1. **Week 1-2**: [PRP-05 Main Demo] → Complete reference application with timers
-2. **Week 3-4**: [PRP-02 Float16] → Fix ONNX Runtime for f16 models
-3. **Week 5-8**: [PRP-04 DeepStream FFI] → Implement NvDsMeta extraction
-4. **Week 9-12**: [PRP-12/13 Production] → Multi-stream processing and export
+1. **Week 1-2**: [PRP-02 Float16] → Fix ONNX Runtime for f16 models
+2. **Week 3-4**: [PRP-04 DeepStream FFI] → Implement NvDsMeta extraction
+3. **Week 5-8**: [PRP-12 Multi-stream] → Multiple pipeline support
+4. **Week 9-12**: [PRP-13/17 Production] → Export capabilities and control API
 
 ### Technical Debt Priorities
-1. **Main Demo Completion**: High Impact - Low Effort
-2. **Float16 Models**: High Impact - Medium Effort  
-3. **DeepStream FFI**: Medium Impact - High Effort
-4. **Remove tokio**: Low Impact - Low Effort
-5. **Stub Implementations**: Low Impact - Medium Effort
+1. **Float16 Models**: High Impact - Medium Effort  
+2. **DeepStream FFI**: Medium Impact - High Effort
+3. **Remove tokio**: Low Impact - Low Effort
+4. **Stub Implementations**: Low Impact - Medium Effort
+5. **Unimplemented!() cleanup**: Low Impact - Low Effort
 
 ## Implementation Decisions Record
 
@@ -109,4 +110,4 @@ The ds-rs project is a functional Rust port with working video pipeline, YOLO ob
 
 ## Summary
 
-The ds-rs project has a functional pipeline with working video playback and object detection. The architecture successfully abstracts hardware differences, enabling the same code to run on NVIDIA GPUs and CPU-only systems. With 14/33 PRPs completed (42%), the foundation exists but needs production features. The immediate priority is completing the main demo application (PRP-05) to match the C reference implementation, followed by fixing Float16 model support. Key gaps remain in DeepStream FFI integration, multi-stream processing, and export capabilities. The test suite provides basic coverage but many tests rely on Mock backend which limits their effectiveness.
+The ds-rs project has achieved feature parity with the C reference implementation for the main demo application. The pipeline successfully demonstrates dynamic source addition/deletion with timer-based automation, YOLO object detection, and cross-platform support. With 15/33 PRPs completed (45%), the core functionality is complete. The immediate priority is fixing Float16 model support (PRP-02) to enable broader YOLO compatibility, followed by DeepStream FFI integration for hardware acceleration. The architecture successfully abstracts hardware differences, enabling seamless operation on both NVIDIA GPUs and CPU-only systems.

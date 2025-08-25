@@ -36,6 +36,11 @@ impl SourceAddition for SourceManager {
         let source_element = video_source.element();
         pipeline.add_element(source_element)?;
         
+        // For test sources, connect after adding to pipeline
+        if uri == "videotestsrc://" {
+            video_source.connect_test_source(streammux)?;
+        }
+        
         video_source.update_state(SourceState::Initializing)?;
         
         // CRITICAL: Use sync_state_with_parent() instead of set_state() for dynamic elements

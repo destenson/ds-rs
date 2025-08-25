@@ -144,38 +144,10 @@ impl VideoSource {
         let timestamp = format!("{:.3}", now.as_secs_f64());
         println!("[{}] Connecting pad-added callback for source {}", timestamp, self.source_id);
         
-        // For test sources (videotestsrc://), directly connect since they have static pads
+        // For test sources (videotestsrc://), we don't need pad-added callback
+        // We'll handle the connection after the element is added to the pipeline
         if self.uri == "videotestsrc://" {
-            if let Some(src_pad) = self.source_bin.static_pad("src") {
-                // For compositor (Standard backend), request a pad and configure position
-                let is_compositor = streammux.factory()
-                    .map(|f| f.name() == "compositor")
-                    .unwrap_or(false);
-                
-                if is_compositor {
-                    if let Some(sinkpad) = streammux.request_pad_simple("sink_%u") {
-                        // Set position for this video on the compositor
-                        let x_pos = (self.source_id.0 % 2) * 640;
-                        let y_pos = (self.source_id.0 / 2) * 480;
-                        sinkpad.set_property("xpos", x_pos as i32);
-                        sinkpad.set_property("ypos", y_pos as i32);
-                        
-                        if let Err(e) = src_pad.link(&sinkpad) {
-                            eprintln!("Failed to link test source to compositor: {:?}", e);
-                        } else {
-                            println!("[{}] Linked test source {} to compositor", timestamp, self.source_id);
-                        }
-                    }
-                } else {
-                    // For other muxers, use normal pad naming
-                    let pad_name = format!("sink_{}", self.source_id.0);
-                    if let Some(sinkpad) = streammux.request_pad_simple(&pad_name) {
-                        if let Err(e) = src_pad.link(&sinkpad) {
-                            eprintln!("Failed to link test source to mux: {:?}", e);
-                        }
-                    }
-                }
-            }
+            // Don't set up callback for test sources
             return Ok(());
         }
         
@@ -450,6 +422,51 @@ impl VideoSource {
         let mut state_guard = self.state.lock()
             .map_err(|_| DeepStreamError::Unknown("Failed to lock state".to_string()))?;
         *state_guard = state;
+        Ok(())
+    }
+    
+    /// Connect test sources to the muxer after being added to pipeline
+    pub fn connect_test_source(&self, streammux: &gst::Element) -> Result<()> {
+        if self.uri != "videotestsrc://" {
+            return Ok(()); // Not a test source
+        }
+        
+        let Some(src_pad) = self.source_bin.static_pad("src") else {
+            return Err(DeepStreamError::Pipeline("Test source has no src pad".to_string()));
+        };
+        
+        // For compositor (Standard backend), request a pad and configure position
+        let is_compositor = streammux.factory()
+            .map(|f| f.name() == "compositor")
+            .unwrap_or(false);
+        
+        if is_compositor {
+            if let Some(sinkpad) = streammux.request_pad_simple("sink_%u") {
+                // Set position for this video on the compositor
+                let x_pos = (self.source_id.0 % 2) * 640;
+                let y_pos = (self.source_id.0 / 2) * 480;
+                sinkpad.set_property("xpos", x_pos as i32);
+                sinkpad.set_property("ypos", y_pos as i32);
+                
+                if let Err(e) = src_pad.link(&sinkpad) {
+                    return Err(DeepStreamError::Pipeline(
+                        format!("Failed to link test source to compositor: {:?}", e)
+                    ));
+                }
+                println!("[{:.3}] Linked test source {} to compositor", crate::timestamp(), self.source_id);
+            }
+        } else {
+            // For other muxers, use normal pad naming
+            let pad_name = format!("sink_{}", self.source_id.0);
+            if let Some(sinkpad) = streammux.request_pad_simple(&pad_name) {
+                if let Err(e) = src_pad.link(&sinkpad) {
+                    return Err(DeepStreamError::Pipeline(
+                        format!("Failed to link test source to mux: {:?}", e)
+                    ));
+                }
+            }
+        }
+        
         Ok(())
     }
 }

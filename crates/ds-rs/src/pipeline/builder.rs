@@ -451,19 +451,26 @@ fn configure_osd_for_rendering(
     renderer.connect_metadata_source(metadata_bridge)?;
     
     // Configure OSD element based on rendering config
-    if config.enable_bbox {
-        osd_element.set_property("display-bbox", 1i32);
-    }
-    
-    if config.enable_labels {
-        osd_element.set_property("display-text", 1i32);
+    // Only set properties if this is a DeepStream nvdsosd element
+    if backend_type == crate::backend::BackendType::DeepStream {
+        if config.enable_bbox {
+            osd_element.set_property("display-bbox", 1i32);
+        }
         
-        // Set font configuration if supported
-        let font_desc = format!("{} {}", 
-            config.font_config.family,
-            config.font_config.size as i32
-        );
-        osd_element.set_property("font-desc", &font_desc);
+        if config.enable_labels {
+            osd_element.set_property("display-text", 1i32);
+            
+            // Set font configuration if supported
+            let font_desc = format!("{} {}", 
+                config.font_config.family,
+                config.font_config.size as i32
+            );
+            osd_element.set_property("font-desc", &font_desc);
+        }
+    } else {
+        // For Standard backend, the OSD configuration is handled differently
+        // The CPU OSD or text overlay doesn't use these properties
+        log::debug!("Standard backend OSD doesn't support display-bbox/display-text properties");
     }
     
     log::info!("Configured OSD element '{}' for dynamic rendering with {} backend",

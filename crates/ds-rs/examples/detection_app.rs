@@ -149,7 +149,7 @@ fn build_detection_pipeline(factory: &ElementFactory) -> Result<gst::Pipeline, B
         .build()?;
     
     // Configure test source
-    source.set_property("pattern", "ball");
+    source.set_property_from_str("pattern", "ball");
     source.set_property("num-buffers", 300i32);
     
     // Add elements to pipeline

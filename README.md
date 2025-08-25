@@ -4,7 +4,26 @@ A Rust port of NVIDIA's DeepStream runtime source addition/deletion reference ap
 
 ## Recent Updates
 
-### 2025-01-25: Directory and File List Support Complete (PRP-35)
+### 2025-08-25: Network Simulation Integration Complete (PRP-40)
+- ✅ **INTEGRATED: Network simulation with source-videos** - Full network condition simulation for testing
+- ✅ **ADDED: Multiple network profiles** - NoisyRadio, IntermittentSatellite, DroneUrban, DroneMountain
+- ✅ **IMPLEMENTED: CLI network options** - --network-profile, --packet-loss, --latency, --bandwidth flags
+- ✅ **CREATED: Per-source network conditions** - Different network profiles for each video source
+- ✅ **BUILT: Time-based scenarios** - Dynamic network conditions that change over time
+- ✅ **ADDED: Drone communication simulation** - UHF/VHF radio links through buildings and mountains
+- ✅ **INTEGRATED: RTSP server network simulation** - Apply network conditions to streaming pipelines
+- ✅ **CREATED: Network simulation examples** - drone_network_demo, scenarios in YAML format
+
+### 2025-08-25: File Watching and Auto-reload Complete (PRP-36)
+- ✅ **IMPLEMENTED: File system watching** - Monitor directories for video file changes
+- ✅ **ADDED: Auto-reload on modification** - Automatically reload changed video files
+- ✅ **CREATED: WatcherManager** - Centralized management of multiple directory watchers
+- ✅ **BUILT: Event channel system** - Async communication between watchers and manager
+- ✅ **INTEGRATED: RTSP server updates** - Dynamic source updates without restart
+- ✅ **FIXED: Channel connection bug** - Resolved watcher-to-manager communication issue
+- ✅ **ADDED: Auto-repeat functionality** - Loop video playback with configurable options
+
+### 2025-08-25: Directory and File List Support Complete (PRP-35)
 - ✅ **COMPLETED: Full directory serving** - Serve all video files from directories as RTSP streams
 - ✅ **ADDED: Recursive directory traversal** - Process nested video collections with configurable depth
 - ✅ **IMPLEMENTED: File list support** - Accept explicit lists of files via CLI or config
@@ -82,6 +101,8 @@ A Rust port of NVIDIA's DeepStream runtime source addition/deletion reference ap
 - **Real-time Bounding Box Rendering**: Visual feedback showing detected objects with configurable styles
 - **Production-Grade Error Recovery**: Exponential backoff, circuit breakers, and health monitoring
 - **Stream Isolation**: Error boundaries prevent cascade failures across sources
+- **Network Simulation**: Test resilience with realistic network conditions (packet loss, latency, disconnections)
+- **File System Watching**: Auto-reload video files on changes with directory monitoring
 - **Configuration System**: Support for DeepStream configuration files and TOML-based settings
 - **Pipeline Builder**: Fluent API for constructing complex GStreamer pipelines with dynamic OSD
 - **Comprehensive Test Infrastructure**: Self-contained testing with RTSP server and video generation

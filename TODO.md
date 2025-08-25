@@ -1,9 +1,19 @@
 # TODO List
 
-Last Updated: 2025-08-25 (Post PRP-36 File Watching Fix)
+Last Updated: 2025-08-25 (Post PRP-40 Network Simulation Integration)
 
 ## Recent Achievements ✅
-- **COMPLETED**: PRP-36 File Watching and Auto-reload (2025-01-25)
+- **COMPLETED**: PRP-40 Network Simulation Integration (2025-08-25)
+  - ✅ Full network simulation integrated with source-videos
+  - ✅ Added 4 new network profiles: NoisyRadio, IntermittentSatellite, DroneUrban, DroneMountain
+  - ✅ CLI integration with --network-profile, --packet-loss, --latency, --bandwidth flags
+  - ✅ Per-source network conditions with --per-source-network
+  - ✅ Time-based network scenarios with interpolation
+  - ✅ RTSP server integration with GStreamer simulation elements
+  - ✅ Created drone communication examples and YAML scenarios
+  - ✅ 13/13 network simulation tests passing
+
+- **COMPLETED**: PRP-36 File Watching and Auto-reload (2025-08-25)
   - ✅ Directory and file watching infrastructure implemented
   - ✅ WatcherManager coordinates multiple watchers
   - ✅ Auto-repeat/looping functionality with LoopingVideoSource
@@ -11,7 +21,7 @@ Last Updated: 2025-08-25 (Post PRP-36 File Watching Fix)
   - ✅ 11/11 file watching tests passing
   - ✅ CLI integration with --watch, --auto-repeat flags
 
-- **COMPLETED**: PRP-37 Fix RTSP File Serving Architecture (2025-01-25)
+- **COMPLETED**: PRP-37 Fix RTSP File Serving Architecture (2025-08-25)
   - ✅ Separated RTSP serving from local playback pipelines
   - ✅ Removed VideoSourceManager usage from serve_command
   - ✅ Added RTSP-specific file watching integration
@@ -19,7 +29,7 @@ Last Updated: 2025-08-25 (Post PRP-36 File Watching Fix)
   - ✅ Clear architectural separation of concerns
   - ✅ Comprehensive tests for RTSP file serving
 
-- **COMPLETED**: PRP-35 Directory and File List Support (2025-01-25)
+- **COMPLETED**: PRP-35 Directory and File List Support (2025-08-25)
   - ✅ DirectoryScanner with recursive traversal
   - ✅ FileVideoSource with uridecodebin auto-detection
   - ✅ Filter system for include/exclude patterns  
@@ -28,7 +38,7 @@ Last Updated: 2025-08-25 (Post PRP-36 File Watching Fix)
   - ✅ 13/13 directory serving tests passing
   - ✅ Examples: directory_server.rs and batch_file_server.rs
 
-- **COMPLETED**: PRP-12 Multi-stream Detection Pipeline (2025-01-25)
+- **COMPLETED**: PRP-12 Multi-stream Detection Pipeline (2025-08-25)
   - ✅ MultiStreamManager with fault tolerance integration
   - ✅ Pipeline pool for concurrent processing
   - ✅ Stream coordinator with priority scheduling
@@ -71,7 +81,7 @@ Last Updated: 2025-08-25 (Post PRP-36 File Watching Fix)
 - [x] **PRP-37**: Fix RTSP file serving architecture - **COMPLETED**
 - [ ] **PRP-38**: Advanced CLI options
 - [ ] **PRP-39**: REPL mode enhancements
-- [ ] **PRP-40**: Network simulation integration
+- [x] **PRP-40**: Network simulation integration - **COMPLETED**
 - **Impact**: Major feature expansion for testing infrastructure
 
 ### 5. Float16 Model Support

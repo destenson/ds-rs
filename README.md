@@ -1,8 +1,18 @@
 # ds-rs
 
-A Rust port of NVIDIA's DeepStream runtime source addition/deletion reference application, demonstrating dynamic video source management in AI-powered video analytics pipelines.
+A Rust port of NVIDIA's DeepStream runtime source addition/deletion reference application, demonstrating dynamic video source management in AI-powered video analytics pipelines error recovery and fault tolerance.
 
 ## Recent Updates
+
+### 2025-08-25: Enhanced Error Recovery and Fault Tolerance (PRP-34)
+- ✅ **IMPLEMENTED: Comprehensive error recovery system** - Production-ready fault tolerance mechanisms
+- ✅ **ADDED: Exponential backoff with jitter** - Smart retry strategies prevent thundering herd
+- ✅ **CREATED: Circuit breaker pattern** - Prevents cascade failures with automatic recovery testing
+- ✅ **INTEGRATED: Health monitoring** - Proactive detection of degraded sources with frame rate tracking
+- ✅ **BUILT: Error classification system** - Distinguishes transient vs permanent failures for appropriate recovery
+- ✅ **ADDED: Stream isolation** - Error boundaries prevent single source failures from affecting pipeline
+- ✅ **IMPLEMENTED: Recovery statistics** - Track success rates, downtime, and recovery patterns
+- ✅ **CREATED: fault_tolerant_pipeline example** - Demonstrates all recovery features in action
 
 ### 2025-08-24: Completed Main Application Demo (PRP-05)
 - ✅ **IMPLEMENTED: Timer-based source management** - Automatically adds sources every 10 seconds
@@ -44,6 +54,8 @@ A Rust port of NVIDIA's DeepStream runtime source addition/deletion reference ap
 - **Dynamic Source Management**: Add and remove video sources at runtime without pipeline interruption
 - **CPU Object Detection**: Custom GStreamer plugin with ONNX Runtime support for YOLOv3-v12
 - **Real-time Bounding Box Rendering**: Visual feedback showing detected objects with configurable styles
+- **Production-Grade Error Recovery**: Exponential backoff, circuit breakers, and health monitoring
+- **Stream Isolation**: Error boundaries prevent cascade failures across sources
 - **Configuration System**: Support for DeepStream configuration files and TOML-based settings
 - **Pipeline Builder**: Fluent API for constructing complex GStreamer pipelines with dynamic OSD
 - **Comprehensive Test Infrastructure**: Self-contained testing with RTSP server and video generation
@@ -247,6 +259,9 @@ cargo run --example detection_app -- file:///path/to/video.mp4
 
 # CPU detection demo (requires ONNX model)
 cargo run --example cpu_detection_demo --features cpu_vision,nalgebra,half
+
+# Fault-tolerant pipeline with error recovery (NEW)
+cargo run --example fault_tolerant_pipeline
 ```
 
 ### Test Video Generation and RTSP Server

@@ -2,6 +2,37 @@
 
 Last Updated: 2025-08-24 (PRP-19 Network Simulation completed, PRP-12 Multi-stream next)
 
+## Code TODOs Found in Codebase
+
+### High Priority TODOs 🔴
+- [ ] **Remove global state in error classification** (crates/ds-rs/src/error/classification.rs:309)
+  - GET RID OF THIS GLOBAL & dependency on lazy_static
+  - Replace with proper dependency injection
+  
+- [ ] **Implement DeepStream metadata processing** (crates/ds-rs/src/rendering/deepstream_renderer.rs:190,222)
+  - Implement actual DeepStream metadata processing
+  - Create and attach actual NvDsObjectMeta
+  - Critical for hardware acceleration features
+
+- [ ] **Fix unimplemented property handlers** (4 occurrences)
+  - cpuinfer/src/cpudetector/imp.rs:258,272
+  - ds-rs/src/backend/cpu_vision/cpudetector/imp.rs:274,288
+  - Complete property getter/setter implementations
+
+### Medium Priority TODOs 🟡
+- [ ] **Mock backend conditional compilation** (crates/ds-rs/src/backend/mock.rs:48)
+  - Only include mock backend for testing with #[cfg(test)]
+  
+- [ ] **Implement source modification API** (crates/source-videos/src/manager.rs:215)
+  - Currently placeholder for future enhancement
+  - Add actual source config modification functionality
+
+- [ ] **Add custom metadata to buffers** (crates/ds-rs/src/backend/cpu_vision/cpudetector/imp.rs:154)
+  - Attach detection metadata to GStreamer buffers
+  
+- [ ] **Test with real ONNX model** (crates/ds-rs/tests/cpu_backend_tests.rs:343)
+  - When real ONNX model is available, add proper tests
+
 ## Critical Priority 🔴
 
 ### Production Reliability Issues
@@ -33,7 +64,7 @@ Last Updated: 2025-08-24 (PRP-19 Network Simulation completed, PRP-12 Multi-stre
 ### Active Critical Issues
 ✅ **Core functionality working** - Application demonstrates basic features
 ✅ **Error recovery implemented** - PRP-34 provides fault tolerance mechanisms
-⚠️ **Testing infrastructure needed** - PRP-19 network simulation will enable comprehensive testing
+✅ **Testing infrastructure ready** - PRP-19 network simulation enables comprehensive testing
 
 ### Known Issues (Non-Critical)
 - [ ] **Float16 Model Support** (See BUGS.md)
@@ -186,48 +217,48 @@ Last Updated: 2025-08-24 (PRP-19 Network Simulation completed, PRP-12 Multi-stre
 - PRP-13: Detection Data Export/Streaming
 - PRP-17: Control API WebSocket
 - PRP-18: Dynamic Source Properties
-- PRP-19: Network Simulation
 - PRP-23: GST Plugins Integration
 - PRP-27: Multi-Backend Detector Trait Architecture
 - PRP-28: OpenCV DNN Backend
 - PRP-29: TensorFlow Lite Backend
 - PRP-30: Darknet Native Backend
 - PRP-31: Advanced Tracking Algorithms
-- PRP-34: Enhanced Error Recovery ⭐ (Ready for implementation)
 
 ## Statistics 📊
 
 ### Code Quality Metrics
 - **unwrap() calls**: Critical production unwrap() calls fixed (most remaining are in test code)
 - **Clippy warnings**: 100+ style warnings (uninlined format args, duplicated attributes, etc.) - non-critical
-- **TODO comments**: 6 remaining in code
+- **TODO comments**: 6 remaining in code (4 high priority, 2 medium)
 - **todo!() macros**: 1 (in dsl test)
-- **unimplemented!()**: 4 occurrences
+- **unimplemented!()**: 4 occurrences (property handlers in cpudetector)
 - **Unused parameters**: 50+ underscore-prefixed variables (many legitimate - required by trait signatures)
 - **Ignored tests**: 1 test requiring runtime
-- **"For now" comments**: 15+ indicating temporary implementations
+- **"For now" comments**: 30+ indicating temporary implementations
 - **Placeholder/stub implementations**: 20+ locations with stub/dummy/placeholder comments
 
 ### Project Status
-- **Critical Bugs**: 0 (ALL RESOLVED ✅)
+- **Critical Bugs**: 1 (Float16 model support - PRP-02)
 - **Build Status**: ✅ SUCCESS
-- **Test Status**: 140/140 tests passing (100% pass rate ✅)
-- **PRP Progress**: 15/33 complete (45%), 4/33 in progress (12%), 14/33 not started (42%)
+- **Test Status (ds-rs)**: 140/140 tests passing (100% pass rate ✅)
+- **Test Status (source-videos)**: 95/95 tests passing (100% pass rate ✅)
+- **PRP Progress**: 16/34 complete (47%), 3/34 in progress (9%), 15/34 not started (44%)
 
 ### Recent Achievements
-- **2025-08-24 (Evening)**: 
+- **2025-08-24**:
+  - **Completed PRP-19**: Network Simulation for Error Recovery Testing
+    - Added comprehensive network simulation to source-videos crate
+    - Implemented packet loss, latency, bandwidth limits, connection drops
+    - Created network profiles (3G, 4G, WiFi, Satellite, etc.)
+    - Integrated with GStreamer pipelines and RTSP server
+    - All 95 tests passing in source-videos crate
+  - **Completed PRP-34**: Enhanced Error Recovery and Fault Tolerance
+    - Implemented retry mechanisms with exponential backoff
+    - Added circuit breaker pattern and stream isolation
+    - Created health monitoring system
   - **Completed PRP-05**: Main Application Demo with timer-based source management
-  - Implemented GLib timers matching C reference implementation
-  - Application now automatically adds/removes sources periodically
-- **2025-08-24**: 
-  - Completed PRP-08 Code Quality improvements
-  - Fixed workspace configuration for all crates
-  - Fixed critical unwrap() calls in production code
-  - Fixed clippy warnings in build scripts
-  - Added PRP-32 for fixing Standard backend OSD property configuration
-  - **Completed PRP-33**: Fixed all 3 failing source_management tests
-    - Fixed concurrent operations race condition by making ID generation atomic
-    - Fixed capacity checking to use instance max_sources instead of global constant
+  - **Completed PRP-08**: Code Quality improvements
+  - **Completed PRP-33**: Fixed all source_management test failures
     - Modified tests to use Standard backend instead of Mock for reliability
     - **Achieved 100% test pass rate (140/140 tests)**
 - **2025-08-24**: 

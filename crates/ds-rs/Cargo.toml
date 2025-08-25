@@ -5,7 +5,7 @@ edition.workspace = true
 description.workspace = true
 
 [features]
-default = ["std", "onnx", "cpu_vision", "gst_v1_26"]
+default = ["std", "onnx", "cpu_vision"]
 std = []
 onnx = ["ort", "ndarray", "half"]
 cpu_vision = ["nalgebra", "onnx"]
@@ -17,7 +17,7 @@ serde = ["gstreamer/serde"]
 # gst_v1_20 = ["gstreamer/v1_20"]
 # gst_v1_22 = ["gstreamer/v1_22"]
 # gst_v1_24 = ["gstreamer/v1_24"]
-gst_v1_26 = ["gstreamer/v1_26"]
+# gst_v1_26 = ["gstreamer/v1_26"]
 # gst_v1_28 = ["gstreamer/v1_28"]
 # opencv = ["dep:opencv"]
 nalgebra = ["dep:nalgebra"]

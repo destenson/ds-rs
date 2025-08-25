@@ -1,0 +1,342 @@
+# Network Inference Test Scenarios
+# Tests inference pipeline resilience under various network conditions
+
+[defaults]
+rust_log = "info"
+inference_timeout = 120
+min_detection_accuracy = 0.7
+max_recovery_time = 30
+enable_metrics = true
+
+# Basic network inference test - single stream with various conditions
+[scenarios.network-inference-basic]
+description = "Test inference on single stream with different network conditions"
+timeout = 300
+parallel = false
+
+[scenarios.network-inference-basic.setup.rtsp_server]
+enabled = true
+port = 8554
+api_port = 9554
+network_profile = "wifi"  # Start with good conditions
+
+[[scenarios.network-inference-basic.setup.rtsp_server.streams]]
+source = "crates/ds-rs/tests/test_video.mp4"
+mount_point = "test"
+auto_repeat = true
+
+[[scenarios.network-inference-basic.steps]]
+name = "inference-perfect"
+command = "cargo run --example multi_stream_detection -- rtsp://127.0.0.1:8554/test"
+cwd = "crates/ds-rs"
+expected_exit_code = 0
+timeout = 30
+validation = "check_detections"
+min_fps = 25
+min_detections = 10
+
+[[scenarios.network-inference-basic.steps]]
+name = "update-network-degraded"
+type = "network_update"
+profile = "3g"
+stream_index = 0
+wait = 5
+
+[[scenarios.network-inference-basic.steps]]
+name = "inference-degraded"
+command = "cargo run --example fault_tolerant_multi_stream -- rtsp://127.0.0.1:8554/test"
+cwd = "crates/ds-rs"
+expected_exit_code = 0
+timeout = 30
+validation = "check_recovery"
+min_fps = 10  # Lower expectation for degraded network
+min_detections = 5
+
+# Multi-stream test with different network conditions per stream
+[scenarios.network-inference-multi]
+description = "Test multiple concurrent streams with different network profiles"
+timeout = 600
+parallel = false
+
+[scenarios.network-inference-multi.setup.rtsp_server]
+enabled = true
+port = 8555
+api_port = 9555
+
+[[scenarios.network-inference-multi.setup.rtsp_server.streams]]
+source = "crates/ds-rs/tests/test_video.mp4"
+mount_point = "stream1"
+network_profile = "perfect"
+auto_repeat = true
+
+[[scenarios.network-inference-multi.setup.rtsp_server.streams]]
+source = "crates/source-videos/tests/test_patterns/ball.mp4"
+mount_point = "stream2"
+network_profile = "4g"
+auto_repeat = true
+
+[[scenarios.network-inference-multi.setup.rtsp_server.streams]]
+source = "crates/source-videos/tests/test_patterns/smpte.mp4"
+mount_point = "stream3"
+network_profile = "satellite"
+auto_repeat = true
+
+[[scenarios.network-inference-multi.setup.rtsp_server.streams]]
+source = "crates/ds-rs/tests/test_video.mp4"
+mount_point = "stream4"
+network_profile = "poor"
+auto_repeat = true
+
+[[scenarios.network-inference-multi.steps]]
+name = "multi-stream-inference"
+command = """cargo run --example fault_tolerant_multi_stream -- \
+    rtsp://127.0.0.1:8555/stream1 \
+    rtsp://127.0.0.1:8555/stream2 \
+    rtsp://127.0.0.1:8555/stream3 \
+    rtsp://127.0.0.1:8555/stream4"""
+cwd = "crates/ds-rs"
+expected_exit_code = 0
+timeout = 60
+validation = "check_multi_stream"
+expected_streams = 4
+min_active_streams = 3  # At least 3 should work despite poor network on one
+
+# Recovery test - validate automatic recovery from connection drops
+[scenarios.network-inference-recovery]
+description = "Test recovery from network disconnections"
+timeout = 400
+parallel = false
+
+[scenarios.network-inference-recovery.setup.rtsp_server]
+enabled = true
+port = 8556
+api_port = 9556
+network_scenario = "flaky"  # Intermittent drops
+
+[[scenarios.network-inference-recovery.setup.rtsp_server.streams]]
+source = "crates/ds-rs/tests/test_video.mp4"
+mount_point = "recovery"
+auto_repeat = true
+
+[[scenarios.network-inference-recovery.steps]]
+name = "start-inference"
+command = "cargo run --example fault_tolerant_pipeline -- rtsp://127.0.0.1:8556/recovery"
+cwd = "crates/ds-rs"
+background = true
+expected_exit_code = 0
+timeout = 120
+
+[[scenarios.network-inference-recovery.steps]]
+name = "simulate-disconnect"
+type = "network_update"
+packet_loss = 100  # Complete loss
+stream_index = 0
+wait = 10
+
+[[scenarios.network-inference-recovery.steps]]
+name = "check-recovery-initiated"
+type = "validate_metrics"
+check = "recovery_attempts"
+min_value = 1
+timeout = 10
+
+[[scenarios.network-inference-recovery.steps]]
+name = "restore-connection"
+type = "network_update"
+packet_loss = 0
+stream_index = 0
+wait = 5
+
+[[scenarios.network-inference-recovery.steps]]
+name = "verify-recovery"
+type = "validate_metrics"
+check = "stream_active"
+expected = true
+timeout = 30
+
+# Drone mission simulation - changing network conditions
+[scenarios.network-inference-drone]
+description = "Simulate drone mission with changing network conditions"
+timeout = 600
+parallel = false
+
+[scenarios.network-inference-drone.setup.rtsp_server]
+enabled = true
+port = 8557
+api_port = 9557
+network_scenario = "drone-urban"  # Start in urban environment
+
+[[scenarios.network-inference-drone.setup.rtsp_server.streams]]
+source = "crates/ds-rs/tests/test_video.mp4"
+mount_point = "drone"
+auto_repeat = true
+
+[[scenarios.network-inference-drone.steps]]
+name = "takeoff-urban"
+command = "cargo run --example ball_tracking_visualization -- rtsp://127.0.0.1:8557/drone"
+cwd = "crates/ds-rs"
+background = true
+timeout = 180
+
+[[scenarios.network-inference-drone.steps]]
+name = "urban-flight"
+type = "network_sequence"
+duration = 30
+conditions = [
+    { time = 0, profile = "drone-urban" },
+    { time = 10, packet_loss = 8, latency = 120 },  # Behind building
+    { time = 15, packet_loss = 2, latency = 80 },   # Clear line of sight
+    { time = 25, packet_loss = 15, latency = 200 }  # Interference
+]
+
+[[scenarios.network-inference-drone.steps]]
+name = "transition-to-rural"
+type = "network_update"
+profile = "drone-mountain"
+stream_index = 0
+wait = 5
+
+[[scenarios.network-inference-drone.steps]]
+name = "mountain-flight"
+type = "network_sequence"
+duration = 30
+conditions = [
+    { time = 0, profile = "drone-mountain" },
+    { time = 10, packet_loss = 25, latency = 300 },  # Behind ridge
+    { time = 20, packet_loss = 5, latency = 150 }     # High altitude
+]
+
+[[scenarios.network-inference-drone.steps]]
+name = "validate-continuous-tracking"
+type = "validate_metrics"
+check = "tracking_continuity"
+min_value = 0.8  # 80% tracking continuity despite network issues
+
+# Stress test - high packet loss and latency
+[scenarios.network-inference-stress]
+description = "Stress test with extreme network conditions"
+timeout = 300
+parallel = false
+
+[scenarios.network-inference-stress.setup.rtsp_server]
+enabled = true
+port = 8558
+api_port = 9558
+
+[[scenarios.network-inference-stress.setup.rtsp_server.streams]]
+source = "crates/ds-rs/tests/test_video.mp4"
+mount_point = "stress"
+auto_repeat = true
+packet_loss = 20
+latency_ms = 800
+bandwidth_kbps = 100
+jitter_ms = 200
+
+[[scenarios.network-inference-stress.steps]]
+name = "stress-inference"
+command = "cargo run --example fault_tolerant_pipeline -- rtsp://127.0.0.1:8558/stress"
+cwd = "crates/ds-rs"
+expected_exit_code = 0
+timeout = 60
+validation = "check_graceful_degradation"
+allow_frame_drops = true
+max_error_rate = 0.5  # Allow up to 50% errors
+min_fps = 1  # At least 1 FPS
+
+# Satellite link test - high latency, periodic drops
+[scenarios.network-inference-satellite]
+description = "Test inference over satellite link with high latency"
+timeout = 400
+parallel = false
+
+[scenarios.network-inference-satellite.setup.rtsp_server]
+enabled = true
+port = 8559
+api_port = 9559
+network_scenario = "intermittent-satellite"
+
+[[scenarios.network-inference-satellite.setup.rtsp_server.streams]]
+source = "crates/ds-rs/tests/test_video.mp4"
+mount_point = "satellite"
+auto_repeat = true
+
+[[scenarios.network-inference-satellite.steps]]
+name = "satellite-inference"
+command = "cargo run --example fault_tolerant_pipeline -- rtsp://127.0.0.1:8559/satellite"
+cwd = "crates/ds-rs"
+expected_exit_code = 0
+timeout = 90
+validation = "check_high_latency_handling"
+max_latency_ms = 1000
+buffer_strategy = "adaptive"
+
+# Performance benchmark under network stress
+[scenarios.network-inference-benchmark]
+description = "Benchmark inference performance under various network conditions"
+timeout = 900
+parallel = false
+generate_report = true
+
+[[scenarios.network-inference-benchmark.profiles]]
+name = "baseline"
+profile = "perfect"
+duration = 60
+
+[[scenarios.network-inference-benchmark.profiles]]
+name = "mobile"
+profile = "4g"
+duration = 60
+
+[[scenarios.network-inference-benchmark.profiles]]
+name = "wifi"
+profile = "wifi"
+duration = 60
+
+[[scenarios.network-inference-benchmark.profiles]]
+name = "degraded"
+profile = "poor"
+duration = 60
+
+[scenarios.network-inference-benchmark.metrics]
+track = ["fps", "detections", "latency", "frame_drops", "recovery_time", "memory_usage"]
+export_format = ["json", "csv", "html"]
+comparison_baseline = "perfect"
+
+# Validation functions configuration
+[validations.check_detections]
+type = "detection_count"
+min_detections_per_second = 1
+confidence_threshold = 0.5
+
+[validations.check_recovery]
+type = "recovery_metrics"
+max_recovery_time_seconds = 30
+min_success_rate = 0.8
+
+[validations.check_multi_stream]
+type = "multi_stream_health"
+min_healthy_streams = 3
+per_stream_min_fps = 5
+
+[validations.check_graceful_degradation]
+type = "degradation_pattern"
+allow_quality_reduction = true
+prevent_complete_failure = true
+
+[validations.check_high_latency_handling]
+type = "latency_adaptation"
+max_buffer_size_mb = 100
+adaptive_quality = true
+
+# Network profiles for quick reference
+[network_profiles]
+perfect = { packet_loss = 0, latency = 0, bandwidth = 0 }
+residential = { packet_loss = 0.1, latency = 20, bandwidth = 100000 }
+mobile_3g = { packet_loss = 2, latency = 300, bandwidth = 384 }
+mobile_4g = { packet_loss = 0.5, latency = 50, bandwidth = 12000 }
+mobile_5g = { packet_loss = 0.1, latency = 10, bandwidth = 100000 }
+wifi_good = { packet_loss = 0.5, latency = 20, bandwidth = 54000 }
+wifi_poor = { packet_loss = 3, latency = 100, bandwidth = 5000 }
+satellite = { packet_loss = 3, latency = 600, bandwidth = 1000 }
+drone_los = { packet_loss = 1, latency = 50, bandwidth = 10000 }  # Line of sight
+drone_nlos = { packet_loss = 15, latency = 200, bandwidth = 1000 }  # No line of sight

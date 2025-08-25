@@ -2,6 +2,7 @@
 """
 Test Orchestrator for ds-rs project
 Cross-platform test runner that manages test scenarios, RTSP servers, and test environments
+Now with network simulation support for inference testing under degraded conditions
 """
 
 import argparse
@@ -17,6 +18,7 @@ from pathlib import Path
 from typing import Dict, List, Optional, Any
 import signal
 import atexit
+import threading
 
 # Add lib directory to path for helper imports
 sys.path.insert(0, str(Path(__file__).parent / "lib"))
@@ -26,6 +28,14 @@ try:
 except ImportError:
     print("Error: tomli package required. Install with: pip install tomli")
     sys.exit(1)
+
+# Import network simulation support
+try:
+    from network_controller import NetworkSimulationManager, StreamConfig, NetworkCondition
+    NETWORK_SIMULATION_AVAILABLE = True
+except ImportError:
+    NETWORK_SIMULATION_AVAILABLE = False
+    print("Warning: Network simulation not available. Some tests may be skipped.")
 
 # Setup logging
 logging.basicConfig(
@@ -100,7 +110,7 @@ class ProcessManager:
             self.stop_process(name)
 
 class TestOrchestrator:
-    """Main test orchestration class"""
+    """Main test orchestration class with network simulation support"""
     
     def __init__(self, config_path: Path):
         self.config_path = config_path
@@ -108,6 +118,8 @@ class TestOrchestrator:
         self.process_manager = ProcessManager()
         self.project_root = Path(__file__).parent.parent
         self.test_results = []
+        self.network_manager = NetworkSimulationManager() if NETWORK_SIMULATION_AVAILABLE else None
+        self.inference_metrics = {}
         
     def _load_config(self) -> Dict:
         """Load TOML configuration"""
@@ -148,8 +160,126 @@ class TestOrchestrator:
             
         return True
         
+    def _handle_network_update(self, step: Dict) -> bool:
+        """Handle network condition update step"""
+        if not self.network_manager:
+            logger.warning("Network simulation not available, skipping network update")
+            return True
+        
+        stream_index = step.get('stream_index', 0)
+        wait = step.get('wait', 0)
+        
+        # Build network condition
+        condition = NetworkCondition(
+            profile=step.get('profile'),
+            packet_loss=step.get('packet_loss'),
+            latency_ms=step.get('latency_ms') or step.get('latency'),
+            bandwidth_kbps=step.get('bandwidth_kbps') or step.get('bandwidth'),
+            jitter_ms=step.get('jitter_ms') or step.get('jitter')
+        )
+        
+        logger.info(f"Updating network condition for stream {stream_index}")
+        success = self.network_manager.update_network_condition('rtsp_server', stream_index, condition)
+        
+        if wait > 0:
+            logger.info(f"Waiting {wait} seconds after network update")
+            time.sleep(wait)
+        
+        return success
+    
+    def _run_network_sequence(self, step: Dict) -> bool:
+        """Run a sequence of network condition changes over time"""
+        if not self.network_manager:
+            logger.warning("Network simulation not available, skipping network sequence")
+            return True
+        
+        duration = step.get('duration', 30)
+        conditions = step.get('conditions', [])
+        stream_index = step.get('stream_index', 0)
+        
+        logger.info(f"Running network sequence for {duration} seconds")
+        
+        # Sort conditions by time
+        conditions.sort(key=lambda x: x.get('time', 0))
+        
+        start_time = time.time()
+        condition_index = 0
+        
+        while time.time() - start_time < duration:
+            elapsed = time.time() - start_time
+            
+            # Check if we need to apply next condition
+            if condition_index < len(conditions):
+                next_condition = conditions[condition_index]
+                if elapsed >= next_condition.get('time', 0):
+                    # Apply this condition
+                    network_cond = NetworkCondition(
+                        profile=next_condition.get('profile'),
+                        packet_loss=next_condition.get('packet_loss'),
+                        latency_ms=next_condition.get('latency') or next_condition.get('latency_ms'),
+                        bandwidth_kbps=next_condition.get('bandwidth') or next_condition.get('bandwidth_kbps')
+                    )
+                    
+                    logger.info(f"Applying network condition at t={elapsed:.1f}s")
+                    self.network_manager.update_network_condition('rtsp_server', stream_index, network_cond)
+                    condition_index += 1
+            
+            time.sleep(1)
+        
+        return True
+    
+    def _validate_metrics(self, step: Dict) -> bool:
+        """Validate inference metrics"""
+        check = step.get('check')
+        expected = step.get('expected')
+        min_value = step.get('min_value')
+        max_value = step.get('max_value')
+        timeout = step.get('timeout', 30)
+        
+        logger.info(f"Validating metrics: {check}")
+        
+        # Simple example - in production this would check actual metrics
+        # from the running inference process
+        start_time = time.time()
+        while time.time() - start_time < timeout:
+            # Check metrics (placeholder - would read from actual system)
+            if check == "recovery_attempts":
+                # Simulate checking recovery attempts
+                if self.inference_metrics.get('recovery_attempts', 0) >= min_value:
+                    logger.info(f"Validation passed: {check} >= {min_value}")
+                    return True
+            elif check == "stream_active":
+                # Check if stream is active
+                if self.network_manager:
+                    metrics = self.network_manager.get_metrics('rtsp_server')
+                    if metrics and metrics.streams > 0:
+                        logger.info(f"Validation passed: stream is active")
+                        return True
+            elif check == "tracking_continuity":
+                # Check tracking continuity
+                continuity = self.inference_metrics.get('tracking_continuity', 0)
+                if continuity >= min_value:
+                    logger.info(f"Validation passed: tracking continuity {continuity} >= {min_value}")
+                    return True
+            time.sleep(1)
+        
+        logger.error(f"Validation failed: {check} did not meet criteria")
+        return False
+    
     def _run_command(self, step: Dict, scenario_env: Dict = None) -> bool:
-        """Run a single test command"""
+        """Run a single test command or special step type"""
+        # Handle special step types
+        step_type = step.get('type', 'command')
+        
+        if step_type == 'network_update':
+            return self._handle_network_update(step)
+        elif step_type == 'validate_metrics':
+            return self._validate_metrics(step)
+        elif step_type == 'network_sequence':
+            # Handle dynamic network condition changes over time
+            return self._run_network_sequence(step)
+        
+        # Regular command execution
         name = step.get('name', 'unnamed')
         command = step['command']
         cwd = step.get('cwd', '.')
@@ -157,6 +287,7 @@ class TestOrchestrator:
         retry_count = step.get('retry_count', 0)
         allow_failure = step.get('allow_failure', False)
         timeout = step.get('timeout', 300)
+        background = step.get('background', False)
         
         # Resolve cwd relative to project root
         full_cwd = self.project_root / cwd
@@ -217,29 +348,86 @@ class TestOrchestrator:
         return False
         
     def _setup_scenario(self, scenario: Dict) -> bool:
-        """Setup a test scenario (start RTSP server, create test files, etc.)"""
+        """Setup a test scenario (start RTSP server with optional network simulation)"""
         setup = scenario.get('setup', {})
         
         # Start RTSP server if needed
         if 'rtsp_server' in setup and setup['rtsp_server'].get('enabled', False):
             server_config = setup['rtsp_server']
             
-            self.process_manager.start_process(
-                'rtsp_server',
-                server_config['command'],
-                cwd=self.project_root / server_config['cwd']
-            )
-            
-            # Wait for startup
-            startup_delay = server_config.get('startup_delay', 5)
-            logger.info(f"Waiting {startup_delay} seconds for RTSP server to start...")
-            time.sleep(startup_delay)
-            
-            # Health check
-            if 'health_check' in server_config:
-                if not self._wait_for_health_check(server_config['health_check']):
-                    logger.error("RTSP server health check failed")
+            # Check if network simulation is requested
+            if self.network_manager and ('streams' in server_config or 'network_profile' in server_config):
+                # Use network simulation manager
+                logger.info("Starting RTSP server with network simulation")
+                
+                # Build stream configurations
+                streams = []
+                if 'streams' in server_config:
+                    for stream_cfg in server_config['streams']:
+                        network_cond = NetworkCondition(
+                            profile=stream_cfg.get('network_profile'),
+                            scenario=stream_cfg.get('network_scenario'),
+                            packet_loss=stream_cfg.get('packet_loss'),
+                            latency_ms=stream_cfg.get('latency_ms'),
+                            bandwidth_kbps=stream_cfg.get('bandwidth_kbps'),
+                            jitter_ms=stream_cfg.get('jitter_ms')
+                        )
+                        
+                        stream = StreamConfig(
+                            source_path=str(self.project_root / stream_cfg['source']),
+                            mount_point=stream_cfg.get('mount_point', 'test'),
+                            network_condition=network_cond,
+                            auto_repeat=stream_cfg.get('auto_repeat', True)
+                        )
+                        streams.append(stream)
+                else:
+                    # Single stream with default configuration
+                    network_cond = NetworkCondition(
+                        profile=server_config.get('network_profile', 'perfect'),
+                        scenario=server_config.get('network_scenario')
+                    )
+                    stream = StreamConfig(
+                        source_path=str(self.project_root / "crates/ds-rs/tests/test_video.mp4"),
+                        mount_point="test",
+                        network_condition=network_cond,
+                        auto_repeat=True
+                    )
+                    streams = [stream]
+                
+                # Start server with network simulation
+                success = self.network_manager.start_server(
+                    'rtsp_server',
+                    streams,
+                    port=server_config.get('port', 8554),
+                    api_port=server_config.get('api_port'),
+                    wait_for_ready=True,
+                    timeout=server_config.get('timeout', 30)
+                )
+                
+                if not success:
+                    logger.error("Failed to start RTSP server with network simulation")
                     return False
+                    
+                logger.info(f"RTSP URLs: {self.network_manager.get_rtsp_urls('rtsp_server')}")
+                
+            else:
+                # Traditional RTSP server start without network simulation
+                self.process_manager.start_process(
+                    'rtsp_server',
+                    server_config['command'],
+                    cwd=self.project_root / server_config['cwd']
+                )
+                
+                # Wait for startup
+                startup_delay = server_config.get('startup_delay', 5)
+                logger.info(f"Waiting {startup_delay} seconds for RTSP server to start...")
+                time.sleep(startup_delay)
+                
+                # Health check
+                if 'health_check' in server_config:
+                    if not self._wait_for_health_check(server_config['health_check']):
+                        logger.error("RTSP server health check failed")
+                        return False
                     
         # Create test files if needed
         if 'test_files' in setup and setup['test_files'].get('enabled', False):
@@ -264,8 +452,11 @@ class TestOrchestrator:
         """Clean up after a test scenario"""
         cleanup = scenario.get('cleanup', {})
         
-        # Stop RTSP server
-        if cleanup.get('stop_rtsp_server', False):
+        # Stop RTSP server (network or traditional)
+        if self.network_manager and 'rtsp_server' in self.network_manager.servers:
+            logger.info("Stopping network simulation RTSP server")
+            self.network_manager.stop_server('rtsp_server')
+        elif cleanup.get('stop_rtsp_server', False):
             self.process_manager.stop_process('rtsp_server')
             
         # Remove test files
@@ -391,6 +582,12 @@ def main():
     )
     
     parser.add_argument(
+        '--network-config',
+        help='Path to network inference scenarios configuration file',
+        default='scripts/config/network-inference-scenarios.toml'
+    )
+    
+    parser.add_argument(
         '--list', '-l',
         action='store_true',
         help='List available test scenarios'
@@ -423,6 +620,20 @@ def main():
         logger.error(f"Configuration file not found: {config_path}")
         sys.exit(1)
         
+    # Check if we're running network inference tests
+    scenario = args.scenario
+    if scenario.startswith('network-inference'):
+        # Load network inference scenarios instead
+        network_config_path = Path(args.network_config)
+        if not network_config_path.is_absolute():
+            network_config_path = Path(__file__).parent.parent / args.network_config
+            
+        if network_config_path.exists():
+            logger.info(f"Loading network inference scenarios from {network_config_path}")
+            config_path = network_config_path
+        else:
+            logger.warning(f"Network config not found: {network_config_path}, using default config")
+    
     # Create orchestrator
     orchestrator = TestOrchestrator(config_path)
     

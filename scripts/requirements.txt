@@ -1,0 +1,12 @@
+# Python dependencies for test orchestration scripts
+# Install with: pip install -r scripts/requirements.txt
+
+# TOML parsing for configuration files
+tomli>=2.0.0
+
+# HTTP requests for API communication with RTSP servers
+requests>=2.28.0
+
+# Optional: For enhanced test reporting
+pytest>=7.0.0  # If using pytest integration
+junit-xml>=1.9  # For JUnit XML reports

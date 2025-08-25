@@ -1,5 +1,6 @@
 use tokio::sync::broadcast;
 use serde::{Serialize, Deserialize};
+use std::path::PathBuf;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub enum ConfigurationEvent {
@@ -28,6 +29,12 @@ pub enum ConfigurationEvent {
     },
     ValidationError {
         error: String,
+    },
+    FileSystemChange {
+        event_type: String,
+        path: PathBuf,
+        source_id: Option<String>,
+        watcher_id: String,
     },
 }
 

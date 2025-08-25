@@ -128,6 +128,33 @@ pub struct FilterConfig {
     pub extensions: Vec<String>,
 }
 
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct WatchConfig {
+    #[serde(default = "default_watch_enabled")]
+    pub enabled: bool,
+    
+    #[serde(default = "default_auto_repeat")]
+    pub auto_repeat: bool,
+    
+    #[serde(default = "default_reload_on_change")]
+    pub reload_on_change: bool,
+    
+    #[serde(default = "default_debounce_duration")]
+    pub debounce_duration_ms: u64,
+    
+    #[serde(default)]
+    pub exclude_patterns: Vec<String>,
+    
+    #[serde(default)]
+    pub max_loops: Option<u32>,
+    
+    #[serde(default = "default_seamless_loop")]
+    pub seamless_loop: bool,
+    
+    #[serde(default = "default_gap_duration")]
+    pub gap_duration_ms: u64,
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ServerConfig {
     #[serde(default = "default_rtsp_port")]
@@ -364,6 +391,30 @@ fn default_recursive() -> bool {
 
 fn default_lazy_loading() -> bool {
     true
+}
+
+fn default_watch_enabled() -> bool {
+    false
+}
+
+fn default_auto_repeat() -> bool {
+    false
+}
+
+fn default_reload_on_change() -> bool {
+    true
+}
+
+fn default_debounce_duration() -> u64 {
+    500
+}
+
+fn default_seamless_loop() -> bool {
+    true
+}
+
+fn default_gap_duration() -> u64 {
+    100
 }
 
 #[cfg(test)]

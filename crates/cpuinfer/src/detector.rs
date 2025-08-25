@@ -3,13 +3,12 @@
 //! 
 //! This module provides CPU-based object detection using ONNX Runtime (ort) v1.16.3.
 //! It supports multiple YOLO versions (v3-v12) with automatic format detection and
-//! includes a mock detector for testing without actual models.
+//! includes a mock detector for testing without actual models (when in test mode).
 //! 
 //! # Features
 //! 
 //! - Multiple YOLO version support with auto-detection
 //! - Configurable NMS and confidence thresholds
-//! - Mock detector for testing without models
 //! - Efficient tensor operations using ndarray
 //! - Thread-safe inference with configurable parallelism
 //! 
@@ -130,10 +129,10 @@ impl OnnxDetector {
     
     /// Create a new ONNX detector with a configuration
     pub fn new_with_config(config: DetectorConfig) -> Result<Self> {
-        // Try to load model if path is provided, but fallback to mock on any error
+        // Try to load model if path is provided
         let (session, environment) = if let Some(ref model_path) = config.model_path {
             if !Path::new(model_path).exists() {
-                // log::warn!("Model file not found: {}, using mock detector", model_path);
+                // log::warn!("Model file not found: {}", model_path);
                 (None, None)
             } else {
                 match Self::load_onnx_model(model_path, config.num_threads) {
@@ -142,15 +141,22 @@ impl OnnxDetector {
                         (Some(sess), Some(env))
                     },
                     Err(e) => {
-                        // log::warn!("Failed to load ONNX model: {}, using mock detector", e);
+                        // log::warn!("Failed to load ONNX model: {}", e);
                         (None, None)
                     }
                 }
             }
         } else {
-            // log::info!("No model path provided, using mock detector");
+            // log::info!("No model path provided");
             (None, None)
         };
+
+        match (&session, &environment) {
+            (&None, &None) => return Err(DetectorError::Configuration(
+                "No valid ONNX model loaded. Please provide a valid model_path.".to_string()
+            )),
+            _ => { /* Proceed with whatever is loaded */ }
+        }
         
         let class_names = config.class_names.unwrap_or_else(Self::default_class_names);
         

@@ -80,9 +80,14 @@ impl CpuDetector {
                     gstreamer::info!(CAT, imp = self, "Loaded ONNX detector from: {}", settings.model_path);
                     *detector_guard = Some(detector);
                 },
+                #[cfg(test)]
                 Err(e) => {
                     gstreamer::warning!(CAT, imp = self, "Failed to load detector: {}, using mock", e);
                     *detector_guard = Some(OnnxDetector::new_mock());
+                }
+                #[cfg(not(test))]
+                Err(e) => {
+                    gstreamer::warning!(CAT, imp = self, "Failed to load detector: {}", e);
                 }
             }
         }

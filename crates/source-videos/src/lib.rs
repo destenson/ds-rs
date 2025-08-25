@@ -1,5 +1,6 @@
 #![allow(unused)]
 
+pub mod auto_repeat;
 pub mod config;
 pub mod config_types;
 pub mod directory;
@@ -14,8 +15,9 @@ pub mod pipeline;
 pub mod rtsp;
 pub mod runtime;
 pub mod source;
+pub mod watch;
 
-pub use config_types::{AppConfig, ServerConfig, VideoSourceConfig, VideoSourceType, DirectoryConfig, FileListConfig, FilterConfig};
+pub use config_types::{AppConfig, ServerConfig, VideoSourceConfig, VideoSourceType, DirectoryConfig, FileListConfig, FilterConfig, WatchConfig};
 pub use directory::{DirectoryScanner, BatchSourceLoader};
 pub use error::{Result, SourceVideoError};
 pub use file::{FileGenerator, BatchFileGenerator, generate_test_file};
@@ -26,6 +28,9 @@ pub use patterns::{TestPattern, PatternRotator};
 pub use rtsp::{RtspServer, RtspServerBuilder, create_test_rtsp_server};
 pub use runtime::{RuntimeManager, events::ConfigurationEvent};
 pub use source::{VideoSource, SourceState};
+pub use auto_repeat::{LoopingVideoSource, LoopConfig, AutoRepeatManager, create_looping_source, enable_auto_repeat_for_source};
+pub use watch::{FileWatcher, DirectoryWatcher, WatcherManager};
+pub use watch::events::{FileSystemEvent, FileEventMetadata, FileEventHandler, EventRouter, EventFilter};
 
 use once_cell::sync::OnceCell;
 

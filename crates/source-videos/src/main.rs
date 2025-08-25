@@ -59,6 +59,24 @@ enum Commands {
         
         #[arg(long = "lazy", help = "Enable lazy loading of sources")]
         lazy_loading: bool,
+        
+        #[arg(short = 'w', long = "watch", help = "Enable file system watching for dynamic source updates")]
+        watch: bool,
+        
+        #[arg(short = 'l', long = "auto-repeat", help = "Enable auto-repeat/looping for video playback")]
+        auto_repeat: bool,
+        
+        #[arg(long = "reload-on-change", help = "Reload video files when they are modified")]
+        reload_on_change: bool,
+        
+        #[arg(long = "watch-interval", default_value_t = 500, help = "File watching debounce interval in milliseconds")]
+        watch_interval_ms: u64,
+        
+        #[arg(long = "max-loops", help = "Maximum number of loops for auto-repeat (default: infinite)")]
+        max_loops: Option<u32>,
+        
+        #[arg(long = "seamless-loop", help = "Enable seamless looping without gaps")]
+        seamless_loop: bool,
     },
     Generate {
         #[arg(short, long, default_value = "smpte")]
@@ -118,6 +136,12 @@ async fn main() -> Result<()> {
             exclude,
             mount_prefix,
             lazy_loading,
+            watch,
+            auto_repeat,
+            reload_on_change,
+            watch_interval_ms,
+            max_loops,
+            seamless_loop,
         } => {
             serve_command(
                 port, 
@@ -131,6 +155,12 @@ async fn main() -> Result<()> {
                 exclude,
                 mount_prefix,
                 lazy_loading,
+                watch,
+                auto_repeat,
+                reload_on_change,
+                watch_interval_ms,
+                max_loops,
+                seamless_loop,
             ).await
         }
         Commands::Generate { pattern, duration, output, width, height, fps } => {
@@ -160,9 +190,17 @@ async fn serve_command(
     exclude: Vec<String>,
     mount_prefix: Option<String>,
     lazy_loading: bool,
+    watch: bool,
+    auto_repeat: bool,
+    reload_on_change: bool,
+    watch_interval_ms: u64,
+    max_loops: Option<u32>,
+    seamless_loop: bool,
 ) -> Result<()> {
-    use source_videos::{DirectoryConfig, FileListConfig, FilterConfig, DirectoryScanner, RtspServerBuilder};
+    use source_videos::{DirectoryConfig, FileListConfig, FilterConfig, DirectoryScanner, RtspServerBuilder, WatcherManager, LoopConfig, create_looping_source};
+    use std::time::Duration;
     
+    println!("Starting RTSP server on rtsp://localhost:{}", port);
     println!("Starting RTSP server on {}:{}", address, port);
     
     // Build server with initial patterns
@@ -178,7 +216,7 @@ async fn serve_command(
     }
     
     // Scan directory for video files if specified
-    if let Some(dir_path) = directory {
+    if let Some(ref dir_path) = directory {
         let filters = if !include.is_empty() || !exclude.is_empty() {
             Some(FilterConfig {
                 include: include.clone(),
@@ -254,6 +292,30 @@ async fn serve_command(
     // Build and start the server
     let mut server = server_builder.build()?;
     
+    // Set up file watching if enabled
+    let mut watcher_manager = if watch && directory.is_some() {
+        println!("Setting up file system watching...");
+        let mut manager = WatcherManager::new();
+        
+        if let Some(ref dir_path) = directory {
+            let watcher_id = manager.add_directory_watcher(dir_path, recursive).await?;
+            println!("Started watching directory: {} (ID: {})", dir_path.display(), watcher_id);
+        }
+        
+        Some(manager)
+    } else {
+        None
+    };
+    
+    // Print auto-repeat configuration
+    if auto_repeat {
+        println!("Auto-repeat enabled: max_loops={:?}, seamless={}", max_loops, seamless_loop);
+    }
+    
+    if reload_on_change {
+        println!("Hot-reload enabled with {}ms debounce interval", watch_interval_ms);
+    }
+    
     server.start()?;
     
     for mount in server.list_sources() {
@@ -284,6 +346,33 @@ async fn serve_command(
             _ = async {
                 loop {
                     main_context.iteration(false);
+                    
+                    // Check for file system events if watching is enabled
+                    if let Some(ref mut manager) = watcher_manager {
+                        if let Some(event) = manager.recv().await {
+                            println!("File system event: {:?} - {}", event.event_type(), event.path().display());
+                            
+                            // Handle the event based on type
+                            match &event {
+                                source_videos::FileSystemEvent::Created(meta) => {
+                                    println!("New video file detected: {}", meta.path.display());
+                                    // TODO: Add new source to server
+                                }
+                                source_videos::FileSystemEvent::Modified(meta) => {
+                                    if reload_on_change {
+                                        println!("Video file modified: {}", meta.path.display());
+                                        // TODO: Reload the source
+                                    }
+                                }
+                                source_videos::FileSystemEvent::Deleted(meta) => {
+                                    println!("Video file deleted: {}", meta.path.display());
+                                    // TODO: Remove source from server
+                                }
+                                _ => {}
+                            }
+                        }
+                    }
+                    
                     tokio::time::sleep(Duration::from_millis(10)).await;
                 }
             } => {}

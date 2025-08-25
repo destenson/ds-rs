@@ -102,7 +102,11 @@ impl RtspServer {
             format!("/{}", mount_point)
         };
         
-        format!("rtsp://{}:{}{}", self.address, self.port, path)
+        let addr = match self.address.as_str() {
+            "0.0.0.0" => "localhost",
+            _ => &self.address,
+        };
+        format!("rtsp://{}:{}{}", addr, self.port, path)
     }
     
     pub fn get_port(&self) -> u16 {

@@ -2,7 +2,7 @@ pub mod events;
 
 use crate::error::{Result, SourceVideoError};
 use crate::file_utils::is_video_file;
-use crate::watch::events::{FileSystemEvent, FileEventMetadata};
+pub(crate) use events::{FileSystemEvent, FileEventMetadata};
 use notify::{Config, Event, EventKind, RecommendedWatcher, RecursiveMode, Watcher};
 use std::collections::HashMap;
 use std::path::{Path, PathBuf};

@@ -1,14 +1,23 @@
-use crate::config_types::{VideoSourceConfig, VideoSourceType, DirectoryConfig, FileListConfig};
+use crate::config_types::{VideoSourceConfig, VideoSourceType, DirectoryConfig, FileListConfig, WatchConfig};
 use crate::directory::{DirectoryScanner, BatchSourceLoader};
 use crate::error::{Result, SourceVideoError};
 use crate::source::{VideoSource, SourceState, create_source};
+use crate::watch::{WatcherManager, DirectoryWatcher, FileSystemEvent};
+use crate::auto_repeat::{LoopingVideoSource, LoopConfig};
+use crate::runtime::events::{EventBus, ConfigurationEvent};
 use std::collections::HashMap;
+use std::path::{Path, PathBuf};
 use std::sync::{Arc, RwLock};
+use std::time::Duration;
 use uuid::Uuid;
 
 pub struct VideoSourceManager {
     sources: Arc<RwLock<HashMap<String, Box<dyn VideoSource>>>>,
     name_to_id: Arc<RwLock<HashMap<String, String>>>,
+    watcher_manager: Option<WatcherManager>,
+    watch_config: Option<WatchConfig>,
+    event_bus: Arc<EventBus>,
+    path_to_source: Arc<RwLock<HashMap<PathBuf, String>>>,
 }
 
 impl VideoSourceManager {
@@ -16,6 +25,10 @@ impl VideoSourceManager {
         Self {
             sources: Arc::new(RwLock::new(HashMap::new())),
             name_to_id: Arc::new(RwLock::new(HashMap::new())),
+            watcher_manager: None,
+            watch_config: None,
+            event_bus: Arc::new(EventBus::new()),
+            path_to_source: Arc::new(RwLock::new(HashMap::new())),
         }
     }
     
@@ -360,6 +373,338 @@ impl VideoSourceManager {
     pub fn add_from_batch_loader(&self, loader: &mut BatchSourceLoader) -> Result<Vec<String>> {
         let configs = loader.load_all()?;
         self.add_sources_batch(configs)
+    }
+    
+    // File watching methods
+    
+    pub fn enable_file_watching(&mut self, config: WatchConfig) {
+        self.watch_config = Some(config);
+        if self.watcher_manager.is_none() {
+            self.watcher_manager = Some(WatcherManager::new());
+        }
+        log::info!("File watching enabled");
+    }
+    
+    pub async fn add_watched_directory<P: AsRef<Path>>(
+        &mut self, 
+        path: P, 
+        recursive: bool
+    ) -> Result<()> {
+        if self.watcher_manager.is_none() {
+            return Err(SourceVideoError::config("File watching not enabled"));
+        }
+        
+        let path = path.as_ref();
+        
+        // First, scan the directory for existing files
+        let mut dir_config = DirectoryConfig {
+            path: path.display().to_string(),
+            recursive,
+            filters: None,
+            lazy_loading: false,
+            mount_prefix: None,
+        };
+        
+        // Add existing files
+        let source_ids = self.add_directory(dir_config.clone())?;
+        
+        // Track file paths to source IDs
+        {
+            let mut path_map = self.path_to_source.write()
+                .map_err(|_| SourceVideoError::resource("Failed to acquire write lock on path map"))?;
+            
+            for id in &source_ids {
+                if let Ok(info) = self.get_source(id) {
+                    if let Some(file_path) = extract_file_path_from_uri(&info.uri) {
+                        path_map.insert(PathBuf::from(file_path), id.clone());
+                    }
+                }
+            }
+        }
+        
+        // Add directory watcher
+        if let Some(ref mut watcher_manager) = self.watcher_manager {
+            let watcher_id = watcher_manager.add_directory_watcher(path, recursive).await?;
+            log::info!("Added directory watcher: {} for path: {}", watcher_id, path.display());
+            
+            // Start monitoring task
+            self.start_file_watching_task().await?;
+        }
+        
+        Ok(())
+    }
+    
+    pub async fn add_watched_file<P: AsRef<Path>>(&mut self, path: P) -> Result<()> {
+        if self.watcher_manager.is_none() {
+            return Err(SourceVideoError::config("File watching not enabled"));
+        }
+        
+        let path = path.as_ref();
+        
+        // Add the file as a source
+        let container = crate::file_utils::detect_container_format(path)
+            .unwrap_or(crate::config_types::FileContainer::Mp4);
+        
+        let name = path.file_stem()
+            .and_then(|s| s.to_str())
+            .unwrap_or("video")
+            .to_string();
+        
+        let config = VideoSourceConfig {
+            name: name.clone(),
+            source_type: VideoSourceType::File {
+                path: path.display().to_string(),
+                container,
+            },
+            resolution: crate::config_types::Resolution {
+                width: 1920,
+                height: 1080,
+            },
+            framerate: crate::config_types::Framerate {
+                numerator: 30,
+                denominator: 1,
+            },
+            format: crate::config_types::VideoFormat::I420,
+            duration: None,
+            num_buffers: None,
+            is_live: false,
+        };
+        
+        let source_id = if let Some(ref watch_config) = self.watch_config {
+            if watch_config.auto_repeat {
+                self.add_source_with_auto_repeat(config)?
+            } else {
+                self.add_source(config)?
+            }
+        } else {
+            self.add_source(config)?
+        };
+        
+        // Track file path to source ID
+        {
+            let mut path_map = self.path_to_source.write()
+                .map_err(|_| SourceVideoError::resource("Failed to acquire write lock on path map"))?;
+            path_map.insert(path.to_path_buf(), source_id.clone());
+        }
+        
+        // Add file watcher
+        if let Some(ref mut watcher_manager) = self.watcher_manager {
+            let watcher_id = watcher_manager.add_file_watcher(path).await?;
+            log::info!("Added file watcher: {} for path: {}", watcher_id, path.display());
+            
+            // Start monitoring task if not already running
+            self.start_file_watching_task().await?;
+        }
+        
+        Ok(())
+    }
+    
+    pub fn add_source_with_auto_repeat(&self, config: VideoSourceConfig) -> Result<String> {
+        let source = create_source(config.clone());
+        
+        let loop_config = if let Some(ref watch_config) = self.watch_config {
+            LoopConfig {
+                max_loops: watch_config.max_loops,
+                seamless: watch_config.seamless_loop,
+                gap_duration: Duration::from_millis(watch_config.gap_duration_ms),
+                ..Default::default()
+            }
+        } else {
+            LoopConfig::default()
+        };
+        
+        let mut looping_source = LoopingVideoSource::new(source).with_config(loop_config);
+        let id = looping_source.get_id().to_string();
+        let name = looping_source.get_name().to_string();
+        
+        {
+            let mut sources = self.sources.write()
+                .map_err(|_| SourceVideoError::resource("Failed to acquire write lock on sources"))?;
+            
+            let mut name_map = self.name_to_id.write()
+                .map_err(|_| SourceVideoError::resource("Failed to acquire write lock on name map"))?;
+            
+            if name_map.contains_key(&name) {
+                return Err(SourceVideoError::config(format!("Source with name '{}' already exists", name)));
+            }
+            
+            looping_source.start()?;
+            
+            sources.insert(id.clone(), Box::new(looping_source));
+            name_map.insert(name.clone(), id.clone());
+        }
+        
+        log::info!("Added looping source '{}' with ID: {}", name, id);
+        Ok(id)
+    }
+    
+    async fn start_file_watching_task(&self) -> Result<()> {
+        let sources = Arc::clone(&self.sources);
+        let name_to_id = Arc::clone(&self.name_to_id);
+        let path_to_source = Arc::clone(&self.path_to_source);
+        let event_bus = Arc::clone(&self.event_bus);
+        let watch_config = self.watch_config.clone();
+        
+        // This would normally spawn a task to handle file system events
+        // For now, we'll just log that it's ready
+        log::info!("File watching task ready");
+        
+        Ok(())
+    }
+    
+    pub async fn handle_file_event(&mut self, event: FileSystemEvent) -> Result<()> {
+        let path = event.path().clone();
+        
+        match &event {
+            FileSystemEvent::Created(metadata) => {
+                self.handle_file_created(metadata.path.clone()).await?;
+            }
+            FileSystemEvent::Modified(metadata) => {
+                if let Some(ref config) = self.watch_config {
+                    if config.reload_on_change {
+                        self.handle_file_modified(metadata.path.clone()).await?;
+                    }
+                }
+            }
+            FileSystemEvent::Deleted(metadata) => {
+                self.handle_file_deleted(metadata.path.clone()).await?;
+            }
+            _ => {}
+        }
+        
+        // Emit event
+        self.event_bus.emit(ConfigurationEvent::FileSystemChange {
+            event_type: event.event_type().to_string(),
+            path: path.clone(),
+            source_id: self.get_source_id_for_path(&path),
+            watcher_id: event.watcher_id().to_string(),
+        }).await;
+        
+        Ok(())
+    }
+    
+    async fn handle_file_created(&mut self, path: PathBuf) -> Result<()> {
+        if !crate::file_utils::is_video_file(&path) {
+            return Ok(());
+        }
+        
+        log::info!("New video file detected: {}", path.display());
+        
+        let container = crate::file_utils::detect_container_format(&path)
+            .unwrap_or(crate::config_types::FileContainer::Mp4);
+        
+        let name = path.file_stem()
+            .and_then(|s| s.to_str())
+            .unwrap_or("video")
+            .to_string();
+        
+        let config = VideoSourceConfig {
+            name,
+            source_type: VideoSourceType::File {
+                path: path.display().to_string(),
+                container,
+            },
+            resolution: crate::config_types::Resolution {
+                width: 1920,
+                height: 1080,
+            },
+            framerate: crate::config_types::Framerate {
+                numerator: 30,
+                denominator: 1,
+            },
+            format: crate::config_types::VideoFormat::I420,
+            duration: None,
+            num_buffers: None,
+            is_live: false,
+        };
+        
+        let source_id = if let Some(ref watch_config) = self.watch_config {
+            if watch_config.auto_repeat {
+                self.add_source_with_auto_repeat(config)?
+            } else {
+                self.add_source(config)?
+            }
+        } else {
+            self.add_source(config)?
+        };
+        
+        // Track the new source
+        {
+            let mut path_map = self.path_to_source.write()
+                .map_err(|_| SourceVideoError::resource("Failed to acquire write lock on path map"))?;
+            path_map.insert(path, source_id);
+        }
+        
+        Ok(())
+    }
+    
+    async fn handle_file_modified(&mut self, path: PathBuf) -> Result<()> {
+        log::info!("Video file modified: {}", path.display());
+        
+        if let Some(source_id) = self.get_source_id_for_path(&path) {
+            // Stop the current source
+            self.stop_source(&source_id)?;
+            
+            // Wait a bit for file to be fully written
+            tokio::time::sleep(Duration::from_millis(100)).await;
+            
+            // Restart the source
+            self.start_source(&source_id)?;
+            
+            log::info!("Reloaded source for modified file: {}", path.display());
+        }
+        
+        Ok(())
+    }
+    
+    async fn handle_file_deleted(&mut self, path: PathBuf) -> Result<()> {
+        log::info!("Video file deleted: {}", path.display());
+        
+        if let Some(source_id) = self.get_source_id_for_path(&path) {
+            // Remove the source
+            self.remove_source(&source_id)?;
+            
+            // Remove from path tracking
+            {
+                let mut path_map = self.path_to_source.write()
+                    .map_err(|_| SourceVideoError::resource("Failed to acquire write lock on path map"))?;
+                path_map.remove(&path);
+            }
+            
+            log::info!("Removed source for deleted file: {}", path.display());
+        }
+        
+        Ok(())
+    }
+    
+    fn get_source_id_for_path(&self, path: &Path) -> Option<String> {
+        self.path_to_source.read()
+            .ok()
+            .and_then(|map| map.get(path).cloned())
+    }
+    
+    pub async fn stop_watching(&mut self) -> Result<()> {
+        if let Some(ref mut watcher_manager) = self.watcher_manager {
+            watcher_manager.stop_all().await?;
+            log::info!("Stopped all file watchers");
+        }
+        
+        self.watcher_manager = None;
+        self.watch_config = None;
+        
+        Ok(())
+    }
+    
+    pub fn get_event_bus(&self) -> Arc<EventBus> {
+        Arc::clone(&self.event_bus)
+    }
+}
+
+fn extract_file_path_from_uri(uri: &str) -> Option<String> {
+    if uri.starts_with("file:///") {
+        Some(uri.trim_start_matches("file:///").replace('/', "\\"))
+    } else {
+        None
     }
 }
 

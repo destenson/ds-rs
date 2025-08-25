@@ -105,6 +105,8 @@ impl MediaFactoryBuilder {
                 )
             }
             crate::config_types::VideoSourceType::File { path, .. } => {
+                // Convert Windows paths to forward slashes for GStreamer
+                let gst_path = path.replace('\\', "/");
                 format!(
                     "( filesrc location=\"{}\" ! \
                      decodebin ! \
@@ -114,7 +116,7 @@ impl MediaFactoryBuilder {
                      x264enc tune=zerolatency speed-preset=ultrafast bitrate=2000 ! \
                      {} \
                      rtph264pay name=pay0 pt=96 config-interval=1 )",
-                    path,
+                    gst_path,
                     config.resolution.width,
                     config.resolution.height,
                     network_sim

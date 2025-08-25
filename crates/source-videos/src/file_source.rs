@@ -274,6 +274,64 @@ impl VideoSource for FileVideoSource {
     }
 }
 
+impl FileVideoSource {
+    pub fn reload(&mut self) -> Result<()> {
+        log::info!("Reloading file source: {} ({})", self.name, self.file_path);
+        
+        // Get current state
+        let current_state = self.get_state();
+        
+        // Stop the current pipeline
+        if self.pipeline.is_some() {
+            self.stop()?;
+        }
+        
+        // Check if file still exists
+        let path = Path::new(&self.file_path);
+        if !path.exists() {
+            return Err(SourceVideoError::FileNotFound(self.file_path.clone()));
+        }
+        
+        // Recreate and restart based on previous state
+        match current_state {
+            SourceState::Playing => {
+                self.start()?;
+            }
+            SourceState::Paused => {
+                self.start()?;
+                self.pause()?;
+            }
+            _ => {
+                // If it was stopped or in error, just recreate pipeline
+                self.create_pipeline()?;
+            }
+        }
+        
+        log::info!("Successfully reloaded file source: {}", self.name);
+        Ok(())
+    }
+    
+    pub fn supports_hot_reload(&self) -> bool {
+        true
+    }
+    
+    pub fn get_file_path(&self) -> &str {
+        &self.file_path
+    }
+    
+    pub fn update_file_path(&mut self, new_path: impl Into<String>) -> Result<()> {
+        let new_path = new_path.into();
+        let path = Path::new(&new_path);
+        
+        if !path.exists() {
+            return Err(SourceVideoError::FileNotFound(new_path));
+        }
+        
+        self.file_path = new_path;
+        self.reload()
+    }
+}
+
 /// Factory for creating file-based video sources
 pub struct FileSourceFactory;
 

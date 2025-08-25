@@ -1,3 +1,5 @@
+pub mod classification;
+
 use thiserror::Error;
 
 #[derive(Error, Debug)]
@@ -80,3 +82,8 @@ impl<T> ResultExt<T> for Option<T> {
         self.ok_or_else(|| DeepStreamError::Unknown(msg.to_string()))
     }
 }
+
+pub use classification::{
+    classify, is_retryable, ErrorCategory, ErrorClassification, ErrorClassifier,
+    ErrorPersistence, ErrorSeverity, RecoveryAction,
+};

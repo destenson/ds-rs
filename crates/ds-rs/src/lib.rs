@@ -16,16 +16,22 @@ pub mod rendering;
 #[cfg(target_os = "windows")]
 pub mod dll_validator;
 
-pub use error::{DeepStreamError, Result};
+pub use error::{DeepStreamError, Result, ErrorClassifier, ErrorClassification, is_retryable};
 pub use platform::{Platform, PlatformInfo};
 pub use backend::{Backend, BackendType, BackendCapabilities, BackendManager};
 pub use elements::{DeepStreamElement, DeepStreamElementType, ElementBuilder};
+pub use elements::factory::ElementFactory;
 pub use config::ApplicationConfig;
 pub use pipeline::{Pipeline, PipelineBuilder, PipelineState, StateManager, BusWatcher, MessageHandler};
 pub use source::{
     SourceId, SourceState, SourceInfo, SourceManager, VideoSource,
     SourceAddition, SourceRemoval, SourceEvent, SourceEventHandler,
-    SourceSynchronizer, SourceController
+    SourceSynchronizer, SourceController,
+    // Recovery and fault tolerance exports
+    RecoveryConfig, RecoveryManager, RecoveryState, RecoveryStats,
+    HealthConfig, HealthMonitor, HealthStatus, SourceHealthMonitor,
+    CircuitBreaker, CircuitBreakerConfig, CircuitBreakerManager, CircuitState,
+    ErrorBoundary, IsolatedSource, IsolationManager, IsolationPolicy
 };
 pub use metadata::{
     MetadataExtractor, MetadataError, MetadataStats,

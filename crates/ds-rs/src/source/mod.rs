@@ -5,6 +5,10 @@ pub mod removal;
 pub mod events;
 pub mod synchronization;
 pub mod controller;
+pub mod recovery;
+pub mod health;
+pub mod circuit_breaker;
+pub mod isolation;
 
 use crate::error::{DeepStreamError, Result};
 use gstreamer as gst;
@@ -19,6 +23,10 @@ pub use removal::SourceRemoval;
 pub use events::{SourceEvent, SourceEventHandler};
 pub use synchronization::SourceSynchronizer;
 pub use controller::SourceController;
+pub use recovery::{RecoveryConfig, RecoveryManager, RecoveryState, RecoveryStats};
+pub use health::{HealthConfig, HealthMonitor, HealthStatus, SourceHealthMonitor};
+pub use circuit_breaker::{CircuitBreaker, CircuitBreakerConfig, CircuitBreakerManager, CircuitState};
+pub use isolation::{ErrorBoundary, IsolatedSource, IsolationManager, IsolationPolicy};
 
 pub const MAX_NUM_SOURCES: usize = 30;
 

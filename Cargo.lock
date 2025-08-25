@@ -593,6 +593,7 @@ dependencies = [
  "half",
  "image 0.25.6",
  "imgproc",
+ "lazy_static",
  "log",
  "nalgebra",
  "ndarray",

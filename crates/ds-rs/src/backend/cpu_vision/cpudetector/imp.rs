@@ -271,7 +271,9 @@ impl ObjectImpl for CpuDetector {
             "process-every-n-frames" => {
                 settings.process_every_n_frames = value.get().expect("type checked upstream");
             },
-            _ => unimplemented!(),
+            _ => {
+                gstreamer::warning!(CAT, imp = self, "Unknown property '{}' in set_property", pspec.name());
+            }
         }
     }
     
@@ -285,7 +287,11 @@ impl ObjectImpl for CpuDetector {
             "input-width" => settings.input_width.to_value(),
             "input-height" => settings.input_height.to_value(),
             "process-every-n-frames" => settings.process_every_n_frames.to_value(),
-            _ => unimplemented!(),
+            _ => {
+                gstreamer::warning!(CAT, imp = self, "Unknown property '{}' in property getter", pspec.name());
+                // Return a default value to avoid crashes
+                glib::Value::from(&0u32)
+            }
         }
     }
 }

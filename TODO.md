@@ -1,6 +1,6 @@
 # TODO List
 
-Last Updated: 2025-08-24 (PRP-34 Error Recovery completed)
+Last Updated: 2025-08-24 (PRP-34 Error Recovery completed, PRP-19 Network Simulation next)
 
 ## Critical Priority 🔴
 
@@ -14,6 +14,14 @@ Last Updated: 2025-08-24 (PRP-34 Error Recovery completed)
   - Recovery manager with statistics tracking
   - Example: fault_tolerant_pipeline.rs demonstrates recovery features
   
+- [ ] **Network Simulation for Testing** (PRP-19 - Next Priority)
+  - Add network simulation to `source-videos` crate
+  - Simulate packet loss, latency, bandwidth limits
+  - Create connection interruption scenarios
+  - Test error recovery system with realistic conditions
+  - Integrate with RTSP server for live testing
+  - Started: Created network/mod.rs with basic structure
+  
 - [ ] **Multi-stream Fault Tolerance** (PRP-12 - Builds on PRP-34)
   - Integrate recovery modules with SourceController
   - Add per-source recovery policies
@@ -22,7 +30,8 @@ Last Updated: 2025-08-24 (PRP-34 Error Recovery completed)
 
 ### Active Critical Issues
 ✅ **Core functionality working** - Application demonstrates basic features
-⚠️ **Production readiness pending** - Needs fault tolerance for real deployments
+✅ **Error recovery implemented** - PRP-34 provides fault tolerance mechanisms
+⚠️ **Testing infrastructure needed** - PRP-19 network simulation will enable comprehensive testing
 
 ### Known Issues (Non-Critical)
 - [ ] **Float16 Model Support** (See BUGS.md)

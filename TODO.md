@@ -1,6 +1,6 @@
 # TODO List
 
-Last Updated: 2025-08-25 (Complete codebase scan for TODO items)
+Last Updated: 2025-08-24 (Complete codebase scan and update)
 
 ## Critical Priority 🔴
 
@@ -36,22 +36,20 @@ Last Updated: 2025-08-25 (Complete codebase scan for TODO items)
   - Remaining unwrap() calls are non-critical (mostly in test code or GStreamer init)
   - Note: 100+ clippy warnings remain for code style (uninlined format args, etc.)
 
-- [ ] **Complete TODO comments in code** (3 remaining)
+- [ ] **Complete TODO comments in code** (5 remaining)
   - [x] `Cargo.toml:3-4`: Fixed - all crates now use workspace version and edition
-  - [ ] `source-videos/Cargo.toml:20`: Remove tokio dependency (async is ok though)
-  - [ ] `backend/cpu_vision/cpudetector/imp.rs:154`: Attach custom metadata to buffer
+  - [ ] `Cargo.toml:52`, `source-videos/Cargo.toml:20`: Remove tokio dependency (async is ok though)
+  - [ ] `tests/cpu_backend_tests.rs:343`: Test with actual ONNX model file when available
   - [ ] `rendering/deepstream_renderer.rs:190,222`: Implement actual DeepStream metadata processing
-  - `Cargo.toml:52`, `source-videos/Cargo.toml:20`: Remove tokio dependency
-  - `tests/cpu_backend_tests.rs:343`: Test with actual ONNX model file
-  - `rendering/deepstream_renderer.rs:190,222`: Implement DeepStream metadata processing
-  - `backend/cpu_vision/cpudetector/imp.rs:154`: Attach custom metadata to buffer
+  - [ ] `backend/cpu_vision/cpudetector/imp.rs:154`: Attach custom metadata to buffer
+  - [ ] `backend/mock.rs:48`: Only include for testing with #[cfg(test)]
 
 - [ ] **Handle unimplemented!() calls** (4 occurrences)
   - `backend/cpu_vision/cpudetector/imp.rs:274,288`: 2 occurrences in match statements
   - `cpuinfer/src/cpudetector/imp.rs:258,272`: 2 occurrences in match statements
   - Replace with proper error handling or complete implementation
 
-- [ ] **Clean up unused parameters** (50+ underscore-prefixed variables)
+- [ ] **Clean up unused parameters** (30+ underscore-prefixed variables)
   - Common patterns:
     - Callback closures: `_pad`, `_info`, `_bus`, `_msg` in probes and handlers
     - Trait implementations: `_id`, `_decodebin`, `_timestamp`
@@ -165,17 +163,12 @@ Last Updated: 2025-08-25 (Complete codebase scan for TODO items)
 ### Code Quality Metrics
 - **unwrap() calls**: Critical production unwrap() calls fixed (most remaining are in test code)
 - **Clippy warnings**: 100+ style warnings (uninlined format args, duplicated attributes, etc.) - non-critical
-- **TODO comments**: 3 remaining (down from 8)
+- **TODO comments**: 5 remaining (down from 8)
 - **todo!() macros**: 1 (in dsl test)
 - **unimplemented!()**: 4 occurrences
-- **Unused parameters**: 50+ underscore-prefixed variables (many legitimate)
+- **Unused parameters**: 30+ underscore-prefixed variables (many legitimate)
 - **Ignored tests**: 1 test requiring runtime
 - **"For now" comments**: 15+ indicating temporary implementations
-- **TODO comments**: 8 found
-- **todo!() macros**: 1 (in dsl crate)
-- **unimplemented!()**: 2 occurrences
-- **Unused parameters**: 33 underscore-prefixed variables
-- **Ignored tests**: 1 test requiring runtime
 
 ### Project Status
 - **Critical Bugs**: 0 (ALL RESOLVED ✅)
@@ -184,10 +177,12 @@ Last Updated: 2025-08-25 (Complete codebase scan for TODO items)
 - **PRP Progress**: 13/31 complete (42%), 4/31 in progress (13%), 14/31 not started (45%)
 
 ### Recent Achievements
-- **2025-08-25**: Completed PRP-08 Code Quality improvements
+- **2025-08-25**: 
+  - Completed PRP-08 Code Quality improvements
   - Fixed workspace configuration for all crates
   - Fixed critical unwrap() calls in production code
   - Fixed clippy warnings in build scripts
+  - Added PRP-32 for fixing Standard backend OSD property configuration
 - **2025-08-24**: 
   - Fixed video playback state management (PRP-03)
   - Implemented real-time bounding box rendering (PRP-11)

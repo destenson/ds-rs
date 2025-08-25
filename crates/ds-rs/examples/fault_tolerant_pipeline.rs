@@ -2,7 +2,7 @@ use ds_rs::{
     init, timestamp, BackendManager, ElementFactory, Pipeline, 
     RecoveryConfig, RecoveryManager, HealthConfig, SourceHealthMonitor,
     CircuitBreakerConfig, CircuitBreaker, IsolationPolicy, IsolatedSource,
-    ErrorClassifier, is_retryable,
+    is_retryable,
 };
 use gstreamer as gst;
 use gst::prelude::*;
@@ -91,7 +91,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let recovery_manager_clone = recovery_manager.clone();
     let circuit_breaker_clone = circuit_breaker.clone();
     
-    bus.add_watch(move |_, msg| {
+    let _bus_watch = bus.add_watch(move |_, msg| {
         use gst::MessageView;
         
         match msg.view() {
@@ -256,7 +256,7 @@ fn build_fault_tolerant_pipeline(
     
     // Create test source with error injection capability
     let videosrc = gst::ElementFactory::make("videotestsrc")
-        .property("pattern", 18) // Ball pattern
+        .property_from_str("pattern", "ball") // Ball pattern
         .property("is-live", true)
         .build()?;
     

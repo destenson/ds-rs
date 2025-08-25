@@ -352,23 +352,9 @@ async fn serve_command(
                         if let Some(event) = manager.recv().await {
                             println!("File system event: {:?} - {}", event.event_type(), event.path().display());
                             
-                            // Handle the event based on type
-                            match &event {
-                                source_videos::FileSystemEvent::Created(meta) => {
-                                    println!("New video file detected: {}", meta.path.display());
-                                    // TODO: Add new source to server
-                                }
-                                source_videos::FileSystemEvent::Modified(meta) => {
-                                    if reload_on_change {
-                                        println!("Video file modified: {}", meta.path.display());
-                                        // TODO: Reload the source
-                                    }
-                                }
-                                source_videos::FileSystemEvent::Deleted(meta) => {
-                                    println!("Video file deleted: {}", meta.path.display());
-                                    // TODO: Remove source from server
-                                }
-                                _ => {}
+                            // Handle the event through the RTSP server directly
+                            if let Err(e) = server.handle_file_event(&event) {
+                                eprintln!("Error handling file event: {}", e);
                             }
                         }
                     }

@@ -2,10 +2,12 @@ pub mod factory;
 
 use crate::config::{ServerConfig, VideoSourceConfig};
 use crate::error::{Result, SourceVideoError};
+use crate::watch::FileSystemEvent;
 use factory::MediaFactoryBuilder;
 use gstreamer_rtsp_server as rtsp_server;
 use gstreamer_rtsp_server::prelude::*;
 use std::collections::HashMap;
+use std::path::PathBuf;
 use std::sync::{Arc, Mutex};
 
 pub struct RtspServer {
@@ -115,6 +117,97 @@ impl RtspServer {
     
     pub fn get_address(&self) -> &str {
         &self.address
+    }
+    
+    // File watching integration methods for RTSP server
+    pub fn update_source(&mut self, mount_point: &str, config: VideoSourceConfig) -> Result<()> {
+        // Remove existing source if it exists
+        let _ = self.remove_source(mount_point);
+        
+        // Add the updated source
+        self.add_source(config)?;
+        
+        log::info!("Updated RTSP source at mount point: {}", mount_point);
+        Ok(())
+    }
+    
+    pub fn handle_file_event(&mut self, event: &FileSystemEvent) -> Result<()> {
+        let path = event.path();
+        
+        match event {
+            FileSystemEvent::Created(metadata) => {
+                if crate::file_utils::is_video_file(&metadata.path) {
+                    log::info!("New video file detected for RTSP: {}", path.display());
+                    
+                    let container = crate::file_utils::detect_container_format(path)
+                        .unwrap_or(crate::config_types::FileContainer::Mp4);
+                    
+                    let name = path.file_stem()
+                        .and_then(|s| s.to_str())
+                        .unwrap_or("video")
+                        .to_string();
+                    
+                    let config = VideoSourceConfig {
+                        name: name.clone(),
+                        source_type: crate::config_types::VideoSourceType::File {
+                            path: path.display().to_string(),
+                            container,
+                        },
+                        resolution: crate::config_types::Resolution {
+                            width: 1920,
+                            height: 1080,
+                        },
+                        framerate: crate::config_types::Framerate {
+                            numerator: 30,
+                            denominator: 1,
+                        },
+                        format: crate::config_types::VideoFormat::I420,
+                        duration: None,
+                        num_buffers: None,
+                        is_live: false,
+                    };
+                    
+                    self.add_source(config)?;
+                }
+            }
+            FileSystemEvent::Modified(metadata) => {
+                log::info!("Video file modified (RTSP will reload on next client connect): {}", path.display());
+                // RTSP server creates new pipelines on client connect, so no action needed
+            }
+            FileSystemEvent::Deleted(metadata) => {
+                log::info!("Video file deleted from RTSP: {}", path.display());
+                // Find and remove the source with this file path
+                let sources = self.sources.lock()
+                    .map(|s| s.clone())
+                    .unwrap_or_default();
+                
+                for (mount_point, config) in sources {
+                    if let crate::config_types::VideoSourceType::File { path: file_path, .. } = &config.source_type {
+                        if PathBuf::from(file_path) == metadata.path {
+                            self.remove_source(&mount_point)?;
+                            break;
+                        }
+                    }
+                }
+            }
+            _ => {}
+        }
+        
+        Ok(())
+    }
+    
+    pub fn get_source_for_path(&self, path: &PathBuf) -> Option<(String, VideoSourceConfig)> {
+        let sources = self.sources.lock().ok()?;
+        
+        for (mount_point, config) in sources.iter() {
+            if let crate::config_types::VideoSourceType::File { path: file_path, .. } = &config.source_type {
+                if PathBuf::from(file_path) == *path {
+                    return Some((mount_point.clone(), config.clone()));
+                }
+            }
+        }
+        
+        None
     }
 }
 

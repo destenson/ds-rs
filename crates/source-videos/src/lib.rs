@@ -50,6 +50,16 @@ pub fn ensure_initialized() {
     }
 }
 
+/// SourceVideos combines VideoSourceManager with optional RTSP server.
+/// 
+/// IMPORTANT: This struct is for local playback scenarios.
+/// For RTSP-only serving, use RtspServerBuilder directly to avoid creating
+/// unnecessary local playback pipelines.
+/// 
+/// Usage patterns:
+/// - Local playback: Use SourceVideos with VideoSourceManager
+/// - RTSP serving: Use RtspServerBuilder directly without VideoSourceManager
+/// - Mixed mode: Use SourceVideos (but be aware of resource usage)
 pub struct SourceVideos {
     manager: VideoSourceManager,
     rtsp_server: Option<RtspServer>,

@@ -633,6 +633,7 @@ dependencies = [
  "ndarray",
  "once_cell",
  "ort",
+ "serde",
  "thiserror 2.0.16",
 ]
 
@@ -770,6 +771,7 @@ version = "0.1.0"
 dependencies = [
  "cairo-rs",
  "clap",
+ "cpuinfer",
  "ctrlc",
  "env_logger",
  "gstreamer",
@@ -3239,6 +3241,7 @@ dependencies = [
  "clap_complete",
  "colored",
  "comfy-table",
+ "cpuinfer",
  "dirs",
  "env_logger",
  "glob",

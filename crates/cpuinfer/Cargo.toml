@@ -5,15 +5,14 @@ edition.workspace = true
 description.workspace = true
 
 [features]
-default = ["onnx"]  # Default to ONNX, but can be disabled
-onnx = ["dep:ort", "half", "dep:ndarray"]
+default = ["ort"]  # Default to ONNX Runtime, but can be disabled
+ort = ["dep:ort", "half", "dep:ndarray"]
 # opencv-dnn = ["dep:opencv"]
 # tflite = ["dep:tflite"]
 static = []
 capi = []
 half = ["dep:half"]
 # darknet = ["dep:darknet"]
-ort = ["dep:ort"]
 
 [lib]
 name = "gstcpuinfer"
@@ -32,6 +31,7 @@ once_cell = "1.21.3"
 # opencv = { version = "0.95", default-features = false, features = ["dnn", "imgproc"], optional = true }
 ort = { version = "1.16.3", features = ["half"], optional = true }
 # tflite = { version = "0.9", optional = true } # TensorFlow Lite support (lightweight alternative)
+serde = { version = "1.0", features = ["derive"] }
 thiserror = "2.0.16"
 
 

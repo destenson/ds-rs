@@ -9,7 +9,7 @@ default = ["std", "onnx", "cpu_vision", "gst_v1_26"]
 std = []
 onnx = ["ort", "ndarray", "half"]
 cpu_vision = ["nalgebra", "onnx"]
-half = ["dep:half", "ort?/half"]
+half = ["dep:half", "ort?/half", "cpuinfer/half"]
 logging = ["gstreamer/log"]
 serde = ["gstreamer/serde"]
 # gst_v1_16 = ["gstreamer/v1_16"]
@@ -22,7 +22,7 @@ gst_v1_26 = ["gstreamer/v1_26"]
 # opencv = ["dep:opencv"]
 nalgebra = ["dep:nalgebra"]
 ndarray = ["dep:ndarray"]
-ort = ["dep:ort"]
+ort = ["dep:ort", "cpuinfer/ort"]
 imgproc = ["dep:imgproc"]
 gst_cpuinfer = []
 cairo-rs = ["dep:cairo-rs"]
@@ -31,6 +31,7 @@ cairo-rs = ["dep:cairo-rs"]
 [dependencies]
 cairo-rs = { version = "0.21.1", optional = true }
 clap = { version = "4.5", features = ["derive"] }
+cpuinfer = { path = "../cpuinfer", features = ["ort"] }
 ctrlc = "3.4"
 gstreamer.workspace = true
 gstreamer-app.workspace = true

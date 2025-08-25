@@ -30,6 +30,13 @@ Last Updated: 2025-08-24 (Complete codebase scan and update)
 
 ## High Priority 🟡
 
+### Main Application Feature Complete ✅
+- [x] **Timer-based source addition/deletion** (PRP-05 COMPLETED)
+  - Implemented GLib timers matching C reference
+  - Sources automatically added every 10 seconds
+  - Random source deletion after MAX_NUM_SOURCES reached
+  - Application now matches C implementation behavior
+
 ### Code Quality & Production Readiness
 - [x] **Replace critical unwrap() calls in production code** ✅ (PRP-08 PARTIAL)
   - Fixed critical unwrap() calls in video_source.rs (replaced with proper error handling)
@@ -128,6 +135,7 @@ Last Updated: 2025-08-24 (Complete codebase scan and update)
 - PRP-01: Core Infrastructure
 - PRP-02: GStreamer Pipeline
 - PRP-03: Fix Video Playback State Management ✅ (2025-08-24)
+- PRP-05: Main Application Demo ✅ (2025-08-24)
 - PRP-06: Hardware Abstraction
 - PRP-07: Dynamic Video Sources
 - PRP-08: Code Quality & Production Readiness ✅ (2025-08-24)
@@ -146,7 +154,6 @@ Last Updated: 2025-08-24 (Complete codebase scan and update)
 - PRP-22: CPU Tracking Module (stub implementation)
 
 ## Not Started PRPs ⏳
-- PRP-05: Main Application (demo incomplete)
 - PRP-10: Ball Detection Integration
 - PRP-12: Multistream Detection Pipeline
 - PRP-13: Detection Data Export/Streaming
@@ -177,9 +184,13 @@ Last Updated: 2025-08-24 (Complete codebase scan and update)
 - **Critical Bugs**: 0 (ALL RESOLVED ✅)
 - **Build Status**: ✅ SUCCESS
 - **Test Status**: 140/140 tests passing (100% pass rate ✅)
-- **PRP Progress**: 14/33 complete (42%), 4/33 in progress (12%), 15/33 not started (45%)
+- **PRP Progress**: 15/33 complete (45%), 4/33 in progress (12%), 14/33 not started (42%)
 
 ### Recent Achievements
+- **2025-08-24 (Evening)**: 
+  - **Completed PRP-05**: Main Application Demo with timer-based source management
+  - Implemented GLib timers matching C reference implementation
+  - Application now automatically adds/removes sources periodically
 - **2025-08-25**: 
   - Completed PRP-08 Code Quality improvements
   - Fixed workspace configuration for all crates

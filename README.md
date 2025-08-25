@@ -4,6 +4,12 @@ A Rust port of NVIDIA's DeepStream runtime source addition/deletion reference ap
 
 ## Recent Updates
 
+### 2025-08-24: Completed Main Application Demo (PRP-05)
+- ✅ **IMPLEMENTED: Timer-based source management** - Automatically adds sources every 10 seconds
+- ✅ **ADDED: Source deletion timer** - Removes sources randomly after reaching MAX_NUM_SOURCES
+- ✅ **INTEGRATED: GLib timers** - Matching C reference implementation behavior
+- ✅ **COMPLETED: Full runtime demo** - Application now demonstrates dynamic source addition/deletion
+
 ### 2025-08-24: Fixed Video Playback State Management (PRP-03)
 - ✅ **FIXED: Pipeline now properly reaches PLAYING state** - Video window appears and displays content
 - ✅ **Corrected initialization order** - Sources are now added before pipeline transitions to PAUSED

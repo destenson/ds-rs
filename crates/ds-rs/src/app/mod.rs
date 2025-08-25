@@ -377,6 +377,23 @@ impl Application {
         println!("[{:.3}] Now playing: {}", now(), self.initial_uri);
         println!("[{:.3}] Pipeline running... Press Ctrl+C to exit", now());
         
+        // Start the source addition timer
+        let timer_state = std::rc::Rc::new(std::cell::RefCell::new(
+            timers::TimerState::new(
+                self.source_controller.clone(),
+                self.initial_uri.clone(),
+                main_loop.clone(),
+            )
+        ));
+        
+        println!("[{:.3}] Starting source addition timer (interval: {} seconds)", 
+                 now(), config::SOURCE_ADD_INTERVAL_SECS);
+        
+        glib::timeout_add_seconds_local(
+            config::SOURCE_ADD_INTERVAL_SECS as u32,
+            move || timers::add_sources_callback(timer_state.clone())
+        );
+        
         // Run the main loop - this will block until main_loop.quit() is called
         main_loop.run();
         

@@ -100,7 +100,7 @@ fn add_network_simulation_to_pipeline(
 fn setup_bus_watch(pipeline: &gst::Pipeline, simulator: Arc<GStreamerNetworkSimulator>) {
     let bus = pipeline.bus().unwrap();
     
-    bus.add_watch(move |_, msg| {
+    let _bus_watch = bus.add_watch(move |_, msg| {
         match msg.view() {
             gst::MessageView::Error(err) => {
                 println!("ERROR: {} from {:?}", 

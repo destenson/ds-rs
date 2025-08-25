@@ -9,7 +9,6 @@ use source_videos::network::{
 };
 use source_videos::rtsp::factory::create_test_pattern_with_network;
 use gstreamer as gst;
-use gstreamer::prelude::*;
 use gstreamer_rtsp_server as rtsp_server;
 use gstreamer_rtsp_server::prelude::*;
 use std::time::Duration;

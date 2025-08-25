@@ -2,7 +2,7 @@
 
 ## 🔴 ACTIVE: Float16 Model Support Issue
 
-**Status**: ACTIVE - PRP-02 created for fix
+**Status**: ACTIVE - PRP-02 created for fix (may be fixed already, needs verification)
 
 **Problem**:
 - YOLO models using float16 (half precision) format fail to load

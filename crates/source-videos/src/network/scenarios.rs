@@ -12,6 +12,27 @@ pub struct NetworkScenario {
     pub events: BTreeMap<Duration, NetworkConditions>,
 }
 
+/// Helper to create NetworkConditions with defaults for new fields
+fn conditions(
+    packet_loss: f32,
+    latency_ms: u32,
+    bandwidth_kbps: u32,
+    jitter_ms: u32,
+) -> NetworkConditions {
+    NetworkConditions {
+        packet_loss,
+        latency_ms,
+        bandwidth_kbps,
+        connection_dropped: false,
+        jitter_ms,
+        duplicate_probability: 0.0,
+        allow_reordering: true,
+        min_delay_ms: if latency_ms > 0 { latency_ms.saturating_sub(jitter_ms / 2) } else { 0 },
+        max_delay_ms: latency_ms + jitter_ms,
+        delay_probability: if latency_ms > 0 { 100.0 } else { 0.0 },
+    }
+}
+
 impl NetworkScenario {
     /// Create a new network scenario
     pub fn new(name: impl Into<String>, description: impl Into<String>) -> Self {
@@ -65,365 +86,113 @@ impl NetworkScenario {
     /// Create a degrading network scenario
     pub fn degrading() -> Self {
         Self::new("degrading_network", "Network quality degrades over time")
-            .add_event(Duration::ZERO, NetworkConditions {
-                packet_loss: 0.0,
-                latency_ms: 20,
-                bandwidth_kbps: 10000,
-                connection_dropped: false,
-                jitter_ms: 5,
-            })
-            .add_event(Duration::from_secs(60), NetworkConditions {
-                packet_loss: 1.0,
-                latency_ms: 50,
-                bandwidth_kbps: 5000,
-                connection_dropped: false,
-                jitter_ms: 10,
-            })
-            .add_event(Duration::from_secs(180), NetworkConditions {
-                packet_loss: 5.0,
-                latency_ms: 200,
-                bandwidth_kbps: 1000,
-                connection_dropped: false,
-                jitter_ms: 50,
-            })
-            .add_event(Duration::from_secs(240), NetworkConditions {
-                packet_loss: 10.0,
-                latency_ms: 500,
-                bandwidth_kbps: 500,
-                connection_dropped: false,
-                jitter_ms: 100,
-            })
+            .add_event(Duration::ZERO, conditions(0.0, 20, 10000, 5))
+            .add_event(Duration::from_secs(60), conditions(1.0, 50, 5000, 10))
+            .add_event(Duration::from_secs(180), conditions(5.0, 200, 1000, 50))
+            .add_event(Duration::from_secs(240), conditions(10.0, 500, 500, 100))
     }
     
     /// Create a flaky network scenario
     pub fn flaky() -> Self {
         Self::new("flaky_network", "Network with periodic issues")
             .add_event(Duration::ZERO, NetworkConditions::perfect())
-            .add_event(Duration::from_secs(30), NetworkConditions {
-                packet_loss: 20.0,
-                latency_ms: 300,
-                bandwidth_kbps: 500,
-                connection_dropped: false,
-                jitter_ms: 100,
-            })
+            .add_event(Duration::from_secs(30), conditions(20.0, 300, 500, 100))
             .add_event(Duration::from_secs(45), NetworkConditions::perfect())
-            .add_event(Duration::from_secs(90), NetworkConditions {
-                packet_loss: 0.0,
-                latency_ms: 0,
-                bandwidth_kbps: 0,
-                connection_dropped: true,
-                jitter_ms: 0,
-            })
+            .add_event(Duration::from_secs(90), NetworkConditions::disconnected())
             .add_event(Duration::from_secs(95), NetworkConditions::perfect())
-            .add_event(Duration::from_secs(150), NetworkConditions {
-                packet_loss: 15.0,
-                latency_ms: 200,
-                bandwidth_kbps: 1000,
-                connection_dropped: false,
-                jitter_ms: 80,
-            })
+            .add_event(Duration::from_secs(150), conditions(15.0, 200, 1000, 80))
             .add_event(Duration::from_secs(180), NetworkConditions::perfect())
     }
     
     /// Create an intermittent satellite scenario with periodic disconnections
     pub fn intermittent_satellite() -> Self {
         Self::new("intermittent_satellite", "Satellite link with periodic signal loss")
-            .add_event(Duration::ZERO, NetworkConditions {
-                packet_loss: 3.0,
-                latency_ms: 750,
-                bandwidth_kbps: 5000,
-                connection_dropped: false,
-                jitter_ms: 200,
-            })
+            .add_event(Duration::ZERO, conditions(3.0, 750, 5000, 200))
             // First disconnection at 30s
-            .add_event(Duration::from_secs(30), NetworkConditions {
-                packet_loss: 100.0,
-                latency_ms: 0,
-                bandwidth_kbps: 0,
-                connection_dropped: true,
-                jitter_ms: 0,
-            })
+            .add_event(Duration::from_secs(30), NetworkConditions::disconnected())
             // Reconnect at 35s
-            .add_event(Duration::from_secs(35), NetworkConditions {
-                packet_loss: 3.0,
-                latency_ms: 750,
-                bandwidth_kbps: 5000,
-                connection_dropped: false,
-                jitter_ms: 200,
-            })
+            .add_event(Duration::from_secs(35), conditions(3.0, 750, 5000, 200))
             // Second disconnection at 90s
-            .add_event(Duration::from_secs(90), NetworkConditions {
-                packet_loss: 100.0,
-                latency_ms: 0,
-                bandwidth_kbps: 0,
-                connection_dropped: true,
-                jitter_ms: 0,
-            })
+            .add_event(Duration::from_secs(90), NetworkConditions::disconnected())
             // Reconnect at 100s
-            .add_event(Duration::from_secs(100), NetworkConditions {
-                packet_loss: 3.0,
-                latency_ms: 750,
-                bandwidth_kbps: 5000,
-                connection_dropped: false,
-                jitter_ms: 200,
-            })
+            .add_event(Duration::from_secs(100), conditions(3.0, 750, 5000, 200))
             // Signal degradation at 150s
-            .add_event(Duration::from_secs(150), NetworkConditions {
-                packet_loss: 20.0,
-                latency_ms: 900,
-                bandwidth_kbps: 1000,
-                connection_dropped: false,
-                jitter_ms: 300,
-            })
+            .add_event(Duration::from_secs(150), conditions(20.0, 900, 1000, 300))
             // Recovery at 180s
-            .add_event(Duration::from_secs(180), NetworkConditions {
-                packet_loss: 3.0,
-                latency_ms: 750,
-                bandwidth_kbps: 5000,
-                connection_dropped: false,
-                jitter_ms: 200,
-            })
+            .add_event(Duration::from_secs(180), conditions(3.0, 750, 5000, 200))
     }
     
     /// Create a noisy radio link scenario with high interference
     pub fn noisy_radio() -> Self {
         Self::new("noisy_radio", "Radio link with varying interference")
-            .add_event(Duration::ZERO, NetworkConditions {
-                packet_loss: 5.0,
-                latency_ms: 50,
-                bandwidth_kbps: 2000,
-                connection_dropped: false,
-                jitter_ms: 30,
-            })
+            .add_event(Duration::ZERO, conditions(5.0, 50, 2000, 30))
             // High interference period
-            .add_event(Duration::from_secs(20), NetworkConditions {
-                packet_loss: 25.0,
-                latency_ms: 150,
-                bandwidth_kbps: 500,
-                connection_dropped: false,
-                jitter_ms: 200,
-            })
+            .add_event(Duration::from_secs(20), conditions(25.0, 150, 500, 200))
             // Moderate interference
-            .add_event(Duration::from_secs(60), NetworkConditions {
-                packet_loss: 15.0,
-                latency_ms: 80,
-                bandwidth_kbps: 1000,
-                connection_dropped: false,
-                jitter_ms: 150,
-            })
+            .add_event(Duration::from_secs(60), conditions(15.0, 80, 1000, 150))
             // Clear signal
-            .add_event(Duration::from_secs(120), NetworkConditions {
-                packet_loss: 2.0,
-                latency_ms: 40,
-                bandwidth_kbps: 3000,
-                connection_dropped: false,
-                jitter_ms: 20,
-            })
+            .add_event(Duration::from_secs(120), conditions(2.0, 40, 3000, 20))
             // Interference returns
-            .add_event(Duration::from_secs(180), NetworkConditions {
-                packet_loss: 20.0,
-                latency_ms: 100,
-                bandwidth_kbps: 800,
-                connection_dropped: false,
-                jitter_ms: 180,
-            })
+            .add_event(Duration::from_secs(180), conditions(20.0, 100, 800, 180))
     }
     
     /// Create a drone urban flight scenario with building obstructions
     pub fn drone_urban_flight() -> Self {
         Self::new("drone_urban_flight", "Drone flying through urban environment with buildings")
             // Clear line of sight at start
-            .add_event(Duration::ZERO, NetworkConditions {
-                packet_loss: 2.0,
-                latency_ms: 20,
-                bandwidth_kbps: 2000,
-                connection_dropped: false,
-                jitter_ms: 10,
-            })
+            .add_event(Duration::ZERO, conditions(2.0, 20, 2000, 10))
             // Entering urban canyon
-            .add_event(Duration::from_secs(10), NetworkConditions {
-                packet_loss: 15.0,
-                latency_ms: 40,
-                bandwidth_kbps: 1200,
-                connection_dropped: false,
-                jitter_ms: 80,
-            })
+            .add_event(Duration::from_secs(10), conditions(15.0, 40, 1200, 80))
             // Behind building - severe degradation
-            .add_event(Duration::from_secs(20), NetworkConditions {
-                packet_loss: 50.0,
-                latency_ms: 100,
-                bandwidth_kbps: 200,
-                connection_dropped: false,
-                jitter_ms: 200,
-            })
+            .add_event(Duration::from_secs(20), conditions(50.0, 100, 200, 200))
             // Complete signal loss behind large building
-            .add_event(Duration::from_secs(25), NetworkConditions {
-                packet_loss: 100.0,
-                latency_ms: 0,
-                bandwidth_kbps: 0,
-                connection_dropped: true,
-                jitter_ms: 0,
-            })
+            .add_event(Duration::from_secs(25), NetworkConditions::disconnected())
             // Emerging from building shadow
-            .add_event(Duration::from_secs(30), NetworkConditions {
-                packet_loss: 30.0,
-                latency_ms: 60,
-                bandwidth_kbps: 500,
-                connection_dropped: false,
-                jitter_ms: 150,
-            })
+            .add_event(Duration::from_secs(30), conditions(30.0, 60, 500, 150))
             // Between buildings - multipath interference
-            .add_event(Duration::from_secs(45), NetworkConditions {
-                packet_loss: 20.0,
-                latency_ms: 40,
-                bandwidth_kbps: 800,
-                connection_dropped: false,
-                jitter_ms: 120,
-            })
+            .add_event(Duration::from_secs(45), conditions(20.0, 40, 800, 120))
             // Flying low between buildings - reflections
-            .add_event(Duration::from_secs(60), NetworkConditions {
-                packet_loss: 25.0,
-                latency_ms: 50,
-                bandwidth_kbps: 600,
-                connection_dropped: false,
-                jitter_ms: 180,
-            })
+            .add_event(Duration::from_secs(60), conditions(25.0, 50, 600, 180))
             // Gaining altitude - improving signal
-            .add_event(Duration::from_secs(90), NetworkConditions {
-                packet_loss: 8.0,
-                latency_ms: 30,
-                bandwidth_kbps: 1500,
-                connection_dropped: false,
-                jitter_ms: 40,
-            })
+            .add_event(Duration::from_secs(90), conditions(8.0, 30, 1500, 40))
             // Clear line of sight above buildings
-            .add_event(Duration::from_secs(120), NetworkConditions {
-                packet_loss: 1.0,
-                latency_ms: 15,
-                bandwidth_kbps: 2500,
-                connection_dropped: false,
-                jitter_ms: 5,
-            })
+            .add_event(Duration::from_secs(120), conditions(1.0, 15, 2500, 5))
             // Descending back into urban area
-            .add_event(Duration::from_secs(150), NetworkConditions {
-                packet_loss: 20.0,
-                latency_ms: 40,
-                bandwidth_kbps: 800,
-                connection_dropped: false,
-                jitter_ms: 120,
-            })
+            .add_event(Duration::from_secs(150), conditions(20.0, 40, 800, 120))
     }
     
     /// Create a drone mountain flight scenario with terrain masking
     pub fn drone_mountain_flight() -> Self {
         Self::new("drone_mountain_flight", "Drone flying in mountainous/open terrain")
             // Takeoff - good signal
-            .add_event(Duration::ZERO, NetworkConditions {
-                packet_loss: 1.0,
-                latency_ms: 30,
-                bandwidth_kbps: 2000,
-                connection_dropped: false,
-                jitter_ms: 10,
-            })
+            .add_event(Duration::ZERO, conditions(1.0, 30, 2000, 10))
             // Flying away - distance effects
-            .add_event(Duration::from_secs(30), NetworkConditions {
-                packet_loss: 3.0,
-                latency_ms: 50,
-                bandwidth_kbps: 1800,
-                connection_dropped: false,
-                jitter_ms: 20,
-            })
+            .add_event(Duration::from_secs(30), conditions(3.0, 50, 1800, 20))
             // Behind first ridge - partial obstruction
-            .add_event(Duration::from_secs(60), NetworkConditions {
-                packet_loss: 15.0,
-                latency_ms: 70,
-                bandwidth_kbps: 1000,
-                connection_dropped: false,
-                jitter_ms: 60,
-            })
+            .add_event(Duration::from_secs(60), conditions(15.0, 70, 1000, 60))
             // Deep valley - terrain masking
-            .add_event(Duration::from_secs(90), NetworkConditions {
-                packet_loss: 40.0,
-                latency_ms: 100,
-                bandwidth_kbps: 300,
-                connection_dropped: false,
-                jitter_ms: 150,
-            })
+            .add_event(Duration::from_secs(90), conditions(40.0, 100, 300, 150))
             // Complete terrain masking
-            .add_event(Duration::from_secs(105), NetworkConditions {
-                packet_loss: 100.0,
-                latency_ms: 0,
-                bandwidth_kbps: 0,
-                connection_dropped: true,
-                jitter_ms: 0,
-            })
+            .add_event(Duration::from_secs(105), NetworkConditions::disconnected())
             // Climbing out of valley
-            .add_event(Duration::from_secs(120), NetworkConditions {
-                packet_loss: 25.0,
-                latency_ms: 80,
-                bandwidth_kbps: 800,
-                connection_dropped: false,
-                jitter_ms: 100,
-            })
+            .add_event(Duration::from_secs(120), conditions(25.0, 80, 800, 100))
             // High altitude - good signal but distance effects
-            .add_event(Duration::from_secs(150), NetworkConditions {
-                packet_loss: 5.0,
-                latency_ms: 60,
-                bandwidth_kbps: 1500,
-                connection_dropped: false,
-                jitter_ms: 30,
-            })
+            .add_event(Duration::from_secs(150), conditions(5.0, 60, 1500, 30))
             // Maximum range - weak signal
-            .add_event(Duration::from_secs(180), NetworkConditions {
-                packet_loss: 12.0,
-                latency_ms: 90,
-                bandwidth_kbps: 600,
-                connection_dropped: false,
-                jitter_ms: 80,
-            })
+            .add_event(Duration::from_secs(180), conditions(12.0, 90, 600, 80))
             // Returning - signal improving
-            .add_event(Duration::from_secs(240), NetworkConditions {
-                packet_loss: 4.0,
-                latency_ms: 45,
-                bandwidth_kbps: 1700,
-                connection_dropped: false,
-                jitter_ms: 25,
-            })
+            .add_event(Duration::from_secs(240), conditions(4.0, 45, 1700, 25))
             // Close range - excellent signal
-            .add_event(Duration::from_secs(300), NetworkConditions {
-                packet_loss: 0.5,
-                latency_ms: 25,
-                bandwidth_kbps: 2200,
-                connection_dropped: false,
-                jitter_ms: 5,
-            })
+            .add_event(Duration::from_secs(300), conditions(0.5, 25, 2200, 5))
     }
     
     /// Create a congestion scenario
     pub fn congestion() -> Self {
         Self::new("congestion", "Network congestion during peak hours")
             .add_event(Duration::ZERO, NetworkConditions::perfect())
-            .add_event(Duration::from_secs(60), NetworkConditions {
-                packet_loss: 2.0,
-                latency_ms: 100,
-                bandwidth_kbps: 3000,
-                connection_dropped: false,
-                jitter_ms: 30,
-            })
-            .add_event(Duration::from_secs(180), NetworkConditions {
-                packet_loss: 5.0,
-                latency_ms: 250,
-                bandwidth_kbps: 1000,
-                connection_dropped: false,
-                jitter_ms: 80,
-            })
-            .add_event(Duration::from_secs(300), NetworkConditions {
-                packet_loss: 3.0,
-                latency_ms: 150,
-                bandwidth_kbps: 2000,
-                connection_dropped: false,
-                jitter_ms: 50,
-            })
+            .add_event(Duration::from_secs(60), conditions(2.0, 100, 3000, 30))
+            .add_event(Duration::from_secs(180), conditions(5.0, 250, 1000, 80))
+            .add_event(Duration::from_secs(300), conditions(3.0, 150, 2000, 50))
             .add_event(Duration::from_secs(420), NetworkConditions::perfect())
     }
 }
@@ -438,6 +207,11 @@ fn interpolate_conditions(from: &NetworkConditions, to: &NetworkConditions, prog
         bandwidth_kbps: (from.bandwidth_kbps as f32 + (to.bandwidth_kbps as f32 - from.bandwidth_kbps as f32) * progress) as u32,
         jitter_ms: (from.jitter_ms as f32 + (to.jitter_ms as f32 - from.jitter_ms as f32) * progress) as u32,
         connection_dropped: if progress > 0.5 { to.connection_dropped } else { from.connection_dropped },
+        duplicate_probability: from.duplicate_probability + (to.duplicate_probability - from.duplicate_probability) * progress,
+        allow_reordering: if progress > 0.5 { to.allow_reordering } else { from.allow_reordering },
+        min_delay_ms: (from.min_delay_ms as f32 + (to.min_delay_ms as f32 - from.min_delay_ms as f32) * progress) as u32,
+        max_delay_ms: (from.max_delay_ms as f32 + (to.max_delay_ms as f32 - from.max_delay_ms as f32) * progress) as u32,
+        delay_probability: from.delay_probability + (to.delay_probability - from.delay_probability) * progress,
     }
 }
 
@@ -513,6 +287,20 @@ pub struct ScenarioConditions {
     pub jitter_ms: u32,
     #[serde(default)]
     pub connection_dropped: bool,
+    #[serde(default)]
+    pub duplicate_probability: f32,
+    #[serde(default = "default_allow_reordering")]
+    pub allow_reordering: bool,
+    #[serde(default)]
+    pub min_delay_ms: u32,
+    #[serde(default)]
+    pub max_delay_ms: u32,
+    #[serde(default)]
+    pub delay_probability: f32,
+}
+
+fn default_allow_reordering() -> bool {
+    true
 }
 
 impl ScenarioConfig {
@@ -530,6 +318,11 @@ impl ScenarioConfig {
                 bandwidth_kbps: event.conditions.bandwidth_kbps,
                 jitter_ms: event.conditions.jitter_ms,
                 connection_dropped: event.conditions.connection_dropped,
+                duplicate_probability: event.conditions.duplicate_probability,
+                allow_reordering: event.conditions.allow_reordering,
+                min_delay_ms: event.conditions.min_delay_ms,
+                max_delay_ms: event.conditions.max_delay_ms,
+                delay_probability: event.conditions.delay_probability,
             };
             scenario = scenario.add_event(time, conditions);
         }
@@ -594,6 +387,11 @@ mod tests {
             bandwidth_kbps: 10000,
             jitter_ms: 0,
             connection_dropped: false,
+            duplicate_probability: 0.0,
+            allow_reordering: false,
+            min_delay_ms: 0,
+            max_delay_ms: 0,
+            delay_probability: 0.0,
         };
         
         let to = NetworkConditions {
@@ -602,12 +400,19 @@ mod tests {
             bandwidth_kbps: 1000,
             jitter_ms: 50,
             connection_dropped: false,
+            duplicate_probability: 2.0,
+            allow_reordering: true,
+            min_delay_ms: 50,
+            max_delay_ms: 150,
+            delay_probability: 100.0,
         };
         
         let mid = interpolate_conditions(&from, &to, 0.5);
         assert_eq!(mid.packet_loss, 5.0);
         assert_eq!(mid.latency_ms, 50);
         assert_eq!(mid.bandwidth_kbps, 5500);
+        assert_eq!(mid.duplicate_probability, 1.0);
+        assert_eq!(mid.delay_probability, 50.0);
     }
     
     #[test]

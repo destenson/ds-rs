@@ -149,6 +149,9 @@ enum Commands {
         #[arg(long = "network-profile", help = "Apply network profile (perfect, 3g, 4g, 5g, wifi, public, satellite, broadband, poor)")]
         network_profile: Option<String>,
         
+        #[arg(long = "network-scenario", help = "Apply dynamic network scenario (degrading, flaky, congestion, intermittent-satellite, noisy-radio, drone-urban, drone-mountain)")]
+        network_scenario: Option<String>,
+        
         #[arg(long = "packet-loss", help = "Packet loss percentage (0-100)")]
         packet_loss: Option<f32>,
         
@@ -396,6 +399,7 @@ async fn main() -> Result<()> {
             max_loops,
             seamless_loop,
             network_profile,
+            network_scenario,
             packet_loss,
             latency_ms,
             bandwidth_kbps,
@@ -425,6 +429,7 @@ async fn main() -> Result<()> {
                 max_loops,
                 seamless_loop,
                 network_profile,
+                network_scenario,
                 packet_loss,
                 latency_ms,
                 bandwidth_kbps,
@@ -518,6 +523,7 @@ async fn serve_command(
     max_loops: Option<u32>,
     seamless_loop: bool,
     network_profile: Option<String>,
+    network_scenario: Option<String>,
     packet_loss: Option<f32>,
     latency_ms: Option<u32>,
     bandwidth_kbps: Option<u32>,
@@ -526,7 +532,7 @@ async fn serve_command(
     per_source_network: Vec<String>,
 ) -> Result<()> {
     use source_videos::{DirectoryConfig, FileListConfig, FilterConfig, DirectoryScanner, RtspServerBuilder, WatcherManager, LoopConfig, create_looping_source, VideoSourceManager};
-    use source_videos::network::{NetworkProfile, NetworkConditions, GStreamerNetworkSimulator, NetworkController};
+    use source_videos::network::{NetworkProfile, NetworkConditions, GStreamerNetworkSimulator, NetworkController, NetworkScenario, ScenarioPlayer};
     use std::time::Duration;
     use std::str::FromStr;
     
@@ -553,6 +559,11 @@ async fn serve_command(
             bandwidth_kbps: bandwidth_kbps.unwrap_or(0),
             jitter_ms: jitter_ms.unwrap_or(0),
             connection_dropped: false,
+            duplicate_probability: 0.0,
+            allow_reordering: true,
+            min_delay_ms: latency_ms.unwrap_or(0).saturating_sub(jitter_ms.unwrap_or(0) / 2),
+            max_delay_ms: latency_ms.unwrap_or(0) + jitter_ms.unwrap_or(0),
+            delay_probability: if latency_ms.unwrap_or(0) > 0 { 100.0 } else { 0.0 },
         };
         println!("Applying custom network conditions: packet_loss={}%, latency={}ms, bandwidth={}kbps, jitter={}ms",
                  conditions.packet_loss, conditions.latency_ms, conditions.bandwidth_kbps, conditions.jitter_ms);
@@ -780,6 +791,31 @@ async fn serve_command(
         }
     }
     
+    // Set up network scenario player if configured
+    let mut scenario_player = if let Some(scenario_name) = network_scenario {
+        let scenario = match scenario_name.to_lowercase().as_str() {
+            "degrading" => NetworkScenario::degrading(),
+            "flaky" => NetworkScenario::flaky(),
+            "congestion" => NetworkScenario::congestion(),
+            "intermittent-satellite" | "intermittent" => NetworkScenario::intermittent_satellite(),
+            "noisy-radio" | "noisy" | "radio" => NetworkScenario::noisy_radio(),
+            "drone-urban" | "drone" | "urban" => NetworkScenario::drone_urban_flight(),
+            "drone-mountain" | "mountain" => NetworkScenario::drone_mountain_flight(),
+            _ => {
+                eprintln!("Unknown network scenario '{}', using degrading", scenario_name);
+                NetworkScenario::degrading()
+            }
+        };
+        
+        println!("Starting network scenario: {} - {}", scenario.name, scenario.description);
+        println!("Scenario duration: {:?}", scenario.duration);
+        
+        let network_sim = Box::new(GStreamerNetworkSimulator::new()) as Box<dyn NetworkController>;
+        Some(ScenarioPlayer::new(scenario, network_sim))
+    } else {
+        None
+    };
+    
     // Set up periodic network drops if configured
     let mut network_simulator = if let Some((period, duration)) = network_drop_config {
         let sim = GStreamerNetworkSimulator::new();
@@ -798,6 +834,14 @@ async fn serve_command(
         while std::time::Instant::now() < end_time {
             // Iterate the GLib main context
             main_context.iteration(false);
+            
+            // Update network scenario if active
+            if let Some(ref player) = scenario_player {
+                player.update();
+                if player.is_complete() {
+                    println!("Network scenario completed ({}% progress)", player.progress());
+                }
+            }
             
             // Handle periodic network drops
             if let Some((ref mut sim, period, drop_duration, ref mut last_drop)) = network_simulator {
@@ -843,6 +887,14 @@ async fn serve_command(
                             if let Err(e) = server.handle_file_event(&event) {
                                 eprintln!("Error handling file event: {}", e);
                             }
+                        }
+                    }
+                    
+                    // Update network scenario if active
+                    if let Some(ref player) = scenario_player {
+                        player.update();
+                        if player.is_complete() {
+                            println!("Network scenario completed ({}% progress)", player.progress());
                         }
                     }
                     

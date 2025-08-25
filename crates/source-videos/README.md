@@ -582,13 +582,31 @@ source-videos monitor -d /dev/video-assets \
   --list-streams > video-changes.json
 ```
 
-#### Network Testing
+#### Advanced Network Testing (PRP-43)
 ```bash
-# Test streaming under poor network conditions
-source-videos simulate --network-profile poor \
-  -d /test-videos \
-  --duration 600 \
-  --metrics
+# Test with GStreamer netsim element for realistic simulation
+source-videos serve -d /test-videos \
+  --network-profile noisy-radio  # Simulates 15% loss, duplicates, reordering
+
+# Dynamic network scenarios with time-based changes
+source-videos serve -d /test-videos \
+  --network-scenario drone-urban  # Simulates urban drone flight with building obstruction
+
+# Available scenarios:
+# - degrading: Network quality degrades over time
+# - flaky: Periodic connection issues
+# - intermittent-satellite: Satellite with periodic drops
+# - noisy-radio: High interference radio link
+# - drone-urban: Urban drone flight with multipath
+# - drone-mountain: Mountain terrain with masking
+# - congestion: Peak hour network congestion
+
+# Custom network conditions with netsim properties
+source-videos serve -d /test-videos \
+  --packet-loss 5.0 \
+  --latency 100 \
+  --jitter 20 \
+  --bandwidth 1000  # Now uses netsim for bandwidth throttling
 ```
 
 ### Code Examples
@@ -620,7 +638,11 @@ The crate follows a modular architecture:
 - **FileUtils** - Video file detection and mount point generation
 - **FileSource** - Direct file-based video source implementation
 - **Watch** - File system monitoring and auto-reload functionality
-- **Network** - Network simulation and testing infrastructure
+- **Network** - Advanced network simulation with GStreamer netsim element
+  - Packet loss, duplication, reordering simulation
+  - Dynamic scenarios with time-based progression
+  - Bandwidth throttling with token bucket algorithm
+  - Support for drone, satellite, and mobile network profiles
 - **API** - REST API for remote control and automation
 - **Runtime** - Dynamic configuration and signal handling
 

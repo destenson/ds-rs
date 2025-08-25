@@ -86,6 +86,11 @@ pub async fn set_conditions(
         bandwidth_kbps: req.bandwidth_kbps.unwrap_or(0),
         jitter_ms: req.jitter_ms.unwrap_or(0),
         connection_dropped: false,
+        duplicate_probability: 0.0,
+        allow_reordering: true,
+        min_delay_ms: 0,
+        max_delay_ms: req.latency_ms.unwrap_or(0) + req.jitter_ms.unwrap_or(0),
+        delay_probability: if req.latency_ms.unwrap_or(0) > 0 { 100.0 } else { 0.0 },
     };
     
     state.apply_custom_network_conditions(conditions).await?;

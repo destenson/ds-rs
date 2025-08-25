@@ -289,6 +289,11 @@ impl RtspServerBuilder {
             bandwidth_kbps,
             jitter_ms,
             connection_dropped: false,
+            duplicate_probability: 0.0,
+            allow_reordering: true,
+            min_delay_ms: latency_ms.saturating_sub(jitter_ms / 2),
+            max_delay_ms: latency_ms + jitter_ms,
+            delay_probability: if latency_ms > 0 { 100.0 } else { 0.0 },
         });
         self
     }

@@ -43,6 +43,11 @@ impl NetworkProfile {
                 bandwidth_kbps: 0, // unlimited
                 connection_dropped: false,
                 jitter_ms: 0,
+                duplicate_probability: 0.0,
+                allow_reordering: false,
+                min_delay_ms: 0,
+                max_delay_ms: 0,
+                delay_probability: 0.0,
             },
             
             NetworkProfile::Mobile3G => NetworkConditions {
@@ -51,6 +56,11 @@ impl NetworkProfile {
                 bandwidth_kbps: 2000, // 2 Mbps
                 connection_dropped: false,
                 jitter_ms: 30,
+                duplicate_probability: 0.5,
+                allow_reordering: true,
+                min_delay_ms: 120,
+                max_delay_ms: 180,
+                delay_probability: 100.0,
             },
             
             NetworkProfile::Mobile4G => NetworkConditions {
@@ -59,6 +69,11 @@ impl NetworkProfile {
                 bandwidth_kbps: 10000, // 10 Mbps
                 connection_dropped: false,
                 jitter_ms: 10,
+                duplicate_probability: 0.2,
+                allow_reordering: true,
+                min_delay_ms: 40,
+                max_delay_ms: 60,
+                delay_probability: 100.0,
             },
             
             NetworkProfile::Mobile5G => NetworkConditions {
@@ -67,6 +82,11 @@ impl NetworkProfile {
                 bandwidth_kbps: 100000, // 100 Mbps
                 connection_dropped: false,
                 jitter_ms: 2,
+                duplicate_probability: 0.05,
+                allow_reordering: false,
+                min_delay_ms: 8,
+                max_delay_ms: 12,
+                delay_probability: 100.0,
             },
             
             NetworkProfile::WiFiHome => NetworkConditions {
@@ -75,6 +95,11 @@ impl NetworkProfile {
                 bandwidth_kbps: 50000, // 50 Mbps
                 connection_dropped: false,
                 jitter_ms: 2,
+                duplicate_probability: 0.1,
+                allow_reordering: false,
+                min_delay_ms: 3,
+                max_delay_ms: 7,
+                delay_probability: 100.0,
             },
             
             NetworkProfile::WiFiPublic => NetworkConditions {
@@ -83,6 +108,11 @@ impl NetworkProfile {
                 bandwidth_kbps: 5000, // 5 Mbps
                 connection_dropped: false,
                 jitter_ms: 50,
+                duplicate_probability: 1.0,
+                allow_reordering: true,
+                min_delay_ms: 50,
+                max_delay_ms: 150,
+                delay_probability: 100.0,
             },
             
             NetworkProfile::Satellite => NetworkConditions {
@@ -91,6 +121,11 @@ impl NetworkProfile {
                 bandwidth_kbps: 25000, // 25 Mbps
                 connection_dropped: false,
                 jitter_ms: 100,
+                duplicate_probability: 0.2,
+                allow_reordering: false,  // Satellite links maintain order
+                min_delay_ms: 550,
+                max_delay_ms: 700,
+                delay_probability: 100.0,
             },
             
             NetworkProfile::Broadband => NetworkConditions {
@@ -99,6 +134,11 @@ impl NetworkProfile {
                 bandwidth_kbps: 100000, // 100 Mbps
                 connection_dropped: false,
                 jitter_ms: 5,
+                duplicate_probability: 0.05,
+                allow_reordering: false,
+                min_delay_ms: 15,
+                max_delay_ms: 25,
+                delay_probability: 100.0,
             },
             
             NetworkProfile::Poor => NetworkConditions {
@@ -107,6 +147,11 @@ impl NetworkProfile {
                 bandwidth_kbps: 500, // 500 kbps
                 connection_dropped: false,
                 jitter_ms: 200,
+                duplicate_probability: 2.0,
+                allow_reordering: true,
+                min_delay_ms: 300,
+                max_delay_ms: 700,
+                delay_probability: 100.0,
             },
             
             NetworkProfile::NoisyRadio => NetworkConditions {
@@ -115,6 +160,11 @@ impl NetworkProfile {
                 bandwidth_kbps: 1000, // 1 Mbps limited bandwidth
                 connection_dropped: false,
                 jitter_ms: 150,     // High jitter from signal variations
+                duplicate_probability: 3.0,  // Radio interference can cause duplicates
+                allow_reordering: true,  // Signal reflections cause reordering
+                min_delay_ms: 20,
+                max_delay_ms: 230,
+                delay_probability: 100.0,
             },
             
             NetworkProfile::IntermittentSatellite => NetworkConditions {
@@ -123,6 +173,11 @@ impl NetworkProfile {
                 bandwidth_kbps: 5000, // 5 Mbps when connected
                 connection_dropped: false, // Will be toggled periodically
                 jitter_ms: 200,     // High jitter from atmospheric conditions
+                duplicate_probability: 0.5,
+                allow_reordering: false,
+                min_delay_ms: 650,
+                max_delay_ms: 950,
+                delay_probability: 100.0,
             },
             
             NetworkProfile::DroneUrban => NetworkConditions {
@@ -131,6 +186,11 @@ impl NetworkProfile {
                 bandwidth_kbps: 800, // Limited bandwidth on UHF/VHF
                 connection_dropped: false,
                 jitter_ms: 120,     // Variable due to multipath reflections
+                duplicate_probability: 5.0,  // Multipath reflections cause duplicates
+                allow_reordering: true,  // Building reflections cause severe reordering
+                min_delay_ms: 10,
+                max_delay_ms: 160,
+                delay_probability: 100.0,
             },
             
             NetworkProfile::DroneMountain => NetworkConditions {
@@ -139,6 +199,11 @@ impl NetworkProfile {
                 bandwidth_kbps: 1500, // Better bandwidth in clear air
                 connection_dropped: false,
                 jitter_ms: 30,      // More stable than urban
+                duplicate_probability: 1.0,
+                allow_reordering: true,
+                min_delay_ms: 45,
+                max_delay_ms: 90,
+                delay_probability: 100.0,
             },
             
             NetworkProfile::Custom => NetworkConditions::default(),

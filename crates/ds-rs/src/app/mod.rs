@@ -288,8 +288,9 @@ impl Application {
         #[cfg(unix)]
         {
             let main_loop_signal = main_loop.clone();
+            // SIGINT is typically signal number 2 on Unix systems
             let _signal_handler = glib::unix_signal_add(
-                glib::Signal::SIGINT,
+                2, // SIGINT signal number
                 move || {
                     println!("\nReceived interrupt signal, shutting down...");
                     main_loop_signal.quit();

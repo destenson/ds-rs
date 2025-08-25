@@ -1,8 +1,17 @@
 # TODO List
 
-Last Updated: 2025-01-25 (Post Comprehensive TODO Scan)
+Last Updated: 2025-01-25 (Post PRP-35 Completion)
 
 ## Recent Achievements ✅
+- **COMPLETED**: PRP-35 Directory and File List Support (2025-01-25)
+  - ✅ DirectoryScanner with recursive traversal
+  - ✅ FileVideoSource with uridecodebin auto-detection
+  - ✅ Filter system for include/exclude patterns  
+  - ✅ Mount point generation from file paths
+  - ✅ CLI support for directory and file list serving
+  - ✅ 13/13 directory serving tests passing
+  - ✅ Examples: directory_server.rs and batch_file_server.rs
+
 - **COMPLETED**: PRP-12 Multi-stream Detection Pipeline (2025-01-25)
   - ✅ MultiStreamManager with fault tolerance integration
   - ✅ Pipeline pool for concurrent processing
@@ -39,9 +48,9 @@ Last Updated: 2025-01-25 (Post Comprehensive TODO Scan)
 
 ## High Priority TODOs 🟠
 
-### 4. Source-Videos CLI Expansion (NEW)
+### 4. Source-Videos CLI Expansion
 **PRPs Created**: 35-40
-- [ ] **PRP-35**: Directory and file list support
+- [x] **PRP-35**: Directory and file list support - **COMPLETED**
 - [ ] **PRP-36**: File watching and auto-reload
 - [ ] **PRP-37**: Enhanced configuration system
 - [ ] **PRP-38**: Advanced CLI options
@@ -149,16 +158,16 @@ Last Updated: 2025-01-25 (Post Comprehensive TODO Scan)
 - **multistream**: 12/12 passing (100%) - NEW!
 
 ### Implementation Status
-- **PRPs Completed**: 19/40 (including PRP-12)
-- **Working Examples**: 6/7
+- **PRPs Completed**: 20/40 (including PRP-35)
+- **Working Examples**: 7/8 (including directory/file serving)
 - **Crates Building**: 4/4
 
 ## Next Sprint Focus 🎯
 
-1. **Immediate**: Start PRP-35 (Directory/File List Support)
-2. **Week 1-2**: Core file serving features (PRP-35, 38 partial)
-3. **Week 3-4**: File watching + network sim integration (PRP-36, 40)
-4. **Week 5-6**: Config system + REPL (PRP-37, 39)
+1. **Immediate**: Start PRP-36 (File Watching and Auto-reload)
+2. **Week 1-2**: File system monitoring with inotify/FSEvents (PRP-36)
+3. **Week 3-4**: Enhanced config system + CLI improvements (PRP-37, 38) 
+4. **Week 5-6**: REPL mode + network sim integration (PRP-39, 40)
 
 ## Development Guidelines 📝
 

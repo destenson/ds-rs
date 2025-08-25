@@ -4,6 +4,15 @@ A Rust port of NVIDIA's DeepStream runtime source addition/deletion reference ap
 
 ## Recent Updates
 
+### 2025-01-25: Directory and File List Support Complete (PRP-35)
+- ✅ **COMPLETED: Full directory serving** - Serve all video files from directories as RTSP streams
+- ✅ **ADDED: Recursive directory traversal** - Process nested video collections with configurable depth
+- ✅ **IMPLEMENTED: File list support** - Accept explicit lists of files via CLI or config
+- ✅ **CREATED: Auto-detection of formats** - uridecodebin automatically handles mp4, mkv, avi, webm
+- ✅ **BUILT: Mount point generation** - Predictable RTSP URLs from file paths with URL encoding
+- ✅ **ADDED: Filter system** - Include/exclude patterns and extension filtering
+- ✅ **CREATED: CLI integration** - Complete --directory, --files, --recursive, --include/--exclude flags
+
 ### 2025-08-24: Fault-Tolerant Source Controller Integration (PRP-12 Integration)
 - ✅ **INTEGRATED: Error recovery with SourceController** - Automatic reconnection for failed sources
 - ✅ **ADDED: FaultTolerantSourceController wrapper** - Simple, robust fault tolerance without complexity

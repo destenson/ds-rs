@@ -1,11 +1,17 @@
 # TODO List
 
-Last Updated: 2025-08-24 (PRP-08 Code Quality improvements completed)
+Last Updated: 2025-08-25 (Complete codebase scan for TODO items)
 
 ## Critical Priority 🔴
 
 ### Active Critical Issues
 ✅ **ALL CRITICAL ISSUES RESOLVED** - Application is fully functional!
+
+### Known Issues (Non-Critical)
+- [ ] **Float16 Model Support** (See BUGS.md)
+  - YOLO models using float16 format fail to load
+  - Workaround: Use float32 models
+  - PRP-02 created for proper fix
 
 ### Recently Fixed (2025-08-24)
 - [x] **Fixed video playback state management** ✅ (PRP-03 COMPLETED)
@@ -30,20 +36,27 @@ Last Updated: 2025-08-24 (PRP-08 Code Quality improvements completed)
   - Remaining unwrap() calls are non-critical (mostly in test code or GStreamer init)
   - Note: 100+ clippy warnings remain for code style (uninlined format args, etc.)
 
-- [x] **Complete TODO comments in code** ✅ (PARTIAL)
+- [ ] **Complete TODO comments in code** (3 remaining)
   - [x] `Cargo.toml:3-4`: Fixed - all crates now use workspace version and edition
+  - [ ] `source-videos/Cargo.toml:20`: Remove tokio dependency (async is ok though)
+  - [ ] `backend/cpu_vision/cpudetector/imp.rs:154`: Attach custom metadata to buffer
+  - [ ] `rendering/deepstream_renderer.rs:190,222`: Implement actual DeepStream metadata processing
   - `Cargo.toml:52`, `source-videos/Cargo.toml:20`: Remove tokio dependency
   - `tests/cpu_backend_tests.rs:343`: Test with actual ONNX model file
   - `rendering/deepstream_renderer.rs:190,222`: Implement DeepStream metadata processing
   - `backend/cpu_vision/cpudetector/imp.rs:154`: Attach custom metadata to buffer
 
-- [ ] **Handle unimplemented!() calls**
-  - `backend/cpu_vision/cpudetector/imp.rs`: 2 occurrences in match statements
-  - Replace with proper error handling
+- [ ] **Handle unimplemented!() calls** (4 occurrences)
+  - `backend/cpu_vision/cpudetector/imp.rs:274,288`: 2 occurrences in match statements
+  - `cpuinfer/src/cpudetector/imp.rs:258,272`: 2 occurrences in match statements
+  - Replace with proper error handling or complete implementation
 
-- [ ] **Clean up unused parameters** (33 occurrences with underscore prefix)
-  - Review and either use or document why they're unused
-  - Many are legitimate in trait implementations
+- [ ] **Clean up unused parameters** (50+ underscore-prefixed variables)
+  - Common patterns:
+    - Callback closures: `_pad`, `_info`, `_bus`, `_msg` in probes and handlers
+    - Trait implementations: `_id`, `_decodebin`, `_timestamp`
+    - Placeholder Cairo context: `_cr` in rendering functions
+  - Many are legitimate (required by trait signatures or callbacks)
 
 ### DeepStream Integration (PRP-04)
 - [ ] **Implement NvDsMeta extraction with FFI bindings**
@@ -76,7 +89,7 @@ Last Updated: 2025-08-24 (PRP-08 Code Quality improvements completed)
 
 ### DSL Library
 - [ ] **Implement dsl crate**
-  - `dsl/src/lib.rs`: Contains single `todo!()` macro
+  - `dsl/src/lib.rs`: Contains single `todo!()` macro in test
   - DeepStream Services Library implementation pending
 
 ### CPU Vision Backend Enhancements
@@ -84,11 +97,14 @@ Last Updated: 2025-08-24 (PRP-08 Code Quality improvements completed)
   - `backend/cpu_vision/cpudetector/imp.rs:154`: Attach detection results to buffer
   - Currently passes through without metadata
 
-### Documentation
+### Documentation  
 - [ ] Add inline documentation for all public APIs
 - [ ] Create architecture diagrams
 - [ ] Write migration guide from C to Rust
 - [ ] Document metadata extraction architecture
+- [ ] **Fix broken example**: `ball_tracking_visualization`
+  - Multiple compilation errors (wrong method names, API mismatches)
+  - Event handling API needs updating
 
 ## Low Priority 🔵
 
@@ -148,7 +164,13 @@ Last Updated: 2025-08-24 (PRP-08 Code Quality improvements completed)
 
 ### Code Quality Metrics
 - **unwrap() calls**: Critical production unwrap() calls fixed (most remaining are in test code)
-- **Clippy warnings**: 100+ style warnings (uninlined format args, etc.) - non-critical
+- **Clippy warnings**: 100+ style warnings (uninlined format args, duplicated attributes, etc.) - non-critical
+- **TODO comments**: 3 remaining (down from 8)
+- **todo!() macros**: 1 (in dsl test)
+- **unimplemented!()**: 4 occurrences
+- **Unused parameters**: 50+ underscore-prefixed variables (many legitimate)
+- **Ignored tests**: 1 test requiring runtime
+- **"For now" comments**: 15+ indicating temporary implementations
 - **TODO comments**: 8 found
 - **todo!() macros**: 1 (in dsl crate)
 - **unimplemented!()**: 2 occurrences
@@ -161,20 +183,26 @@ Last Updated: 2025-08-24 (PRP-08 Code Quality improvements completed)
 - **Test Status**: 13/13 pipeline tests passing
 - **PRP Progress**: 13/31 complete (42%), 4/31 in progress (13%), 14/31 not started (45%)
 
-### Recent Achievements (Last 24 Hours)
-- Fixed video playback state management (PRP-03)
-- Implemented real-time bounding box rendering (PRP-11)
-- Fixed f16/f32 array conversion issues
-- Fixed application test compilation errors
-- Enhanced timestamp logging throughout
+### Recent Achievements
+- **2025-08-25**: Completed PRP-08 Code Quality improvements
+  - Fixed workspace configuration for all crates
+  - Fixed critical unwrap() calls in production code
+  - Fixed clippy warnings in build scripts
+- **2025-08-24**: 
+  - Fixed video playback state management (PRP-03)
+  - Implemented real-time bounding box rendering (PRP-11)
+  - Fixed f16/f32 array conversion issues
+  - Fixed application test compilation errors
 
 ## Priority Focus
 
 ### Immediate Next Steps
-1. **Code Quality**: ✅ Critical unwrap() calls fixed, clippy style warnings remain (non-critical)
+1. **Fix broken example**: Repair ball_tracking_visualization compilation errors
 2. **DeepStream FFI**: Implement metadata extraction for real object detection
+   - `rendering/deepstream_renderer.rs`: TODO comments for actual processing
+   - `backend/cpu_vision/cpudetector/imp.rs`: TODO for metadata attachment
 3. **Testing**: Add ONNX model integration tests with real YOLO models
-4. **Build Config**: Fix workspace configuration issues
+4. **Remove tokio dependency**: `source-videos/Cargo.toml:20` has TODO comment
 
 ### Technical Debt
 - Mock implementations need replacement with real functionality

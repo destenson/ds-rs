@@ -1,6 +1,7 @@
 use crate::config::VideoSourceConfig;
 use crate::error::{Result, SourceVideoError};
 use crate::patterns::TestPattern;
+use crate::network::NetworkProfile;
 use gstreamer_rtsp_server as rtsp_server;
 use gstreamer_rtsp_server::prelude::*;
 
@@ -9,6 +10,7 @@ pub struct MediaFactoryBuilder {
     shared: bool,
     eos_shutdown: bool,
     latency: u32,
+    network_profile: Option<NetworkProfile>,
 }
 
 impl MediaFactoryBuilder {
@@ -18,6 +20,7 @@ impl MediaFactoryBuilder {
             shared: true,
             eos_shutdown: false,
             latency: 200,
+            network_profile: None,
         }
     }
     
@@ -47,6 +50,11 @@ impl MediaFactoryBuilder {
         self
     }
     
+    pub fn network_profile(mut self, profile: NetworkProfile) -> Self {
+        self.network_profile = Some(profile);
+        self
+    }
+    
     pub fn build(self) -> Result<rtsp_server::RTSPMediaFactory> {
         let launch = self.launch_string
             .ok_or_else(|| SourceVideoError::config("No launch string provided"))?;
@@ -63,6 +71,20 @@ impl MediaFactoryBuilder {
     }
     
     fn create_launch_string(&self, config: &VideoSourceConfig) -> Result<String> {
+        // Create network simulation elements if profile is set
+        let network_sim = if let Some(profile) = self.network_profile {
+            let conditions = profile.into_conditions();
+            format!(
+                "queue max-size-buffers=1000 max-size-bytes=0 max-size-time=0 leaky=2 ! \
+                 identity drop-probability={} sync=true ! \
+                 valve drop={} ! ",
+                conditions.packet_loss / 100.0,
+                conditions.connection_dropped
+            )
+        } else {
+            String::new()
+        };
+        
         let launch = match &config.source_type {
             crate::config::VideoSourceType::TestPattern { pattern } => {
                 let _pattern = TestPattern::from_str(pattern)?; // Validate pattern
@@ -71,13 +93,15 @@ impl MediaFactoryBuilder {
                      video/x-raw,width={},height={},framerate={}/{},format={} ! \
                      videoconvert ! \
                      x264enc tune=zerolatency speed-preset=ultrafast bitrate=2000 ! \
+                     {} \
                      rtph264pay name=pay0 pt=96 config-interval=1 )",
                     pattern,
                     config.resolution.width,
                     config.resolution.height,
                     config.framerate.numerator,
                     config.framerate.denominator,
-                    config.format.to_caps_string()
+                    config.format.to_caps_string(),
+                    network_sim
                 )
             }
             crate::config::VideoSourceType::File { path, .. } => {
@@ -88,10 +112,12 @@ impl MediaFactoryBuilder {
                      videoscale ! \
                      video/x-raw,width={},height={} ! \
                      x264enc tune=zerolatency speed-preset=ultrafast bitrate=2000 ! \
+                     {} \
                      rtph264pay name=pay0 pt=96 config-interval=1 )",
                     path,
                     config.resolution.width,
-                    config.resolution.height
+                    config.resolution.height,
+                    network_sim
                 )
             }
             crate::config::VideoSourceType::Rtsp { .. } => {
@@ -143,6 +169,39 @@ pub fn create_file_source_factory(file_path: &str) -> Result<rtsp_server::RTSPMe
 pub fn create_custom_factory(launch_string: &str) -> Result<rtsp_server::RTSPMediaFactory> {
     MediaFactoryBuilder::new()
         .launch_string(launch_string)
+        .build()
+}
+
+pub fn create_test_pattern_with_network(
+    pattern: &str,
+    profile: NetworkProfile,
+) -> Result<rtsp_server::RTSPMediaFactory> {
+    let _pattern = TestPattern::from_str(pattern)?; // Validate pattern exists
+    
+    let conditions = profile.into_conditions();
+    let network_sim = format!(
+        "queue max-size-buffers=1000 max-size-bytes=0 max-size-time=0 leaky=2 ! \
+         identity drop-probability={} sync=true ! \
+         valve drop={} ! ",
+        conditions.packet_loss / 100.0,
+        conditions.connection_dropped
+    );
+    
+    let launch = format!(
+        "( videotestsrc pattern={} is-live=true ! \
+         video/x-raw,width=1920,height=1080,framerate=30/1 ! \
+         videoconvert ! \
+         x264enc tune=zerolatency speed-preset=ultrafast ! \
+         {} \
+         rtph264pay name=pay0 pt=96 config-interval=1 )",
+        pattern,
+        network_sim
+    );
+    
+    MediaFactoryBuilder::new()
+        .launch_string(launch)
+        .network_profile(profile)
+        .shared(true)
         .build()
 }
 

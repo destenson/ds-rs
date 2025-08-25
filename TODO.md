@@ -1,6 +1,6 @@
 # TODO List
 
-Last Updated: 2025-01-25 (Post PRP-12 Multi-stream Implementation)
+Last Updated: 2025-01-25 (Post Comprehensive TODO Scan)
 
 ## Recent Achievements ✅
 - **COMPLETED**: PRP-12 Multi-stream Detection Pipeline (2025-01-25)
@@ -86,25 +86,43 @@ Last Updated: 2025-01-25 (Post PRP-12 Multi-stream Implementation)
 - Attach detection metadata to GStreamer buffers
 - **Impact**: Better pipeline integration
 
+### 11. Progressive Loading Implementation
+**Location**: `source-videos/src/manager.rs:306`
+- Implement progressive loading for large directories
+- Currently placeholder comment
+- **Impact**: Performance with large video catalogs
+
+### 12. Lazy Loading Implementation  
+**Location**: `source-videos/src/manager.rs:353`
+- Implement lazy loading for better memory usage
+- Currently placeholder comment
+- **Impact**: Memory efficiency
+
 ## Low Priority TODOs 🔵
 
-### 11. DSL Crate Implementation
+### 13. DSL Crate Implementation
 **Location**: `dsl/src/lib.rs:9`
 - DeepStream Services Library implementation
 - Single todo!() in test
 - **Impact**: High-level API
 
-### 12. Test with Real ONNX Model
+### 14. Test with Real ONNX Model
 **Location**: `tests/cpu_backend_tests.rs:343`
 - When real ONNX model available, add proper tests
 - **Impact**: Test coverage
 
-### 13. Export/Streaming Integration
+### 15. Directory Scanning Optimization
+**Location**: `source-videos/src/directory.rs:63`
+- Replace synchronous scanning with async implementation
+- Currently "for now" comment
+- **Impact**: Performance for large directories
+
+### 16. Export/Streaming Integration
 **PRP**: PRP-13
 - MQTT/Kafka integration for detection results
 - **Impact**: Production deployment features
 
-### 14. Control API
+### 17. Control API
 **PRP**: PRP-17
 - WebSocket/REST interface for remote control
 - **Impact**: Production monitoring/control
@@ -112,10 +130,11 @@ Last Updated: 2025-01-25 (Post PRP-12 Multi-stream Implementation)
 ## Technical Debt 🔧
 
 ### Code Quality Issues
-- **Unused parameters**: 53 underscore-prefixed variables (many legitimate)
-- **"For now" comments**: 26 occurrences indicating temporary solutions
-- **Placeholder implementations**: 110+ mock/stub implementations
-- **unwrap() usage**: 229 occurrences (mostly in tests, critical ones fixed)
+- **TODO/FIXME comments**: 9 active items in source code (excluding git logs)
+- **"For now" comments**: 9 occurrences indicating temporary solutions  
+- **Placeholder implementations**: 4 critical unimplemented property handlers
+- **Metadata stubs**: 2 locations with actual processing needed
+- **Tokio usage**: 2 locations marked for removal per architecture decisions
 
 ### Test Failures
 - **CPU Detector Tests**: 2 failures due to missing ONNX model

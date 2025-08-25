@@ -86,6 +86,11 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         circuit_config.clone(),
     ));
     
+    // Clone for closure
+    let pipeline_clone = pipeline.gst_pipeline().clone();
+    let recovery_manager_clone = recovery_manager.clone();
+    let circuit_breaker_clone = circuit_breaker.clone();
+    
     bus.add_watch(move |_, msg| {
         use gst::MessageView;
         
@@ -95,16 +100,15 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                 println!("[{:.3}] ERROR: {}", timestamp(), error_msg);
                 
                 // Classify the error
-                let classifier = ErrorClassifier::new();
                 let error = ds_rs::error::DeepStreamError::Unknown(error_msg.clone());
                 
                 if is_retryable(&error) {
                     println!("[{:.3}] Error is retryable, attempting recovery...", timestamp());
                     
                     // Check circuit breaker
-                    if circuit_breaker.should_allow_request() {
+                    if circuit_breaker_clone.should_allow_request() {
                         // Attempt recovery
-                        if let Some(backoff) = recovery_manager.start_recovery() {
+                        if let Some(backoff) = recovery_manager_clone.start_recovery() {
                             println!("[{:.3}] Retrying after {:?}", timestamp(), backoff);
                             
                             // In a real implementation, schedule retry after backoff
@@ -114,12 +118,12 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                             let success = simulate_recovery_attempt();
                             
                             if success {
-                                recovery_manager.mark_recovered();
-                                circuit_breaker.record_success();
+                                recovery_manager_clone.mark_recovered();
+                                circuit_breaker_clone.record_success();
                                 println!("[{:.3}] Recovery successful!", timestamp());
                             } else {
-                                recovery_manager.mark_failed(error_msg.clone());
-                                circuit_breaker.record_failure(error_msg);
+                                recovery_manager_clone.mark_failed(error_msg.clone());
+                                circuit_breaker_clone.record_failure(error_msg);
                                 println!("[{:.3}] Recovery failed", timestamp());
                             }
                         } else {
@@ -142,7 +146,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             }
             MessageView::StateChanged(state) => {
                 if let Some(element) = msg.src() {
-                    if element.name() == pipeline.name() {
+                    if element == &pipeline_clone {
                         println!(
                             "[{:.3}] Pipeline state changed: {:?} -> {:?}",
                             timestamp(),
@@ -276,9 +280,9 @@ fn build_fault_tolerant_pipeline(
     let sink = factory.create_video_sink(Some("sink"))?;
     
     // Add elements to pipeline
-    pipeline.add(&videosrc)?;
-    pipeline.add(&convert)?;
-    pipeline.add(&sink)?;
+    pipeline.gst_pipeline().add(&videosrc)?;
+    pipeline.gst_pipeline().add(&convert)?;
+    pipeline.gst_pipeline().add(&sink)?;
     
     // Link elements
     gst::Element::link_many(&[

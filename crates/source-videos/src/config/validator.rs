@@ -204,6 +204,16 @@ impl super::loader::ConfigValidator for DefaultConfigValidator {
                     return Err(SourceVideoError::config("RTSP port cannot be 0".to_string()));
                 }
             }
+            VideoSourceType::Directory { config } => {
+                if config.path.is_empty() {
+                    return Err(SourceVideoError::config("Directory path cannot be empty".to_string()));
+                }
+            }
+            VideoSourceType::FileList { config } => {
+                if config.files.is_empty() {
+                    return Err(SourceVideoError::config("File list cannot be empty".to_string()));
+                }
+            }
         }
         
         // Validate duration if specified

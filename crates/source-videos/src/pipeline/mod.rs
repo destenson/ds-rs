@@ -233,5 +233,15 @@ pub fn create_factory(config: &VideoSourceConfig) -> Arc<dyn PipelineFactory> {
         VideoSourceType::TestPattern { .. } => TestPatternPipeline::new(),
         VideoSourceType::File { .. } => FileSinkPipeline::new(),
         VideoSourceType::Rtsp { .. } => RtspSourcePipeline::new(),
+        VideoSourceType::Directory { .. } => {
+            // Directory sources are expanded to individual file sources, 
+            // so this should not be reached in normal operation
+            FileSinkPipeline::new()
+        }
+        VideoSourceType::FileList { .. } => {
+            // FileList sources are expanded to individual file sources,
+            // so this should not be reached in normal operation
+            FileSinkPipeline::new()
+        }
     }
 }

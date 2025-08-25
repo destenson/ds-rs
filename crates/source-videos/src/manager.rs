@@ -1,4 +1,5 @@
-use crate::config_types::VideoSourceConfig;
+use crate::config_types::{VideoSourceConfig, VideoSourceType, DirectoryConfig, FileListConfig};
+use crate::directory::{DirectoryScanner, BatchSourceLoader};
 use crate::error::{Result, SourceVideoError};
 use crate::source::{VideoSource, SourceState, create_source};
 use std::collections::HashMap;
@@ -262,6 +263,103 @@ impl VideoSourceManager {
                 .cloned()
                 .ok_or_else(|| SourceVideoError::SourceNotFound(id_or_name.to_string()))
         }
+    }
+    
+    // Batch operations for directory and file list support
+    
+    pub fn add_sources_batch(&self, configs: Vec<VideoSourceConfig>) -> Result<Vec<String>> {
+        let mut added_ids = Vec::new();
+        let mut errors = Vec::new();
+        
+        for config in configs {
+            match self.add_source(config.clone()) {
+                Ok(id) => {
+                    added_ids.push(id);
+                }
+                Err(e) => {
+                    errors.push(format!("{}: {}", config.name, e));
+                }
+            }
+        }
+        
+        if !errors.is_empty() {
+            log::warn!("Some sources failed to add: {}", errors.join(", "));
+        }
+        
+        log::info!("Added {} sources in batch", added_ids.len());
+        Ok(added_ids)
+    }
+    
+    pub fn add_directory(&self, config: DirectoryConfig) -> Result<Vec<String>> {
+        let mut scanner = DirectoryScanner::new(config.clone());
+        let source_configs = scanner.scan()?;
+        
+        log::info!(
+            "Found {} video files in directory: {}",
+            source_configs.len(),
+            config.path
+        );
+        
+        if config.lazy_loading {
+            // Add sources gradually in background
+            // For now, just add all at once
+            // TODO: Implement progressive loading
+            self.add_sources_batch(source_configs)
+        } else {
+            self.add_sources_batch(source_configs)
+        }
+    }
+    
+    pub fn add_file_list(&self, config: FileListConfig) -> Result<Vec<String>> {
+        let mut source_configs = Vec::new();
+        
+        for (index, file_path) in config.files.iter().enumerate() {
+            let container = crate::file_utils::detect_container_format(std::path::Path::new(file_path))
+                .unwrap_or(crate::config_types::FileContainer::Mp4);
+            
+            let name = format!(
+                "file_{}_{}",
+                index,
+                std::path::Path::new(file_path)
+                    .file_stem()
+                    .and_then(|s| s.to_str())
+                    .unwrap_or("video")
+            );
+            
+            let source_config = VideoSourceConfig {
+                name,
+                source_type: VideoSourceType::File {
+                    path: file_path.clone(),
+                    container,
+                },
+                resolution: crate::config_types::Resolution {
+                    width: 1920,
+                    height: 1080,
+                },
+                framerate: crate::config_types::Framerate {
+                    numerator: 30,
+                    denominator: 1,
+                },
+                format: crate::config_types::VideoFormat::I420,
+                duration: None,
+                num_buffers: None,
+                is_live: false,
+            };
+            
+            source_configs.push(source_config);
+        }
+        
+        if config.lazy_loading {
+            // TODO: Implement lazy loading
+            self.add_sources_batch(source_configs)
+        } else {
+            self.add_sources_batch(source_configs)
+        }
+    }
+    
+    pub fn add_from_batch_loader(&self, loader: &mut BatchSourceLoader) -> Result<Vec<String>> {
+        let configs = loader.load_all()?;
+        self.add_sources_batch(configs)
     }
 }
 

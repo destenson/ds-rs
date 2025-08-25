@@ -29,6 +29,9 @@ pub enum SourceVideoError {
     #[error("File error: {0}")]
     File(#[from] std::io::Error),
     
+    #[error("File not found: {0}")]
+    FileNotFound(String),
+    
     #[error("TOML parsing error: {0}")]
     TomlParse(#[from] toml::de::Error),
     

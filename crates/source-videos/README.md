@@ -11,8 +11,12 @@ The `source-videos` crate provides a comprehensive solution for generating test 
 - **Test Pattern Generation**: 25+ built-in test patterns (SMPTE, ball animation, noise, etc.)
 - **RTSP Server**: Embedded RTSP server serving multiple test streams simultaneously
 - **File Generation**: Generate test video files in common formats (MP4, MKV, WebM)
+- **Directory Serving**: Serve all video files from a directory as RTSP streams (NEW!)
+- **File List Support**: Serve specific video files by providing file paths (NEW!)
+- **Recursive Directory Scanning**: Automatically discover videos in subdirectories (NEW!)
+- **File Filtering**: Include/exclude patterns and extension filtering (NEW!)
 - **Dynamic Source Management**: Runtime addition/removal of video sources
-- **CLI Application**: User-friendly command-line interface
+- **CLI Application**: User-friendly command-line interface with directory support
 - **Configuration Support**: TOML-based configuration files
 - **Cross-Platform**: Works on Windows, Linux, and macOS
 
@@ -76,6 +80,21 @@ cargo run -- interactive
 
 # Run comprehensive test suite
 cargo run -- test --port 8554
+
+# NEW: Serve video files from a directory
+cargo run -- serve --directory /path/to/videos --port 8554
+
+# NEW: Serve videos recursively from directory
+cargo run -- serve --directory /path/to/videos --recursive --port 8554
+
+# NEW: Serve specific video files
+cargo run -- serve --files video1.mp4,video2.avi,/path/to/video3.mkv --port 8554
+
+# NEW: Filter videos by pattern
+cargo run -- serve --directory /videos --include "*.mp4,*test*" --exclude "*.tmp,backup_*"
+
+# NEW: Mixed sources (patterns + files)
+cargo run -- serve --patterns smpte,ball --directory /videos --files extra.mp4
 ```
 
 ## Test Patterns
@@ -253,11 +272,12 @@ let sources = manager.list_sources();
 
 ### RTSP Server
 
-Embedded RTSP server for streaming test patterns:
+Embedded RTSP server for streaming test patterns and video files:
 
 ```rust
-use source_videos::RtspServerBuilder;
+use source_videos::{RtspServerBuilder, DirectoryScanner, DirectoryConfig};
 
+// Basic server with test patterns
 let server = RtspServerBuilder::new()
     .port(8554)
     .add_test_pattern("test1", "smpte")
@@ -265,6 +285,27 @@ let server = RtspServerBuilder::new()
     .build()?;
 
 server.start()?;
+
+// NEW: Server with directory scanning
+let dir_config = DirectoryConfig {
+    path: "/path/to/videos".to_string(),
+    recursive: true,
+    filters: None,
+    lazy_loading: false,
+    mount_prefix: Some("videos".to_string()),
+};
+
+let mut scanner = DirectoryScanner::new(dir_config);
+let source_configs = scanner.scan()?;
+
+let mut server_builder = RtspServerBuilder::new().port(8554);
+for config in source_configs {
+    server_builder = server_builder.add_source(config);
+}
+
+let server = server_builder.build()?;
+server.start()?;
+
 println!("RTSP streams available at:");
 for mount in server.list_sources() {
     println!("  {}", server.get_url(&mount));
@@ -281,6 +322,54 @@ use source_videos::generate_test_file;
 // Generate a 10-second SMPTE pattern video
 generate_test_file("smpte", 10, "test.mp4")?;
 ```
+
+### Directory and File Serving (NEW!)
+
+Serve video files from directories or explicit file lists:
+
+```rust
+use source_videos::{DirectoryScanner, DirectoryConfig, FilterConfig, VideoSourceManager};
+
+// Scan directory for video files
+let dir_config = DirectoryConfig {
+    path: "/path/to/videos".to_string(),
+    recursive: true,
+    filters: Some(FilterConfig {
+        include: vec!["*.mp4".to_string(), "*.avi".to_string()],
+        exclude: vec!["*.tmp".to_string(), "backup_*".to_string()],
+        extensions: vec!["mp4".to_string(), "avi".to_string(), "mkv".to_string()],
+    }),
+    lazy_loading: false,
+    mount_prefix: Some("videos".to_string()),
+};
+
+let mut scanner = DirectoryScanner::new(dir_config);
+let source_configs = scanner.scan()?;
+
+println!("Found {} video files", source_configs.len());
+
+// Add to source manager
+let manager = VideoSourceManager::new();
+let added = manager.add_sources_batch(source_configs)?;
+println!("Successfully added {} sources", added.len());
+
+// Or serve via RTSP
+let mut server_builder = RtspServerBuilder::new().port(8554);
+for config in scanner.scan()? {
+    server_builder = server_builder.add_source(config);
+}
+let server = server_builder.build()?;
+```
+
+### Understanding Mount Points
+
+Mount points are the path part of RTSP URLs that identify specific video streams:
+
+- **Pattern**: `rtsp://localhost:8554/pattern_smpte` → mount point is `pattern_smpte`  
+- **File**: `rtsp://localhost:8554/videos/movie` → mount point is `videos/movie`  
+- **Directory**: `/videos/action/movie.mp4` → becomes mount point `videos/action/movie`
+
+Each video file gets a unique mount point so clients can access streams independently.
 
 ## Integration with ds-rs
 
@@ -359,9 +448,10 @@ Install GStreamer plugins:
 ## Examples
 
 See the `examples/` directory for:
-- `basic_rtsp_server.rs` - Simple RTSP server setup
-- `generate_test_files.rs` - Batch file generation
-- `ds_rs_integration.rs` - Integration with ds-rs
+- `directory_server.rs` - Serve video files from a directory (NEW!)
+- `batch_file_server.rs` - Serve specific video files from a list (NEW!)
+- `mixed_sources.rs` - Combine test patterns, directory files, and explicit files (NEW!)
+- Basic RTSP server setups and integration patterns
 
 ## Architecture
 
@@ -374,6 +464,9 @@ The crate follows a modular architecture:
 - **Manager** - Thread-safe source registry and lifecycle management
 - **RTSP** - Embedded RTSP server with media factories
 - **File** - Video file generation with encoding support
+- **Directory** - Directory scanning and video file discovery (NEW!)
+- **FileUtils** - Video file detection and mount point generation (NEW!)
+- **FileSource** - Direct file-based video source implementation (NEW!)
 
 ## License
 

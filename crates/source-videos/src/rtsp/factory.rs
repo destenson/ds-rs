@@ -1,4 +1,4 @@
-use crate::config::VideoSourceConfig;
+use crate::config_types::VideoSourceConfig;
 use crate::error::{Result, SourceVideoError};
 use crate::patterns::TestPattern;
 use crate::network::NetworkProfile;
@@ -86,7 +86,7 @@ impl MediaFactoryBuilder {
         };
         
         let launch = match &config.source_type {
-            crate::config::VideoSourceType::TestPattern { pattern } => {
+            crate::config_types::VideoSourceType::TestPattern { pattern } => {
                 let _pattern = TestPattern::from_str(pattern)?; // Validate pattern
                 format!(
                     "( videotestsrc pattern={} is-live=true ! \
@@ -104,7 +104,7 @@ impl MediaFactoryBuilder {
                     network_sim
                 )
             }
-            crate::config::VideoSourceType::File { path, .. } => {
+            crate::config_types::VideoSourceType::File { path, .. } => {
                 format!(
                     "( filesrc location=\"{}\" ! \
                      decodebin ! \
@@ -120,9 +120,19 @@ impl MediaFactoryBuilder {
                     network_sim
                 )
             }
-            crate::config::VideoSourceType::Rtsp { .. } => {
+            crate::config_types::VideoSourceType::Rtsp { .. } => {
                 return Err(SourceVideoError::config(
                     "RTSP sources cannot be served by RTSP server (would create loop)"
+                ));
+            }
+            crate::config_types::VideoSourceType::Directory { .. } => {
+                return Err(SourceVideoError::config(
+                    "Directory sources should be expanded to individual file sources before RTSP factory"
+                ));
+            }
+            crate::config_types::VideoSourceType::FileList { .. } => {
+                return Err(SourceVideoError::config(
+                    "FileList sources should be expanded to individual file sources before RTSP factory"
                 ));
             }
         };

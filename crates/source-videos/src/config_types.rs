@@ -47,6 +47,14 @@ pub enum VideoSourceType {
         #[serde(default = "default_rtsp_port")]
         port: u16,
     },
+    Directory {
+        #[serde(flatten)]
+        config: DirectoryConfig,
+    },
+    FileList {
+        #[serde(flatten)]
+        config: FileListConfig,
+    },
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
@@ -78,6 +86,46 @@ pub enum FileContainer {
     Mkv,
     Avi,
     WebM,
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct DirectoryConfig {
+    pub path: String,
+    
+    #[serde(default = "default_recursive")]
+    pub recursive: bool,
+    
+    #[serde(default)]
+    pub filters: Option<FilterConfig>,
+    
+    #[serde(default = "default_lazy_loading")]
+    pub lazy_loading: bool,
+    
+    #[serde(default)]
+    pub mount_prefix: Option<String>,
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct FileListConfig {
+    pub files: Vec<String>,
+    
+    #[serde(default)]
+    pub mount_prefix: Option<String>,
+    
+    #[serde(default = "default_lazy_loading")]
+    pub lazy_loading: bool,
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct FilterConfig {
+    #[serde(default)]
+    pub include: Vec<String>,
+    
+    #[serde(default)]
+    pub exclude: Vec<String>,
+    
+    #[serde(default)]
+    pub extensions: Vec<String>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -174,6 +222,12 @@ impl VideoSourceConfig {
             }
             VideoSourceType::Rtsp { mount_point, port } => {
                 format!("rtsp://localhost:{}/{}", port, mount_point)
+            }
+            VideoSourceType::Directory { config } => {
+                format!("directory:///{}", config.path.replace('\\', "/"))
+            }
+            VideoSourceType::FileList { config } => {
+                format!("filelist:///[{}]", config.files.len())
             }
         }
     }
@@ -301,6 +355,14 @@ fn default_log_level() -> String {
 }
 
 fn default_is_live() -> bool {
+    true
+}
+
+fn default_recursive() -> bool {
+    false
+}
+
+fn default_lazy_loading() -> bool {
     true
 }
 

@@ -2,8 +2,11 @@
 
 pub mod config;
 pub mod config_types;
+pub mod directory;
 pub mod error;
 pub mod file;
+pub mod file_source;
+pub mod file_utils;
 pub mod manager;
 pub mod network;
 pub mod patterns;
@@ -12,9 +15,12 @@ pub mod rtsp;
 pub mod runtime;
 pub mod source;
 
-pub use config_types::{AppConfig, ServerConfig, VideoSourceConfig, VideoSourceType};
+pub use config_types::{AppConfig, ServerConfig, VideoSourceConfig, VideoSourceType, DirectoryConfig, FileListConfig, FilterConfig};
+pub use directory::{DirectoryScanner, BatchSourceLoader};
 pub use error::{Result, SourceVideoError};
 pub use file::{FileGenerator, BatchFileGenerator, generate_test_file};
+pub use file_source::{FileVideoSource, FileSourceFactory};
+pub use file_utils::{is_video_file, detect_container_format, path_to_mount_point, VideoMetadata};
 pub use manager::{VideoSourceManager, SourceInfo, SourceManagerBuilder, ManagerSnapshot};
 pub use patterns::{TestPattern, PatternRotator};
 pub use rtsp::{RtspServer, RtspServerBuilder, create_test_rtsp_server};

@@ -38,6 +38,27 @@ enum Commands {
         
         #[arg(long, value_delimiter = ',')]
         patterns: Vec<String>,
+        
+        #[arg(short = 'd', long = "directory", help = "Directory containing video files to serve")]
+        directory: Option<PathBuf>,
+        
+        #[arg(short = 'r', long = "recursive", help = "Recursively scan directories")]
+        recursive: bool,
+        
+        #[arg(short = 'f', long = "files", value_delimiter = ',', help = "Explicit list of video files to serve")]
+        files: Vec<PathBuf>,
+        
+        #[arg(long = "include", value_delimiter = ',', help = "Include file patterns (e.g., *.mp4,test_*)")]
+        include: Vec<String>,
+        
+        #[arg(long = "exclude", value_delimiter = ',', help = "Exclude file patterns (e.g., *.tmp,backup_*)")]
+        exclude: Vec<String>,
+        
+        #[arg(long = "mount-prefix", help = "Prefix for RTSP mount points")]
+        mount_prefix: Option<String>,
+        
+        #[arg(long = "lazy", help = "Enable lazy loading of sources")]
+        lazy_loading: bool,
     },
     Generate {
         #[arg(short, long, default_value = "smpte")]
@@ -85,8 +106,32 @@ async fn main() -> Result<()> {
     };
     
     match cli.command {
-        Commands::Serve { port, address, duration, patterns } => {
-            serve_command(port, address, duration, patterns).await
+        Commands::Serve { 
+            port, 
+            address, 
+            duration, 
+            patterns,
+            directory,
+            recursive,
+            files,
+            include,
+            exclude,
+            mount_prefix,
+            lazy_loading,
+        } => {
+            serve_command(
+                port, 
+                address, 
+                duration, 
+                patterns,
+                directory,
+                recursive,
+                files,
+                include,
+                exclude,
+                mount_prefix,
+                lazy_loading,
+            ).await
         }
         Commands::Generate { pattern, duration, output, width, height, fps } => {
             generate_command(pattern, duration, output, width, height, fps).await
@@ -107,20 +152,107 @@ async fn serve_command(
     port: u16, 
     address: String, 
     duration: Option<u64>, 
-    patterns: Vec<String>
+    patterns: Vec<String>,
+    directory: Option<PathBuf>,
+    recursive: bool,
+    files: Vec<PathBuf>,
+    include: Vec<String>,
+    exclude: Vec<String>,
+    mount_prefix: Option<String>,
+    lazy_loading: bool,
 ) -> Result<()> {
+    use source_videos::{DirectoryConfig, FileListConfig, FilterConfig, DirectoryScanner, RtspServerBuilder};
+    
     println!("Starting RTSP server on {}:{}", address, port);
     
-    let mut server = create_test_rtsp_server(port)?;
+    // Build server with initial patterns
+    let mut server_builder = RtspServerBuilder::new().port(port);
     
+    // Add test patterns if specified
     if !patterns.is_empty() {
         for (i, pattern) in patterns.iter().enumerate() {
             let name = format!("pattern-{}", i + 1);
-            let config = VideoSourceConfig::test_pattern(&name, pattern);
-            server.add_source(config)?;
-            println!("Added pattern '{}' at rtsp://{}:{}/{}", pattern, address, port, name);
+            server_builder = server_builder.add_test_pattern(&name, pattern);
+            println!("Will add pattern '{}' at rtsp://{}:{}/{}", pattern, address, port, name);
         }
     }
+    
+    // Scan directory for video files if specified
+    if let Some(dir_path) = directory {
+        let filters = if !include.is_empty() || !exclude.is_empty() {
+            Some(FilterConfig {
+                include: include.clone(),
+                exclude: exclude.clone(),
+                extensions: vec![],
+            })
+        } else {
+            None
+        };
+        
+        let dir_config = DirectoryConfig {
+            path: dir_path.display().to_string(),
+            recursive,
+            filters,
+            lazy_loading,
+            mount_prefix: mount_prefix.clone(),
+        };
+        
+        println!("Scanning directory: {} (recursive: {})", dir_path.display(), recursive);
+        let mut scanner = DirectoryScanner::new(dir_config);
+        let source_configs = scanner.scan()?;
+        
+        println!("Found {} video files in directory", source_configs.len());
+        
+        for config in source_configs {
+            server_builder = server_builder.add_source(config);
+        }
+    }
+    
+    // Add explicit file list if specified
+    if !files.is_empty() {
+        use source_videos::file_utils::detect_container_format;
+        
+        println!("Adding {} files from list", files.len());
+        
+        for (index, file_path) in files.iter().enumerate() {
+            let container = detect_container_format(file_path)
+                .unwrap_or(source_videos::config_types::FileContainer::Mp4);
+            
+            let name = format!(
+                "file_{}_{}",
+                index,
+                file_path.file_stem()
+                    .and_then(|s| s.to_str())
+                    .unwrap_or("video")
+            );
+            
+            let config = VideoSourceConfig {
+                name: name.clone(),
+                source_type: source_videos::VideoSourceType::File {
+                    path: file_path.display().to_string(),
+                    container,
+                },
+                resolution: source_videos::config_types::Resolution {
+                    width: 1920,
+                    height: 1080,
+                },
+                framerate: source_videos::config_types::Framerate {
+                    numerator: 30,
+                    denominator: 1,
+                },
+                format: source_videos::config_types::VideoFormat::I420,
+                duration: None,
+                num_buffers: None,
+                is_live: false,
+            };
+            
+            server_builder = server_builder.add_source(config);
+            println!("Added file: {}", file_path.display());
+        }
+    }
+    
+    // Build and start the server
+    let mut server = server_builder.build()?;
     
     server.start()?;
     

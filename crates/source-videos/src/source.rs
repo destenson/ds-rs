@@ -306,6 +306,14 @@ pub fn create_source(config: VideoSourceConfig) -> Box<dyn VideoSource> {
         VideoSourceType::Rtsp { .. } => {
             Box::new(RtspSource::new(config))
         }
+        VideoSourceType::Directory { .. } => {
+            // Directory sources should be expanded to individual file sources before this point
+            panic!("Directory sources should be expanded before creating video source")
+        }
+        VideoSourceType::FileList { .. } => {
+            // FileList sources should be expanded to individual file sources before this point
+            panic!("FileList sources should be expanded before creating video source")
+        }
     }
 }
 

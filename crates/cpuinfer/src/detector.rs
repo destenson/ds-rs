@@ -449,36 +449,66 @@ impl OnnxDetector {
         let output_size = 85; // 4 bbox + 1 objectness + 80 classes
         let num_anchors = outputs.len() / output_size;
         
+        // Debug: Check the range of values to understand the format
+        let mut min_val = f32::MAX;
+        let mut max_val = f32::MIN;
+        for &v in outputs.iter().take(1000) {
+            if v < min_val { min_val = v; }
+            if v > max_val { max_val = v; }
+        }
+        println!("Output value range: [{:.3}, {:.3}]", min_val, max_val);
+        
         // Scale factors to convert from model coordinates to image coordinates
         let x_scale = img_width as f32 / self.input_width as f32;
         let y_scale = img_height as f32 / self.input_height as f32;
         
-        // Check if we need to handle transposed format
-        // Some models output [1, 85, 25200] instead of [1, 25200, 85]
-        let first_few_objectness_scores: Vec<f32> = (0..5.min(num_anchors))
-            .map(|i| outputs[i * output_size + 4])
-            .collect();
-        
-        // If all objectness scores are very low or high, might be transposed
-        let avg_obj = first_few_objectness_scores.iter().sum::<f32>() / first_few_objectness_scores.len() as f32;
-        if avg_obj < 0.001 || avg_obj > 100.0 {
-            println!("Warning: Unusual objectness scores, might need transposed processing. Avg: {}", avg_obj);
-        }
+        // Check if format is transposed [1, 85, 25200] instead of [1, 25200, 85]
+        // In transposed format, all x coords are together, then all y coords, etc.
+        let is_transposed = {
+            // Check a few objectness scores using both interpretations
+            let obj_normal = outputs[4]; // First anchor's objectness in normal format
+            let obj_transposed = outputs[4 * num_anchors]; // First anchor's objectness in transposed format
+            
+            // Transposed format likely has very different values
+            println!("Checking format - Normal obj[0]: {:.6}, Transposed obj[0]: {:.6}", obj_normal, obj_transposed);
+            
+            // If normal format objectness is very low, probably transposed
+            obj_normal < 0.0001
+        };
         
         // Process each anchor/detection
         for i in 0..num_anchors {
-            let offset = i * output_size;
-            
-            // Extract bbox and scores
-            let cx = outputs[offset];
-            let cy = outputs[offset + 1];
-            let w = outputs[offset + 2];
-            let h = outputs[offset + 3];
-            let objectness = outputs[offset + 4];
+            // Extract bbox and scores based on format
+            let (cx, cy, w, h, objectness) = if is_transposed {
+                // Transposed format [1, 85, 25200]: feature_idx * num_anchors + anchor_idx
+                (
+                    outputs[0 * num_anchors + i],  // cx at position [0][i]
+                    outputs[1 * num_anchors + i],  // cy at position [1][i]
+                    outputs[2 * num_anchors + i],  // w at position [2][i]
+                    outputs[3 * num_anchors + i],  // h at position [3][i]
+                    outputs[4 * num_anchors + i],  // objectness at position [4][i]
+                )
+            } else {
+                // Normal format [1, 25200, 85]: anchor_idx * features + feature_idx
+                let offset = i * output_size;
+                (
+                    outputs[offset + 0],  // cx
+                    outputs[offset + 1],  // cy
+                    outputs[offset + 2],  // w
+                    outputs[offset + 3],  // h
+                    outputs[offset + 4],  // objectness
+                )
+            };
             
             // Skip low confidence detections
             if objectness < self.confidence_threshold {
                 continue;
+            }
+            
+            // Debug first few high-confidence detections
+            if objectness > 0.5 && i < 10 {
+                println!("Anchor {}: cx={:.1}, cy={:.1}, w={:.1}, h={:.1}, obj={:.3}", 
+                         i, cx, cy, w, h, objectness);
             }
             
             // Find best class

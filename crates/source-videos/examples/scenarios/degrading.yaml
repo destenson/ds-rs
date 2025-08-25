@@ -1,0 +1,42 @@
+name: degrading_network
+description: Network quality degrades over time
+duration: 5m
+events:
+  - time: 0s
+    conditions:
+      packet_loss: 0.0
+      latency_ms: 20
+      bandwidth_kbps: 10000
+      jitter_ms: 5
+      
+  - time: 1m
+    conditions:
+      packet_loss: 1.0
+      latency_ms: 50
+      bandwidth_kbps: 5000
+      jitter_ms: 10
+      
+  - time: 3m
+    conditions:
+      packet_loss: 5.0
+      latency_ms: 200
+      bandwidth_kbps: 1000
+      jitter_ms: 50
+      
+  - time: 4m
+    conditions:
+      packet_loss: 10.0
+      latency_ms: 500
+      bandwidth_kbps: 500
+      jitter_ms: 100
+      
+  - time: 4m30s
+    conditions:
+      connection_dropped: true
+      
+  - time: 4m45s
+    conditions:
+      packet_loss: 2.0
+      latency_ms: 100
+      bandwidth_kbps: 3000
+      jitter_ms: 30

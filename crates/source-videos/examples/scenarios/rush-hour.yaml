@@ -1,0 +1,42 @@
+name: rush_hour
+description: Network congestion during rush hour traffic
+duration: 2h
+events:
+  - time: 0s
+    conditions:
+      packet_loss: 0.5
+      latency_ms: 30
+      bandwidth_kbps: 50000
+      jitter_ms: 5
+      
+  # Morning rush hour begins
+  - time: 15m
+    conditions:
+      packet_loss: 2.0
+      latency_ms: 100
+      bandwidth_kbps: 10000
+      jitter_ms: 30
+      
+  # Peak congestion
+  - time: 45m
+    conditions:
+      packet_loss: 5.0
+      latency_ms: 250
+      bandwidth_kbps: 2000
+      jitter_ms: 80
+      
+  # Rush hour ending
+  - time: 1h15m
+    conditions:
+      packet_loss: 3.0
+      latency_ms: 150
+      bandwidth_kbps: 5000
+      jitter_ms: 40
+      
+  # Normal conditions
+  - time: 1h45m
+    conditions:
+      packet_loss: 0.5
+      latency_ms: 30
+      bandwidth_kbps: 50000
+      jitter_ms: 5

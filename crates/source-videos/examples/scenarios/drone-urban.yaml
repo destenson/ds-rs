@@ -1,0 +1,101 @@
+name: drone_urban_flight
+description: UHF/VHF radio link to drone flying through urban buildings
+duration: 3m
+events:
+  # Clear line of sight at takeoff
+  - time: 0s
+    conditions:
+      packet_loss: 2.0
+      latency_ms: 20
+      bandwidth_kbps: 2000
+      jitter_ms: 10
+      
+  # Entering urban canyon
+  - time: 10s
+    conditions:
+      packet_loss: 15.0
+      latency_ms: 40
+      bandwidth_kbps: 1200
+      jitter_ms: 80
+      
+  # Behind building - severe degradation
+  - time: 20s
+    conditions:
+      packet_loss: 50.0
+      latency_ms: 100
+      bandwidth_kbps: 200
+      jitter_ms: 200
+      
+  # Complete signal loss behind large building
+  - time: 25s
+    conditions:
+      connection_dropped: true
+      
+  # Emerging from building shadow
+  - time: 30s
+    conditions:
+      packet_loss: 30.0
+      latency_ms: 60
+      bandwidth_kbps: 500
+      jitter_ms: 150
+      
+  # Between buildings - multipath interference
+  - time: 45s
+    conditions:
+      packet_loss: 20.0
+      latency_ms: 40
+      bandwidth_kbps: 800
+      jitter_ms: 120
+      
+  # Flying low between buildings - severe reflections
+  - time: 1m
+    conditions:
+      packet_loss: 25.0
+      latency_ms: 50
+      bandwidth_kbps: 600
+      jitter_ms: 180
+      
+  # Another building obstruction
+  - time: 1m15s
+    conditions:
+      packet_loss: 60.0
+      latency_ms: 150
+      bandwidth_kbps: 100
+      jitter_ms: 250
+      
+  # Brief signal loss in building shadow
+  - time: 1m20s
+    conditions:
+      connection_dropped: true
+      
+  # Signal restored but weak
+  - time: 1m23s
+    conditions:
+      packet_loss: 40.0
+      latency_ms: 80
+      bandwidth_kbps: 400
+      jitter_ms: 160
+      
+  # Gaining altitude - improving signal
+  - time: 1m30s
+    conditions:
+      packet_loss: 8.0
+      latency_ms: 30
+      bandwidth_kbps: 1500
+      jitter_ms: 40
+      
+  # Clear line of sight above buildings
+  - time: 2m
+    conditions:
+      packet_loss: 1.0
+      latency_ms: 15
+      bandwidth_kbps: 2500
+      jitter_ms: 5
+      
+  # Descending back into urban area for landing
+  - time: 2m30s
+    conditions:
+      packet_loss: 20.0
+      latency_ms: 40
+      bandwidth_kbps: 800
+      jitter_ms: 120

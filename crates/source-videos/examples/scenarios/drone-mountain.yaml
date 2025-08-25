@@ -1,0 +1,96 @@
+name: drone_mountain_flight
+description: Long-range drone flight in mountainous/open terrain
+duration: 5m
+events:
+  # Takeoff - excellent signal
+  - time: 0s
+    conditions:
+      packet_loss: 1.0
+      latency_ms: 30
+      bandwidth_kbps: 2000
+      jitter_ms: 10
+      
+  # Flying away - distance starting to affect signal
+  - time: 30s
+    conditions:
+      packet_loss: 3.0
+      latency_ms: 50
+      bandwidth_kbps: 1800
+      jitter_ms: 20
+      
+  # Behind first ridge - partial terrain obstruction
+  - time: 1m
+    conditions:
+      packet_loss: 15.0
+      latency_ms: 70
+      bandwidth_kbps: 1000
+      jitter_ms: 60
+      
+  # Entering deep valley - severe terrain masking
+  - time: 1m30s
+    conditions:
+      packet_loss: 40.0
+      latency_ms: 100
+      bandwidth_kbps: 300
+      jitter_ms: 150
+      
+  # Complete terrain masking behind mountain
+  - time: 1m45s
+    conditions:
+      connection_dropped: true
+      
+  # Climbing out of valley - signal restored
+  - time: 2m
+    conditions:
+      packet_loss: 25.0
+      latency_ms: 80
+      bandwidth_kbps: 800
+      jitter_ms: 100
+      
+  # High altitude plateau - good signal but distance effects
+  - time: 2m30s
+    conditions:
+      packet_loss: 5.0
+      latency_ms: 60
+      bandwidth_kbps: 1500
+      jitter_ms: 30
+      
+  # Maximum operational range - weak but stable
+  - time: 3m
+    conditions:
+      packet_loss: 12.0
+      latency_ms: 90
+      bandwidth_kbps: 600
+      jitter_ms: 80
+      
+  # Brief terrain obstruction
+  - time: 3m15s
+    conditions:
+      packet_loss: 35.0
+      latency_ms: 110
+      bandwidth_kbps: 200
+      jitter_ms: 180
+      
+  # Clear line of sight restored
+  - time: 3m30s
+    conditions:
+      packet_loss: 8.0
+      latency_ms: 70
+      bandwidth_kbps: 1200
+      jitter_ms: 40
+      
+  # Returning - signal improving with distance
+  - time: 4m
+    conditions:
+      packet_loss: 4.0
+      latency_ms: 45
+      bandwidth_kbps: 1700
+      jitter_ms: 25
+      
+  # Close range for landing - excellent signal
+  - time: 5m
+    conditions:
+      packet_loss: 0.5
+      latency_ms: 25
+      bandwidth_kbps: 2200
+      jitter_ms: 5

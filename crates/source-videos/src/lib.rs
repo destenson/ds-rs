@@ -1,5 +1,6 @@
 #![allow(unused)]
 
+pub mod api;
 pub mod auto_repeat;
 pub mod config;
 pub mod config_types;

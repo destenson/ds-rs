@@ -1,11 +1,14 @@
 #![allow(unused)]
 use source_videos::{
     AppConfig, SourceVideos, TestPattern, VideoSourceConfig,
-    generate_test_file, create_test_rtsp_server, Result, SourceVideoError
+    generate_test_file, create_test_rtsp_server, Result, SourceVideoError,
+    api::ControlApi
 };
 use clap::{Parser, Subcommand};
 use std::path::PathBuf;
 use std::time::Duration;
+use std::sync::Arc;
+use tokio::sync::RwLock;
 use tokio::signal;
 use gstreamer::glib::prelude::*;
 
@@ -29,6 +32,15 @@ enum Commands {
     Serve {
         #[arg(short, long, default_value_t = 8554)]
         port: u16,
+        
+        #[arg(long, help = "Enable REST API server")]
+        api: bool,
+        
+        #[arg(long, default_value_t = 3000, help = "API server port")]
+        api_port: u16,
+        
+        #[arg(long, default_value = "0.0.0.0", help = "API server bind address")]
+        api_address: String,
         
         #[arg(short, long, default_value = "0.0.0.0")]
         address: String,
@@ -147,7 +159,10 @@ async fn main() -> Result<()> {
     
     match cli.command {
         Commands::Serve { 
-            port, 
+            port,
+            api,
+            api_port,
+            api_address,
             address, 
             duration, 
             patterns,
@@ -173,7 +188,10 @@ async fn main() -> Result<()> {
             per_source_network,
         } => {
             serve_command(
-                port, 
+                port,
+                api,
+                api_port,
+                api_address,
                 address, 
                 duration, 
                 patterns,
@@ -215,7 +233,10 @@ async fn main() -> Result<()> {
 }
 
 async fn serve_command(
-    port: u16, 
+    port: u16,
+    api: bool,
+    api_port: u16,
+    api_address: String,
     address: String, 
     duration: Option<u64>, 
     patterns: Vec<String>,
@@ -240,7 +261,7 @@ async fn serve_command(
     network_drop: Option<String>,
     per_source_network: Vec<String>,
 ) -> Result<()> {
-    use source_videos::{DirectoryConfig, FileListConfig, FilterConfig, DirectoryScanner, RtspServerBuilder, WatcherManager, LoopConfig, create_looping_source};
+    use source_videos::{DirectoryConfig, FileListConfig, FilterConfig, DirectoryScanner, RtspServerBuilder, WatcherManager, LoopConfig, create_looping_source, VideoSourceManager};
     use source_videos::network::{NetworkProfile, NetworkConditions, GStreamerNetworkSimulator, NetworkController};
     use std::time::Duration;
     use std::str::FromStr;
@@ -426,8 +447,12 @@ async fn serve_command(
     // Build and start the server
     let mut server = server_builder.build()?;
     
+    // Create shared state for API if enabled
+    let rtsp_server_arc = Arc::new(RwLock::new(server));
+    let source_manager_arc = Arc::new(VideoSourceManager::new());
+    
     // Set up file watching if enabled
-    let mut watcher_manager = if watch && directory.is_some() {
+    let watcher_manager_arc = if watch && directory.is_some() {
         println!("Setting up file system watching...");
         let mut manager = WatcherManager::new();
         
@@ -436,7 +461,39 @@ async fn serve_command(
             println!("Started watching directory: {} (ID: {})", dir_path.display(), watcher_id);
         }
         
-        Some(manager)
+        Arc::new(RwLock::new(manager))
+    } else {
+        Arc::new(RwLock::new(WatcherManager::new()))
+    };
+    
+    // Start API server if enabled
+    let api_handle = if api {
+        let api_bind_address: std::net::SocketAddr = format!("{}:{}", api_address, api_port).parse()
+            .map_err(|e| SourceVideoError::config(format!("Invalid API address: {}", e)))?;
+        
+        let api_server = ControlApi::new(
+            Some(rtsp_server_arc.clone()),
+            source_manager_arc.clone(),
+            watcher_manager_arc.clone(),
+        )?;
+        
+        println!("Starting API server on http://{}:{}", api_address, api_port);
+        println!("API documentation available at http://{}:{}/api/docs", api_address, api_port);
+        
+        let mut api_server = api_server;
+        api_server.set_bind_address(api_bind_address);
+        
+        Some(tokio::spawn(async move {
+            if let Err(e) = api_server.bind_and_serve().await {
+                eprintln!("API server error: {}", e);
+            }
+        }))
+    } else {
+        None
+    };
+    
+    let mut watcher_manager = if watch && directory.is_some() {
+        Some(watcher_manager_arc.clone())
     } else {
         None
     };
@@ -450,10 +507,13 @@ async fn serve_command(
         println!("Hot-reload enabled with {}ms debounce interval", watch_interval_ms);
     }
     
-    server.start()?;
-    
-    for mount in server.list_sources() {
-        println!("Stream available at: {}", server.get_url(&mount));
+    {
+        let mut server = rtsp_server_arc.write().await;
+        server.start()?;
+        
+        for mount in server.list_sources() {
+            println!("Stream available at: {}", server.get_url(&mount));
+        }
     }
     
     // Set up periodic network drops if configured
@@ -509,11 +569,13 @@ async fn serve_command(
                     main_context.iteration(false);
                     
                     // Check for file system events if watching is enabled
-                    if let Some(ref mut manager) = watcher_manager {
+                    if let Some(ref manager_arc) = watcher_manager {
+                        let mut manager = manager_arc.write().await;
                         if let Some(event) = manager.recv().await {
                             println!("File system event: {:?} - {}", event.event_type(), event.path().display());
                             
                             // Handle the event through the RTSP server directly
+                            let mut server = rtsp_server_arc.write().await;
                             if let Err(e) = server.handle_file_event(&event) {
                                 eprintln!("Error handling file event: {}", e);
                             }

@@ -78,7 +78,7 @@ impl NetworkSimulator {
         }
         
         let mut rng = rand::thread_rng();
-        rng.gen::<f32>() * 100.0 < config.conditions.packet_loss
+        rng.r#gen::<f32>() * 100.0 < config.conditions.packet_loss
     }
     
     /// Get delay to add for latency simulation

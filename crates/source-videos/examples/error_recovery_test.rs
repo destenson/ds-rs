@@ -45,7 +45,7 @@ fn main() -> Result<()> {
 
 /// Create a test pipeline that simulates video streaming
 fn create_test_pipeline() -> Result<gst::Pipeline> {
-    let pipeline = gst::Pipeline::new(Some("test-pipeline"));
+    let pipeline = gst::Pipeline::with_name("test-pipeline");
     
     // Create elements
     let source = gst::ElementFactory::make("videotestsrc")
@@ -138,7 +138,7 @@ fn setup_bus_watch(pipeline: &gst::Pipeline, simulator: Arc<GStreamerNetworkSimu
             _ => {}
         }
         
-        gst::glib::Continue(true)
+        gst::glib::ControlFlow::Continue
     }).unwrap();
 }
 

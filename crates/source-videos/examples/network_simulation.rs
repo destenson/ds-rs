@@ -111,7 +111,7 @@ fn demo_rtsp_with_simulation() -> Result<(), Box<dyn std::error::Error>> {
     mounts.add_factory("/testpoor", factory);
     
     // Attach server to main context
-    let id = server.attach(None)?;
+    let _id = server.attach(None)?;
     
     println!("\nRTSP streams available at:");
     println!("  rtsp://localhost:8554/test3g   - 3G network simulation");
@@ -122,8 +122,7 @@ fn demo_rtsp_with_simulation() -> Result<(), Box<dyn std::error::Error>> {
     println!("\nRunning for 5 seconds...");
     std::thread::sleep(Duration::from_secs(5));
     
-    // Clean up
-    server.disconnect(id);
+    // Server will be cleaned up when it goes out of scope
     
     Ok(())
 }

@@ -51,6 +51,17 @@ impl NetworkConditions {
             jitter_ms: 100,
         }
     }
+
+    /// Create custom network conditions
+    pub fn custom (packet_loss: f32, latency_ms: u32, bandwidth_kbps: u32, jitter_ms: u32) -> Self {
+        Self {
+            packet_loss,
+            latency_ms,
+            bandwidth_kbps,
+            connection_dropped: false,
+            jitter_ms,
+        }
+    }
     
     /// Simulate complete connection loss
     pub fn disconnected() -> Self {

@@ -5,6 +5,7 @@ pub mod config_types;
 pub mod error;
 pub mod file;
 pub mod manager;
+pub mod network;
 pub mod patterns;
 pub mod pipeline;
 pub mod rtsp;

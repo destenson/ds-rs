@@ -36,7 +36,7 @@ impl GStreamerNetworkSimulator {
     /// Create simulation elements for a pipeline
     pub fn create_elements(&self, name_prefix: &str) -> Result<gst::Bin> {
         // Create a bin to contain all simulation elements
-        let bin = gst::Bin::new(Some(&format!("{}_network_sim", name_prefix)));
+        let bin = gst::Bin::with_name(&format!("{}_network_sim", name_prefix));
         
         // Create queue for buffering and packet dropping
         let queue = gst::ElementFactory::make("queue")
@@ -44,14 +44,14 @@ impl GStreamerNetworkSimulator {
             .property("max-size-buffers", 1000u32)
             .property("max-size-bytes", 0u32)
             .property("max-size-time", 0u64)
-            .property("leaky", 2i32) // Leak downstream (drop old buffers)
+            .property_from_str("leaky", "downstream") // Leak downstream (drop old buffers)
             .build()
             .context("Failed to create queue element")?;
         
         // Create identity for latency injection
         let identity = gst::ElementFactory::make("identity")
             .name(&format!("{}_sim_identity", name_prefix))
-            .property("drop-probability", 0.0f64)
+            .property("drop-probability", 0.0f32)
             .property("sync", true)
             .build()
             .context("Failed to create identity element")?;
@@ -72,12 +72,16 @@ impl GStreamerNetworkSimulator {
         // Create ghost pads for the bin
         let sink_pad = queue.static_pad("sink")
             .context("Failed to get queue sink pad")?;
-        let ghost_sink = gst::GhostPad::with_target(Some("sink"), &sink_pad)?;
+        let ghost_sink = gst::GhostPad::builder_with_target(&sink_pad)?
+            .name("sink")
+            .build();
         bin.add_pad(&ghost_sink)?;
         
         let src_pad = valve.static_pad("src")
             .context("Failed to get valve src pad")?;
-        let ghost_src = gst::GhostPad::with_target(Some("src"), &src_pad)?;
+        let ghost_src = gst::GhostPad::builder_with_target(&src_pad)?
+            .name("src")
+            .build();
         bin.add_pad(&ghost_src)?;
         
         // Store element references
@@ -127,13 +131,13 @@ impl GStreamerNetworkSimulator {
         
         // Apply packet loss to identity element
         if let Some(ref identity) = elements.identity {
-            let drop_prob = (conditions.packet_loss / 100.0) as f64;
+            let drop_prob = (conditions.packet_loss / 100.0) as f32;
             identity.set_property("drop-probability", drop_prob);
             
             // Apply latency
             if conditions.latency_ms > 0 {
                 let latency_ns = conditions.latency_ms as u64 * 1_000_000;
-                identity.set_property("datarate", latency_ns as i64);
+                identity.set_property("datarate", latency_ns as i32);
             }
         }
         

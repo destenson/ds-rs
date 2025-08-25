@@ -69,20 +69,28 @@ impl MetadataExtractor {
             }
         }
         
-        // Create mock metadata for testing
-        let batch_meta = BatchMeta::new_mock(buffer_id);
-        
-        // Cache it
-        if let Ok(mut cache) = self.cache.lock() {
-            cache.insert(buffer_id, batch_meta.clone());
+        #[cfg(test)]
+        {
+            // Create mock metadata for testing
+            let batch_meta = BatchMeta::new_mock(buffer_id);
             
-            // Limit cache size
-            if cache.len() > 100 {
-                cache.clear();
+            // Cache it
+            if let Ok(mut cache) = self.cache.lock() {
+                cache.insert(buffer_id, batch_meta.clone());
+                
+                // Limit cache size
+                if cache.len() > 100 {
+                    cache.clear();
+                }
             }
+            
+            Ok(batch_meta)
         }
-        
-        Ok(batch_meta)
+
+        #[cfg(not(test))]
+        {
+            todo!("Real metadata extraction not implemented");
+        }
     }
     
     /// Extract frame metadata for a specific source

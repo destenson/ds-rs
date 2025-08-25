@@ -226,11 +226,18 @@ impl OnnxDetector {
         // Check if we have a real session or should use mock
         let session = match self.session.as_ref() {
             Some(s) => s,
+            #[cfg(test)]
             None => {
                 // Use mock detection when no model is loaded
                 // log::debug!("Using mock detection (no ONNX model loaded)");
                 let mock_output = self.create_mock_yolo_output();
                 return self.postprocess_outputs(&mock_output, image.width(), image.height());
+            }
+            #[cfg(not(test))]
+            None => {
+                return Err(DetectorError::Inference(
+                    "No ONNX model loaded for detection".to_string()
+                ));
             }
         };
         
@@ -614,6 +621,7 @@ impl OnnxDetector {
         intersection / union
     }
     
+    #[cfg(test)]
     /// Create mock YOLO output for testing
     fn create_mock_yolo_output(&self) -> Vec<f32> {
         let num_anchors = 25200; // Typical for 640x640 YOLOv5
@@ -672,6 +680,7 @@ impl OnnxDetector {
         // log::info!("Set YOLO version to: {:?}", version);
     }
     
+    #[cfg(test)]
     /// Create a mock detector for testing without an actual model
     pub fn new_mock() -> Self {
         Self {

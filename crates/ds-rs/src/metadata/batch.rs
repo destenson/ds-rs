@@ -39,6 +39,7 @@ impl BatchMeta {
         }
     }
     
+    #[cfg(test)]
     /// Create mock batch metadata for testing
     pub fn new_mock(batch_id: u64) -> Self {
         let mut batch = Self::new(batch_id, 4);

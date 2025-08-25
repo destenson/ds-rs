@@ -151,6 +151,7 @@ impl OnnxDetector {
             });
         }
         
+        #[cfg(test)]
         #[cfg(not(feature = "ort"))]
         {
             // When ort feature is not enabled, create mock detector
@@ -163,6 +164,10 @@ impl OnnxDetector {
                 yolo_version: config.yolo_version,
             })
         }
+        #[cfg(not(test))]
+        Err(DetectorError::Configuration(
+            "ONNX Runtime (ort) feature not enabled".to_string()
+        ))
     }
     
     #[cfg(feature = "ort")]
@@ -209,10 +214,17 @@ impl OnnxDetector {
             // Check if we have a real session or should use mock
             let session = match self.session.as_ref() {
                 Some(s) => s,
+                #[cfg(test)]
                 None => {
                     // Use mock detection when no model is loaded
                     let mock_output = self.create_mock_yolo_output();
                     return self.postprocess_outputs(&mock_output, image.width(), image.height());
+                }
+                #[cfg(not(test))]
+                None => {
+                    return Err(DetectorError::Inference(
+                        "No ONNX model loaded for detection".to_string()
+                    ));
                 }
             };
             
@@ -329,6 +341,7 @@ impl OnnxDetector {
             return self.postprocess_outputs(&output, image.width(), image.height());
         }
         
+        #[cfg(test)]
         #[cfg(not(feature = "ort"))]
         {
             // Use mock detection when ONNX feature is not enabled
@@ -609,6 +622,7 @@ impl OnnxDetector {
         intersection / union
     }
     
+    #[cfg(test)]
     /// Create mock YOLO output for testing
     fn create_mock_yolo_output(&self) -> Vec<f32> {
         let num_anchors = 25200; // Typical for 640x640 YOLOv5

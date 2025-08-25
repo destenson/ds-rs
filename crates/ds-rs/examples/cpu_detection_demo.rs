@@ -3,7 +3,7 @@
 //! This example demonstrates the ONNX-based CPU detector working with real YOLO models.
 //! It creates a test image, runs detection, and prints the results.
 
-use ds_rs::backend::cpu_vision::detector::{OnnxDetector, DetectorConfig, YoloVersion};
+use ds_rs::backend::cpu_vision::{OnnxDetector, DetectorConfig, YoloVersion};
 use image::{DynamicImage, RgbImage};
 use std::path::Path;
 

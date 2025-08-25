@@ -3,6 +3,7 @@ pub mod factory;
 use crate::config::{ServerConfig, VideoSourceConfig};
 use crate::error::{Result, SourceVideoError};
 use crate::watch::FileSystemEvent;
+use crate::network::{NetworkProfile, NetworkConditions};
 use factory::MediaFactoryBuilder;
 use gstreamer_rtsp_server as rtsp_server;
 use gstreamer_rtsp_server::prelude::*;
@@ -16,6 +17,8 @@ pub struct RtspServer {
     sources: Arc<Mutex<HashMap<String, VideoSourceConfig>>>,
     port: u16,
     address: String,
+    global_network_profile: Option<NetworkProfile>,
+    per_source_network: HashMap<String, NetworkProfile>,
 }
 
 impl RtspServer {
@@ -41,6 +44,8 @@ impl RtspServer {
             sources: Arc::new(Mutex::new(HashMap::new())),
             port: config.port,
             address: config.address,
+            global_network_profile: None,
+            per_source_network: HashMap::new(),
         })
     }
     
@@ -51,9 +56,18 @@ impl RtspServer {
             format!("/{}", config.name)
         };
         
-        let factory = MediaFactoryBuilder::new()
-            .from_config(&config)?
-            .build()?;
+        // Build factory with network profile if configured
+        let mut factory_builder = MediaFactoryBuilder::new()
+            .from_config(&config)?;
+        
+        // Apply per-source network profile if exists, otherwise use global
+        if let Some(profile) = self.per_source_network.get(&config.name) {
+            factory_builder = factory_builder.network_profile(*profile);
+        } else if let Some(profile) = self.global_network_profile {
+            factory_builder = factory_builder.network_profile(profile);
+        }
+        
+        let factory = factory_builder.build()?;
         
         self.mounts.add_factory(&mount_point, factory);
         
@@ -214,6 +228,9 @@ impl RtspServer {
 pub struct RtspServerBuilder {
     config: ServerConfig,
     sources: Vec<VideoSourceConfig>,
+    global_network_profile: Option<NetworkProfile>,
+    per_source_network: HashMap<String, NetworkProfile>,
+    custom_network_conditions: Option<NetworkConditions>,
 }
 
 impl RtspServerBuilder {
@@ -221,6 +238,9 @@ impl RtspServerBuilder {
         Self {
             config: ServerConfig::default(),
             sources: Vec::new(),
+            global_network_profile: None,
+            per_source_network: HashMap::new(),
+            custom_network_conditions: None,
         }
     }
     
@@ -250,8 +270,46 @@ impl RtspServerBuilder {
         self
     }
     
+    pub fn add_test_pattern_with_network(mut self, name: &str, pattern: &str, profile: NetworkProfile) -> Self {
+        let config = VideoSourceConfig::test_pattern(name, pattern);
+        self.sources.push(config);
+        self.per_source_network.insert(name.to_string(), profile);
+        self
+    }
+    
+    pub fn network_profile(mut self, profile: NetworkProfile) -> Self {
+        self.global_network_profile = Some(profile);
+        self
+    }
+    
+    pub fn custom_network_conditions(mut self, packet_loss: f32, latency_ms: u32, bandwidth_kbps: u32, jitter_ms: u32) -> Self {
+        self.custom_network_conditions = Some(NetworkConditions {
+            packet_loss,
+            latency_ms,
+            bandwidth_kbps,
+            jitter_ms,
+            connection_dropped: false,
+        });
+        self
+    }
+    
+    pub fn per_source_network(mut self, source_name: &str, profile: NetworkProfile) -> Self {
+        self.per_source_network.insert(source_name.to_string(), profile);
+        self
+    }
+    
     pub fn build(self) -> Result<RtspServer> {
         let mut server = RtspServer::new(self.config)?;
+        
+        // Apply network configuration
+        server.global_network_profile = self.global_network_profile;
+        server.per_source_network = self.per_source_network.clone();
+        
+        // If custom conditions are set, convert to Custom profile
+        if let Some(conditions) = self.custom_network_conditions {
+            // We'll handle custom conditions by setting them directly when creating factories
+            server.global_network_profile = Some(NetworkProfile::Custom);
+        }
         
         for source in self.sources {
             server.add_source(source)?;

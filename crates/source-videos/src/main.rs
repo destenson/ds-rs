@@ -77,6 +77,28 @@ enum Commands {
         
         #[arg(long = "seamless-loop", help = "Enable seamless looping without gaps")]
         seamless_loop: bool,
+        
+        // Network simulation options
+        #[arg(long = "network-profile", help = "Apply network profile (perfect, 3g, 4g, 5g, wifi, public, satellite, broadband, poor)")]
+        network_profile: Option<String>,
+        
+        #[arg(long = "packet-loss", help = "Packet loss percentage (0-100)")]
+        packet_loss: Option<f32>,
+        
+        #[arg(long = "latency", help = "Additional latency in milliseconds")]
+        latency_ms: Option<u32>,
+        
+        #[arg(long = "bandwidth", help = "Bandwidth limit in kbps (0 = unlimited)")]
+        bandwidth_kbps: Option<u32>,
+        
+        #[arg(long = "jitter", help = "Jitter in milliseconds")]
+        jitter_ms: Option<u32>,
+        
+        #[arg(long = "network-drop", help = "Simulate periodic connection drops (format: period_seconds,duration_seconds)")]
+        network_drop: Option<String>,
+        
+        #[arg(long = "per-source-network", help = "Per-source network conditions (format: source_name:profile)", value_delimiter = ',')]
+        per_source_network: Vec<String>,
     },
     Generate {
         #[arg(short, long, default_value = "smpte")]
@@ -142,6 +164,13 @@ async fn main() -> Result<()> {
             watch_interval_ms,
             max_loops,
             seamless_loop,
+            network_profile,
+            packet_loss,
+            latency_ms,
+            bandwidth_kbps,
+            jitter_ms,
+            network_drop,
+            per_source_network,
         } => {
             serve_command(
                 port, 
@@ -161,6 +190,13 @@ async fn main() -> Result<()> {
                 watch_interval_ms,
                 max_loops,
                 seamless_loop,
+                network_profile,
+                packet_loss,
+                latency_ms,
+                bandwidth_kbps,
+                jitter_ms,
+                network_drop,
+                per_source_network,
             ).await
         }
         Commands::Generate { pattern, duration, output, width, height, fps } => {
@@ -196,21 +232,119 @@ async fn serve_command(
     watch_interval_ms: u64,
     max_loops: Option<u32>,
     seamless_loop: bool,
+    network_profile: Option<String>,
+    packet_loss: Option<f32>,
+    latency_ms: Option<u32>,
+    bandwidth_kbps: Option<u32>,
+    jitter_ms: Option<u32>,
+    network_drop: Option<String>,
+    per_source_network: Vec<String>,
 ) -> Result<()> {
     use source_videos::{DirectoryConfig, FileListConfig, FilterConfig, DirectoryScanner, RtspServerBuilder, WatcherManager, LoopConfig, create_looping_source};
+    use source_videos::network::{NetworkProfile, NetworkConditions, GStreamerNetworkSimulator, NetworkController};
     use std::time::Duration;
+    use std::str::FromStr;
     
     println!("Starting RTSP server on rtsp://localhost:{}", port);
     println!("Starting RTSP server on {}:{}", address, port);
     
+    // Parse network simulation settings
+    let global_network_profile = if let Some(profile_str) = network_profile {
+        match NetworkProfile::from_str(&profile_str) {
+            Ok(profile) => {
+                println!("Applying network profile: {} - {}", profile_str, profile.description());
+                Some(profile)
+            }
+            Err(e) => {
+                eprintln!("Invalid network profile '{}': {}", profile_str, e);
+                return Err(source_videos::SourceVideoError::config(format!("Invalid network profile: {}", e)).into());
+            }
+        }
+    } else if packet_loss.is_some() || latency_ms.is_some() || bandwidth_kbps.is_some() {
+        // Create custom network conditions from individual parameters
+        let conditions = NetworkConditions {
+            packet_loss: packet_loss.unwrap_or(0.0),
+            latency_ms: latency_ms.unwrap_or(0),
+            bandwidth_kbps: bandwidth_kbps.unwrap_or(0),
+            jitter_ms: jitter_ms.unwrap_or(0),
+            connection_dropped: false,
+        };
+        println!("Applying custom network conditions: packet_loss={}%, latency={}ms, bandwidth={}kbps, jitter={}ms",
+                 conditions.packet_loss, conditions.latency_ms, conditions.bandwidth_kbps, conditions.jitter_ms);
+        Some(NetworkProfile::Custom)
+    } else {
+        None
+    };
+    
+    // Parse per-source network conditions
+    let mut per_source_profiles = std::collections::HashMap::new();
+    for spec in per_source_network {
+        let parts: Vec<&str> = spec.splitn(2, ':').collect();
+        if parts.len() == 2 {
+            match NetworkProfile::from_str(parts[1]) {
+                Ok(profile) => {
+                    per_source_profiles.insert(parts[0].to_string(), profile);
+                    println!("Source '{}' will use network profile: {}", parts[0], parts[1]);
+                }
+                Err(e) => {
+                    eprintln!("Invalid network profile for source '{}': {}", parts[0], e);
+                }
+            }
+        } else {
+            eprintln!("Invalid per-source-network format: '{}' (expected 'source:profile')", spec);
+        }
+    }
+    
+    // Parse network drop simulation
+    let network_drop_config = if let Some(drop_spec) = network_drop {
+        let parts: Vec<&str> = drop_spec.split(',').collect();
+        if parts.len() == 2 {
+            match (parts[0].parse::<u64>(), parts[1].parse::<u64>()) {
+                (Ok(period), Ok(duration)) => {
+                    println!("Network drops configured: every {}s for {}s", period, duration);
+                    Some((Duration::from_secs(period), Duration::from_secs(duration)))
+                }
+                _ => {
+                    eprintln!("Invalid network-drop format: '{}' (expected 'period_seconds,duration_seconds')", drop_spec);
+                    None
+                }
+            }
+        } else {
+            eprintln!("Invalid network-drop format: '{}' (expected 'period_seconds,duration_seconds')", drop_spec);
+            None
+        }
+    } else {
+        None
+    };
+    
     // Build server with initial patterns
     let mut server_builder = RtspServerBuilder::new().port(port);
+    
+    // Apply global network profile if set
+    if let Some(profile) = global_network_profile {
+        server_builder = server_builder.network_profile(profile);
+    } else if packet_loss.is_some() || latency_ms.is_some() || bandwidth_kbps.is_some() {
+        // Apply custom network conditions
+        server_builder = server_builder.custom_network_conditions(
+            packet_loss.unwrap_or(0.0),
+            latency_ms.unwrap_or(0),
+            bandwidth_kbps.unwrap_or(0),
+            jitter_ms.unwrap_or(0)
+        );
+    }
     
     // Add test patterns if specified
     if !patterns.is_empty() {
         for (i, pattern) in patterns.iter().enumerate() {
             let name = format!("pattern-{}", i + 1);
-            server_builder = server_builder.add_test_pattern(&name, pattern);
+            
+            // Check for per-source network profile
+            if let Some(profile) = per_source_profiles.get(&name) {
+                server_builder = server_builder.add_test_pattern_with_network(&name, pattern, *profile);
+            } else {
+                server_builder = server_builder.add_test_pattern(&name, pattern);
+            }
+            
             println!("Will add pattern '{}' at rtsp://{}:{}/{}", pattern, address, port, name);
         }
     }
@@ -322,6 +456,14 @@ async fn serve_command(
         println!("Stream available at: {}", server.get_url(&mount));
     }
     
+    // Set up periodic network drops if configured
+    let mut network_simulator = if let Some((period, duration)) = network_drop_config {
+        let sim = GStreamerNetworkSimulator::new();
+        Some((sim, period, duration, std::time::Instant::now()))
+    } else {
+        None
+    };
+    
     // Get the default main context for manual iteration
     let main_context = gstreamer::glib::MainContext::default();
     
@@ -332,6 +474,25 @@ async fn serve_command(
         while std::time::Instant::now() < end_time {
             // Iterate the GLib main context
             main_context.iteration(false);
+            
+            // Handle periodic network drops
+            if let Some((ref mut sim, period, drop_duration, ref mut last_drop)) = network_simulator {
+                let now = std::time::Instant::now();
+                if now.duration_since(*last_drop) >= period {
+                    println!("Simulating network drop for {}s...", drop_duration.as_secs());
+                    sim.drop_connection();
+                    *last_drop = now;
+                    
+                    // Schedule restoration
+                    let sim_clone = sim.simulator().clone();
+                    let duration_clone = drop_duration;
+                    tokio::spawn(async move {
+                        tokio::time::sleep(duration_clone).await;
+                        sim_clone.restore_connection();
+                        println!("Network connection restored");
+                    });
+                }
+            }
             
             // Small sleep to prevent busy waiting
             tokio::time::sleep(Duration::from_millis(10)).await;
@@ -356,6 +517,25 @@ async fn serve_command(
                             if let Err(e) = server.handle_file_event(&event) {
                                 eprintln!("Error handling file event: {}", e);
                             }
+                        }
+                    }
+                    
+                    // Handle periodic network drops
+                    if let Some((ref mut sim, period, drop_duration, ref mut last_drop)) = network_simulator {
+                        let now = std::time::Instant::now();
+                        if now.duration_since(*last_drop) >= period {
+                            println!("Simulating network drop for {}s...", drop_duration.as_secs());
+                            sim.drop_connection();
+                            *last_drop = now;
+                            
+                            // Schedule restoration
+                            let sim_clone = sim.simulator().clone();
+                            let duration_clone = drop_duration;
+                            tokio::spawn(async move {
+                                tokio::time::sleep(duration_clone).await;
+                                sim_clone.restore_connection();
+                                println!("Network connection restored");
+                            });
                         }
                     }
                     

@@ -21,6 +21,14 @@ pub enum NetworkProfile {
     Broadband,
     /// Poor network conditions
     Poor,
+    /// Noisy radio link (high packet loss, variable latency)
+    NoisyRadio,
+    /// Intermittent satellite (periodic disconnections)
+    IntermittentSatellite,
+    /// Drone UHF/VHF link through urban environment
+    DroneUrban,
+    /// Drone in open/mountain terrain (long range, terrain masking)
+    DroneMountain,
     /// Custom profile
     Custom,
 }
@@ -101,6 +109,38 @@ impl NetworkProfile {
                 jitter_ms: 200,
             },
             
+            NetworkProfile::NoisyRadio => NetworkConditions {
+                packet_loss: 15.0,  // High packet loss due to interference
+                latency_ms: 80,     // Moderate latency
+                bandwidth_kbps: 1000, // 1 Mbps limited bandwidth
+                connection_dropped: false,
+                jitter_ms: 150,     // High jitter from signal variations
+            },
+            
+            NetworkProfile::IntermittentSatellite => NetworkConditions {
+                packet_loss: 3.0,   // Some packet loss
+                latency_ms: 750,    // Very high latency
+                bandwidth_kbps: 5000, // 5 Mbps when connected
+                connection_dropped: false, // Will be toggled periodically
+                jitter_ms: 200,     // High jitter from atmospheric conditions
+            },
+            
+            NetworkProfile::DroneUrban => NetworkConditions {
+                packet_loss: 20.0,  // High loss from building obstruction
+                latency_ms: 40,     // Low latency when signal gets through
+                bandwidth_kbps: 800, // Limited bandwidth on UHF/VHF
+                connection_dropped: false,
+                jitter_ms: 120,     // Variable due to multipath reflections
+            },
+            
+            NetworkProfile::DroneMountain => NetworkConditions {
+                packet_loss: 5.0,   // Lower loss in open terrain
+                latency_ms: 60,     // Slightly higher from distance
+                bandwidth_kbps: 1500, // Better bandwidth in clear air
+                connection_dropped: false,
+                jitter_ms: 30,      // More stable than urban
+            },
+            
             NetworkProfile::Custom => NetworkConditions::default(),
         }
     }
@@ -117,6 +157,10 @@ impl NetworkProfile {
             NetworkProfile::Satellite => "Satellite internet (25 Mbps, 600ms latency)",
             NetworkProfile::Broadband => "Cable/DSL broadband (100 Mbps, 20ms latency)",
             NetworkProfile::Poor => "Poor network conditions (500 kbps, 500ms latency)",
+            NetworkProfile::NoisyRadio => "Noisy radio link (15% loss, high jitter, 1 Mbps)",
+            NetworkProfile::IntermittentSatellite => "Intermittent satellite (750ms latency, periodic drops)",
+            NetworkProfile::DroneUrban => "Drone UHF/VHF through buildings (20% loss, multipath, 800 kbps)",
+            NetworkProfile::DroneMountain => "Drone in mountain terrain (5% loss, distance effects, 1.5 Mbps)",
             NetworkProfile::Custom => "Custom network profile",
         }
     }
@@ -133,6 +177,10 @@ impl NetworkProfile {
             NetworkProfile::Satellite,
             NetworkProfile::Broadband,
             NetworkProfile::Poor,
+            NetworkProfile::NoisyRadio,
+            NetworkProfile::IntermittentSatellite,
+            NetworkProfile::DroneUrban,
+            NetworkProfile::DroneMountain,
         ]
     }
 }
@@ -162,6 +210,26 @@ impl StandardProfiles {
     pub fn for_latency_test() -> NetworkProfile {
         NetworkProfile::Satellite
     }
+    
+    /// Get profile for testing noisy/unreliable connections
+    pub fn for_reliability_test() -> NetworkProfile {
+        NetworkProfile::NoisyRadio
+    }
+    
+    /// Get profile for testing intermittent connections
+    pub fn for_intermittent_test() -> NetworkProfile {
+        NetworkProfile::IntermittentSatellite
+    }
+    
+    /// Get profile for testing urban drone/UAV communications
+    pub fn for_drone_test() -> NetworkProfile {
+        NetworkProfile::DroneUrban
+    }
+    
+    /// Get profile for testing multipath and obstruction effects
+    pub fn for_obstruction_test() -> NetworkProfile {
+        NetworkProfile::DroneUrban
+    }
 }
 
 impl std::fmt::Display for NetworkProfile {
@@ -184,6 +252,10 @@ impl std::str::FromStr for NetworkProfile {
             "satellite" | "sat" => Ok(NetworkProfile::Satellite),
             "broadband" | "cable" | "dsl" => Ok(NetworkProfile::Broadband),
             "poor" | "bad" => Ok(NetworkProfile::Poor),
+            "noisy" | "noisyradio" | "radio" => Ok(NetworkProfile::NoisyRadio),
+            "intermittent" | "intermittentsatellite" | "intermittent-satellite" => Ok(NetworkProfile::IntermittentSatellite),
+            "drone" | "droneurban" | "drone-urban" | "uhf" | "vhf" => Ok(NetworkProfile::DroneUrban),
+            "mountain" | "dronemountain" | "drone-mountain" | "open-terrain" => Ok(NetworkProfile::DroneMountain),
             "custom" => Ok(NetworkProfile::Custom),
             _ => Err(format!("Unknown network profile: {}", s)),
         }

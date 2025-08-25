@@ -1,12 +1,14 @@
 pub mod profiles;
 pub mod simulator;
 pub mod gstreamer;
+pub mod scenarios;
 
 use std::time::Duration;
 
 pub use profiles::{NetworkProfile, StandardProfiles};
 pub use simulator::{NetworkSimulator, SimulationConfig};
 pub use gstreamer::GStreamerNetworkSimulator;
+pub use scenarios::{NetworkScenario, ScenarioPlayer, ScenarioConfig};
 
 /// Network conditions to simulate
 #[derive(Debug, Clone)]

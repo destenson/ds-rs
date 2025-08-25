@@ -2585,6 +2585,7 @@ dependencies = [
 name = "source-videos"
 version = "0.1.0"
 dependencies = [
+ "anyhow",
  "clap",
  "env_logger",
  "gstreamer",
@@ -2594,6 +2595,7 @@ dependencies = [
  "log",
  "notify",
  "once_cell",
+ "rand",
  "serde",
  "serde_json",
  "tempfile",

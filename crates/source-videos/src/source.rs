@@ -15,6 +15,18 @@ pub enum SourceState {
     Error(String),
 }
 
+impl std::fmt::Display for SourceState {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            SourceState::Created => write!(f, "CREATED"),
+            SourceState::Playing => write!(f, "PLAYING"),
+            SourceState::Paused => write!(f, "PAUSED"),
+            SourceState::Stopped => write!(f, "STOPPED"),
+            SourceState::Error(msg) => write!(f, "ERROR: {}", msg),
+        }
+    }
+}
+
 pub trait VideoSource: Send + Sync {
     fn get_id(&self) -> &str;
     fn get_name(&self) -> &str;

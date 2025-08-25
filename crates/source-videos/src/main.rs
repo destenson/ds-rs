@@ -2,7 +2,7 @@
 use source_videos::{
     AppConfig, SourceVideos, TestPattern, VideoSourceConfig,
     generate_test_file, create_test_rtsp_server, Result, SourceVideoError,
-    api::ControlApi
+    api::ControlApi, EnhancedRepl
 };
 use clap::{Parser, Subcommand, ValueEnum};
 use clap_complete::{generate, Shell};
@@ -440,7 +440,7 @@ async fn main() -> Result<()> {
             list_command().await
         }
         Commands::Interactive => {
-            interactive_command().await
+            enhanced_interactive_command().await
         }
         Commands::Test { port } => {
             test_command(port).await
@@ -1797,4 +1797,10 @@ async fn print_file_metrics(path: &PathBuf) -> Result<()> {
         }
     }
     Ok(())
+}
+
+async fn enhanced_interactive_command() -> Result<()> {
+    let sv = SourceVideos::new()?;
+    let mut repl = EnhancedRepl::new(sv)?;
+    repl.run().await
 }

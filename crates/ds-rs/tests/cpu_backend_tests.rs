@@ -27,7 +27,7 @@ fn test_standard_backend_with_cpu_vision() {
 
 #[test]
 fn test_cpu_detector_creation() {
-    use ds_rs::backend::cpu_vision::detector::{OnnxDetector, DetectorConfig};
+    use ds_rs::backend::cpu_vision::{OnnxDetector, DetectorConfig};
     
     // Test with nonexistent model file
     let result = OnnxDetector::new("nonexistent.onnx");
@@ -78,7 +78,7 @@ fn test_cpu_detector_creation() {
 #[cfg(feature = "nalgebra")]
 fn test_cpu_tracker_functionality() {
     use ds_rs::backend::cpu_vision::tracker::CentroidTracker;
-    use ds_rs::backend::cpu_vision::detector::Detection;
+    use ds_rs::backend::cpu_vision::Detection;
     
     let mut tracker = CentroidTracker::new(50.0, 30);
     
@@ -154,7 +154,7 @@ fn test_element_mapping() {
 #[cfg(feature = "nalgebra")]
 fn test_tracker_object_lifecycle() {
     use ds_rs::backend::cpu_vision::tracker::CentroidTracker;
-    use ds_rs::backend::cpu_vision::detector::Detection;
+    use ds_rs::backend::cpu_vision::Detection;
     
     let mut tracker = CentroidTracker::new(50.0, 2); // Low disappear threshold
     
@@ -191,7 +191,7 @@ fn test_tracker_object_lifecycle() {
 
 #[test]
 fn test_detection_nms() {
-    use ds_rs::backend::cpu_vision::detector::Detection;
+    use ds_rs::backend::cpu_vision::Detection;
     
     // Test that Detection struct works correctly
     let det1 = Detection {
@@ -222,7 +222,7 @@ fn test_detection_nms() {
 #[cfg(feature = "nalgebra")]
 fn test_multi_object_tracking() {
     use ds_rs::backend::cpu_vision::tracker::CentroidTracker;
-    use ds_rs::backend::cpu_vision::detector::Detection;
+    use ds_rs::backend::cpu_vision::Detection;
     
     let mut tracker = CentroidTracker::new(100.0, 30);
     
@@ -321,7 +321,7 @@ fn test_backend_manager_selects_standard() {
 #[test]
 #[cfg(feature = "ort")]
 fn test_onnx_tensor_operations() {
-    use ds_rs::backend::cpu_vision::detector::{OnnxDetector, DetectorConfig};
+    use ds_rs::backend::cpu_vision::{OnnxDetector, DetectorConfig};
     use image::DynamicImage;
     
     // Create detector with mock mode (no actual model file)

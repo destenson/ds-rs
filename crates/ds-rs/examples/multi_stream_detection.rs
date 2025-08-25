@@ -8,7 +8,7 @@ use ds_rs::{
     Pipeline, PipelineBuilder,
     MultiStreamManager, MultiStreamConfig, MultiStreamConfigBuilder,
     ResourceLimits, StreamPriority,
-    backend::cpu_vision::detector::DetectorConfig,
+    backend::cpu_vision::DetectorConfig,
 };
 use gstreamer as gst;
 use gstreamer::prelude::*;
@@ -39,7 +39,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             confidence_threshold: 0.5,
             nms_threshold: 0.4,
             num_threads: 2,
-            yolo_version: ds_rs::backend::cpu_vision::detector::YoloVersion::V8,
+            yolo_version: ds_rs::backend::cpu_vision::YoloVersion::V8,
             class_names: None,
         })
         .worker_threads(4)

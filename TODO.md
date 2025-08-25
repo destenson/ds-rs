@@ -1,6 +1,6 @@
 # TODO List
 
-Last Updated: 2025-08-25 (Post PRP-41 Source-Videos Control API)
+Last Updated: 2025-08-25 (Post PRP-38 Advanced CLI Options)
 
 ## Recent Achievements ✅
 
@@ -44,11 +44,13 @@ Last Updated: 2025-08-25 (Post PRP-41 Source-Videos Control API)
 ## Critical Priority TODOs 🔴
 
 ### 1. Excessive unwrap() Usage - Production Risk
-**Status**: CRITICAL - 782 unwrap() calls across 92 files
+**Status**: CRITICAL - 792 unwrap() calls across 93 files (+10 from recent CLI work)
 - **Impact**: Any call could cause production panic
 - **Recommendation**: Systematic replacement sprint
 - **Priority**: Must address before production deployment
 - **Target**: Replace 200 critical unwrap() calls per week
+- **Recent Change**: CLI enhancements (PRP-38) added 10 new unwrap() calls
+- **New Locations**: CLI enhancements added unwrap() calls in source-videos crate
 
 ### 2. Remove Global State in Error Classification
 **Location**: `src/error/classification.rs:309`
@@ -57,18 +59,24 @@ Last Updated: 2025-08-25 (Post PRP-41 Source-Videos Control API)
 - **Impact**: Architecture smell, testing difficulties
 
 ### 3. Fix Unimplemented Property Handlers
+**Status**: CRITICAL - 4 unimplemented!() calls causing runtime panics
 **Locations**: 
-- `cpuinfer/src/cpudetector/imp.rs:263,277`
-- `src/backend/cpu_vision/cpudetector/imp.rs:274,288`
+- `cpuinfer/src/cpudetector/imp.rs:263,277` - 2 property handlers
+- `src/backend/cpu_vision/cpudetector/imp.rs:274,288` - 2 property handlers  
 - Complete property getter/setter implementations
-- **Impact**: Runtime panics when properties accessed
+- **Impact**: Guaranteed runtime panics when GStreamer properties accessed
+- **Priority**: Fix immediately before any GStreamer element property access
 
-### 4. DeepStream Metadata Processing
-**Location**: `src/rendering/deepstream_renderer.rs:190,222`
-- Implement actual DeepStream metadata processing
-- Create and attach actual NvDsObjectMeta
-- **Impact**: Critical for hardware acceleration features
-- **Blocked by**: Need DeepStream FFI bindings (PRP-04)
+### 4. Active TODO Comments in Code
+**Status**: CRITICAL - 2 active todo!() calls requiring implementation
+**Locations**:
+- `dsl/src/lib.rs:9` - DSL crate placeholder with single todo!()
+- `src/metadata/mod.rs:92` - Metadata extraction with todo!("Real metadata extraction not implemented")
+- **New Issues Found**:
+  - `source-videos/src/manager.rs:319,366` - Progressive/lazy loading TODOs
+  - `source-videos/src/file_utils.rs:128` - Actual metadata extraction TODO
+  - `source-videos/src/main.rs:1223` - Get actual metrics TODO
+- **Impact**: Runtime panics when these code paths are executed
 
 ## High Priority TODOs 🟠
 
@@ -97,46 +105,48 @@ Last Updated: 2025-08-25 (Post PRP-41 Source-Videos Control API)
 
 ## Medium Priority TODOs 🟡
 
-### 9. Placeholder Implementations Requiring "Actual" Logic
+### 9. DeepStream Metadata Processing
+**Location**: `src/rendering/deepstream_renderer.rs:190,222`
+- Implement actual DeepStream metadata processing
+- Create and attach actual NvDsObjectMeta
+- **Impact**: Critical for hardware acceleration features
+- **Blocked by**: Need DeepStream FFI bindings (PRP-04)
+
+### 10. Placeholder Implementations Requiring "Actual" Logic
 **Locations with "for now", "actual", or incomplete implementations**:
-- `src/file_utils.rs:128` - Actual metadata extraction using GStreamer discoverer
-- `src/rendering/deepstream_renderer.rs:190` - Actual DeepStream metadata processing
-- `src/api/routes/sources.rs:126` - Source update not fully implemented
-- `src/api/routes/server.rs:110,130,147` - Simplified server state management
-- `src/api/routes/operations.rs:137` - Simplified watcher state check
-- `src/multistream/manager.rs:228` - Simulated processing
-- `src/metadata/mod.rs:61` - Mock metadata for testing
+- `source-videos/src/file_utils.rs:128` - Actual metadata extraction using GStreamer discoverer
+- `source-videos/src/api/routes/sources.rs:126` - Source update not fully implemented
+- `source-videos/src/api/routes/server.rs:110,130,147` - Simplified server state management
+- `source-videos/src/api/routes/operations.rs:137` - Simplified watcher state check
+- `source-videos/src/multistream/manager.rs:228` - Simulated processing
+- `source-videos/src/main.rs:1543` - Simplified playlist source creation
 - Multiple "For now" implementations in various modules
 
-### 10. Remove Tokio Dependency
+### 11. Remove Tokio Dependency
 **Locations**:
-- `Cargo.toml:54` - ds-rs crate
-- `source-videos/Cargo.toml:25`
+- `ds-rs/Cargo.toml:54` - ds-rs crate
+- `source-videos/Cargo.toml:28` - source-videos crate with TODO comment
 - Comment: "we should not use tokio (async is ok though)"
 - **Impact**: Reduce dependencies, simpler runtime
 
-### 11. Mock Backend Conditional Compilation
+### 12. Mock Backend Conditional Compilation
 **Location**: `src/backend/mock.rs:48`
 - Only include mock backend for testing with #[cfg(test)]
 - **Impact**: Smaller production binaries
 
-### 12. Real Metadata Extraction
-**Location**: `src/metadata/mod.rs:92`
-- Replace todo!() with actual metadata extraction logic
-- Currently returns mock data
-- **Impact**: Production readiness
+### 13. Progressive/Lazy Loading Implementation
+**Locations**: 
+- `source-videos/src/manager.rs:319` - Progressive loading for large directories
+- `source-videos/src/manager.rs:366` - Lazy loading for memory efficiency
+- Currently placeholder comments
+- **Impact**: Performance with large video catalogs and memory usage
 
-### 13. Progressive Loading Implementation
-**Location**: `source-videos/src/manager.rs:319`
-- Implement progressive loading for large directories
-- Currently placeholder comment
-- **Impact**: Performance with large video catalogs
-
-### 14. Lazy Loading Implementation  
-**Location**: `source-videos/src/manager.rs:366`
-- Implement lazy loading for better memory usage
-- Currently placeholder comment
-- **Impact**: Memory efficiency
+### 14. CLI Command Completion
+**Status**: Some advanced features need completion
+**Locations**:
+- `source-videos/src/main.rs:1223` - Get actual metrics in simulate command
+- `source-videos/src/main.rs:1543` - Simplified playlist source creation  
+- **Impact**: Full CLI functionality for production use
 
 ## Low Priority TODOs 🔵
 
@@ -164,13 +174,14 @@ Last Updated: 2025-08-25 (Post PRP-41 Source-Videos Control API)
 
 ## Technical Debt 🔧
 
-### Code Quality Issues
-- **unwrap() Usage**: 782 occurrences across 92 files - CRITICAL production risk
-- **TODO/FIXME comments**: 6 active todo!() calls + multiple "for now" implementations
-- **"For now" comments**: ~25 occurrences indicating temporary solutions  
-- **Placeholder implementations**: 4 critical unimplemented property handlers
-- **Metadata stubs**: 3 locations with actual processing needed
+### Code Quality Issues (Updated)
+- **unwrap() Usage**: 792 occurrences across 93 files - CRITICAL production risk (+10 increase)
+- **unimplemented!() Usage**: 4 occurrences across 2 files - CRITICAL runtime panic risk
+- **todo!() Usage**: 2 active calls + 5 TODO comments in new CLI code
+- **"For now" comments**: ~30+ occurrences indicating temporary solutions  
+- **Placeholder implementations**: Multiple locations needing actual logic
 - **Tokio usage**: 2 locations marked for removal per architecture decisions
+- **New CLI Technical Debt**: Recent PRP-38 implementation added several TODOs and unwrap() calls
 
 ### Test Coverage Status
 - **Overall**: 281/285 tests passing (98.6% pass rate) 
@@ -193,19 +204,24 @@ Last Updated: 2025-08-25 (Post PRP-41 Source-Videos Control API)
 - File watching and auto-reload functionality
 - Directory/file serving with filtering
 - Complete REST API for automation
+- Advanced CLI with multiple serving modes
+- Shell completions for major shells
 - Live display integration with GStreamer
 
 ⚠️ **Production Blockers**:
-- 782 unwrap() calls requiring systematic replacement
-- 4 unimplemented property handlers causing runtime panics
+- 792 unwrap() calls requiring systematic replacement (+10 increase)
+- 4 unimplemented!() property handlers causing guaranteed runtime panics
+- 2 active todo!() calls that will panic when executed
 - Missing error propagation in critical paths
+- New CLI code introduced additional technical debt
 
 ## Next Sprint Focus 🎯
 
 ### Immediate Actions (Week 1-2)
-1. **Critical**: Start unwrap() replacement sprint - target 200 calls
-2. **High**: Execute PRP-38 (Advanced CLI Options)
-3. **Medium**: Fix unimplemented property handlers
+1. **Critical**: Fix 4 unimplemented!() property handlers - guaranteed panics
+2. **Critical**: Complete 2 active todo!() implementations
+3. **Critical**: Start unwrap() replacement sprint - target 200 calls from 792
+4. **Medium**: Complete CLI command implementations (metrics, playlist)
 
 ### Short-term (Week 3-6)  
 4. **High**: REPL mode implementation (PRP-39)
@@ -224,6 +240,8 @@ Last Updated: 2025-08-25 (Post PRP-41 Source-Videos Control API)
 - Error recovery and fault tolerance
 - Network simulation testing
 - REST API for automation
+- Advanced CLI with comprehensive options
+- Shell completions and automation support
 - Comprehensive test coverage (98.6%)
 
 ### 🚨 Critical Blockers
@@ -232,7 +250,7 @@ Last Updated: 2025-08-25 (Post PRP-41 Source-Videos Control API)
 - **Missing proper error propagation** - Silent failures possible
 
 ### 📈 Recommendation
-Focus on error handling improvements while maintaining feature development momentum. The project has strong architectural foundations but requires production hardening.
+With PRP-38 now complete, immediately focus on critical error handling issues. The project has excellent feature completeness but requires urgent production hardening to address the 4 unimplemented!() handlers and 792 unwrap() calls that pose significant runtime risks.
 
 ## Development Guidelines 📝
 

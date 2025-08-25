@@ -1,6 +1,6 @@
 # TODO List
 
-Last Updated: 2025-08-25 (Post PRP-38 Advanced CLI Options)
+Last Updated: 2025-08-25 (Post-Codebase Scan Update)
 
 ## Recent Achievements ✅
 
@@ -44,13 +44,13 @@ Last Updated: 2025-08-25 (Post PRP-38 Advanced CLI Options)
 ## Critical Priority TODOs 🔴
 
 ### 1. Excessive unwrap() Usage - Production Risk
-**Status**: CRITICAL - 792 unwrap() calls across 93 files (+10 from recent CLI work)
+**Status**: CRITICAL - 796 unwrap() calls across 93+ files 
 - **Impact**: Any call could cause production panic
 - **Recommendation**: Systematic replacement sprint
-- **Priority**: Must address before production deployment
+- **Priority**: Must address before production deployment  
 - **Target**: Replace 200 critical unwrap() calls per week
-- **Recent Change**: CLI enhancements (PRP-38) added 10 new unwrap() calls
-- **New Locations**: CLI enhancements added unwrap() calls in source-videos crate
+- **Latest Count**: 796 occurrences found in comprehensive scan
+- **High-Risk Files**: Tests have ~500 unwrap() calls, but production code still has ~296
 
 ### 2. Remove Global State in Error Classification
 **Location**: `src/error/classification.rs:309`
@@ -61,22 +61,30 @@ Last Updated: 2025-08-25 (Post PRP-38 Advanced CLI Options)
 ### 3. Fix Unimplemented Property Handlers
 **Status**: CRITICAL - 4 unimplemented!() calls causing runtime panics
 **Locations**: 
-- `cpuinfer/src/cpudetector/imp.rs:263,277` - 2 property handlers
-- `src/backend/cpu_vision/cpudetector/imp.rs:274,288` - 2 property handlers  
+- `crates/cpuinfer/src/cpudetector/imp.rs:263,277` - 2 property handlers
+- `crates/ds-rs/src/backend/cpu_vision/cpudetector/imp.rs:274,288` - 2 property handlers  
 - Complete property getter/setter implementations
 - **Impact**: Guaranteed runtime panics when GStreamer properties accessed
 - **Priority**: Fix immediately before any GStreamer element property access
 
 ### 4. Active TODO Comments in Code
-**Status**: CRITICAL - 2 active todo!() calls requiring implementation
-**Locations**:
-- `dsl/src/lib.rs:9` - DSL crate placeholder with single todo!()
-- `src/metadata/mod.rs:92` - Metadata extraction with todo!("Real metadata extraction not implemented")
-- **New Issues Found**:
-  - `source-videos/src/manager.rs:319,366` - Progressive/lazy loading TODOs
-  - `source-videos/src/file_utils.rs:128` - Actual metadata extraction TODO
-  - `source-videos/src/main.rs:1223` - Get actual metrics TODO
-- **Impact**: Runtime panics when these code paths are executed
+**Status**: CRITICAL - 2 active todo!() calls + 11 TODO comments requiring implementation
+**Active Panics**:
+- `crates/dsl/src/lib.rs:9` - DSL crate placeholder with single todo!()
+- `crates/ds-rs/src/metadata/mod.rs:92` - Metadata extraction with todo!("Real metadata extraction not implemented")
+
+**Active TODO Comments** (Updated locations):
+- `crates/ds-rs/tests/cpu_backend_tests.rs:343` - Real ONNX model testing TODO
+- `crates/ds-rs/src/error/classification.rs:309` - Remove global state TODO
+- `crates/ds-rs/src/backend/mock.rs:48` - Conditional compilation TODO
+- `crates/ds-rs/src/backend/cpu_vision/cpudetector/imp.rs:154` - Attach custom metadata TODO
+- `crates/ds-rs/src/rendering/deepstream_renderer.rs:190,222` - Actual DeepStream metadata processing TODOs
+- `crates/source-videos/src/manager.rs:319,366` - Progressive/lazy loading TODOs
+- `crates/source-videos/src/main.rs:1072` - Unix socket server runtime control TODO
+- `crates/source-videos/src/main.rs:1279` - Get actual metrics TODO
+- `crates/source-videos/src/file_utils.rs:128` - Actual metadata extraction TODO
+
+**Impact**: 2 runtime panics when executed, 11 incomplete implementations
 
 ## High Priority TODOs 🟠
 
@@ -113,21 +121,27 @@ Last Updated: 2025-08-25 (Post PRP-38 Advanced CLI Options)
 - **Blocked by**: Need DeepStream FFI bindings (PRP-04)
 
 ### 10. Placeholder Implementations Requiring "Actual" Logic
-**Locations with "for now", "actual", or incomplete implementations**:
-- `source-videos/src/file_utils.rs:128` - Actual metadata extraction using GStreamer discoverer
-- `source-videos/src/api/routes/sources.rs:126` - Source update not fully implemented
-- `source-videos/src/api/routes/server.rs:110,130,147` - Simplified server state management
-- `source-videos/src/api/routes/operations.rs:137` - Simplified watcher state check
-- `source-videos/src/multistream/manager.rs:228` - Simulated processing
-- `source-videos/src/main.rs:1543` - Simplified playlist source creation
-- Multiple "For now" implementations in various modules
+**Updated locations with "for now", "actual", "simplified", or incomplete implementations**:
+- `crates/source-videos/src/file_utils.rs:128` - Actual metadata extraction using GStreamer discoverer
+- `crates/source-videos/src/api/routes/sources.rs:126` - Source update not fully implemented
+- `crates/source-videos/src/api/routes/server.rs:110,130,147` - Simplified server state management
+- `crates/source-videos/src/api/routes/operations.rs:137` - Simplified watcher state check
+- `crates/source-videos/src/multistream/manager.rs:228` - Simulated processing
+- `crates/source-videos/src/main.rs:1543` - Simplified playlist source creation
+
+**New Findings**:
+- Multiple "Simplified" implementations in API routes needing actual state management
+- Temporary file management and progressive loading placeholders
+- Network simulation metrics tracking needs actual vs simulated condition comparison
+- Various "for now" comments indicating temporary solutions across codebase
 
 ### 11. Remove Tokio Dependency
 **Locations**:
-- `ds-rs/Cargo.toml:54` - ds-rs crate
-- `source-videos/Cargo.toml:28` - source-videos crate with TODO comment
-- Comment: "we should not use tokio (async is ok though)"
+- `crates/ds-rs/Cargo.toml:54` - ds-rs crate with TODO comment
+- `crates/source-videos/Cargo.toml:28` - source-videos crate with TODO comment
+- Comment: "TODO: we should not use tokio (async is ok though)"
 - **Impact**: Reduce dependencies, simpler runtime
+- **Note**: Both locations have explicit TODO comments about removing tokio usage
 
 ### 12. Mock Backend Conditional Compilation
 **Location**: `src/backend/mock.rs:48`
@@ -148,45 +162,65 @@ Last Updated: 2025-08-25 (Post PRP-38 Advanced CLI Options)
 - `source-videos/src/main.rs:1543` - Simplified playlist source creation  
 - **Impact**: Full CLI functionality for production use
 
+### 15. Test Infrastructure Issues
+**Status**: 2 test failures in cpuinfer crate
+**Failing Tests**:
+- `detector::onnx_tests::test_detector_config` - No valid ONNX model loaded error
+- `detector::onnx_tests::test_onnx_runtime_graceful_fallback` - Same model loading issue
+**Root Cause**: Tests require actual ONNX model files that aren't present
+**Impact**: CI/CD pipeline reliability, development confidence
+
+### 16. Code Quality Warnings
+**Status**: Multiple compiler warnings detected
+**Warning Types**:
+- 7 async_fn_in_trait warnings in source-videos crate
+- 6 dead_code warnings in ds-rs multistream module 
+- Multiple unused_imports, unused_variables, unused_mut across examples and tests
+**Impact**: Code maintainability, potential future compilation issues
+
 ## Low Priority TODOs 🔵
 
-### 15. DSL Crate Implementation
-**Location**: `dsl/src/lib.rs:9`
+### 17. DSL Crate Implementation
+**Location**: `crates/dsl/src/lib.rs:9`
 - DeepStream Services Library implementation
 - Single todo!() in test
 - **Impact**: High-level API
 
-### 16. Test with Real ONNX Model
-**Location**: `tests/cpu_backend_tests.rs:343`
+### 18. Test with Real ONNX Model
+**Location**: `crates/ds-rs/tests/cpu_backend_tests.rs:343`
 - When real ONNX model available, add proper tests
 - **Impact**: Test coverage
 
-### 17. Directory Scanning Optimization
-**Location**: `source-videos/src/directory.rs:63`
+### 19. Directory Scanning Optimization
+**Location**: `crates/source-videos/src/directory.rs:63`
 - Replace synchronous scanning with async implementation
 - Currently "for now" comment
 - **Impact**: Performance for large directories
 
-### 18. Export/Streaming Integration
+### 20. Export/Streaming Integration
 **PRP**: PRP-13
 - MQTT/Kafka integration for detection results
 - **Impact**: Production deployment features
 
 ## Technical Debt 🔧
 
-### Code Quality Issues (Updated)
-- **unwrap() Usage**: 792 occurrences across 93 files - CRITICAL production risk (+10 increase)
-- **unimplemented!() Usage**: 4 occurrences across 2 files - CRITICAL runtime panic risk
-- **todo!() Usage**: 2 active calls + 5 TODO comments in new CLI code
-- **"For now" comments**: ~30+ occurrences indicating temporary solutions  
+### Code Quality Issues (Updated from Comprehensive Scan)
+- **unwrap() Usage**: 796 occurrences across 93+ files - CRITICAL production risk
+- **unimplemented!() Usage**: 4 occurrences across 2 files - CRITICAL runtime panic risk  
+- **todo!() Usage**: 2 active calls + 11 TODO comments requiring implementation
+- **"For now" comments**: 30+ occurrences indicating temporary solutions  
 - **Placeholder implementations**: Multiple locations needing actual logic
-- **Tokio usage**: 2 locations marked for removal per architecture decisions
-- **New CLI Technical Debt**: Recent PRP-38 implementation added several TODOs and unwrap() calls
+- **Tokio usage**: 2 locations with explicit TODO comments for removal
+- **Test Failures**: 2 cpuinfer tests failing due to missing ONNX models
+- **Compiler Warnings**: 13+ warning types across async traits, dead code, unused imports
 
-### Test Coverage Status
-- **Overall**: 281/285 tests passing (98.6% pass rate) 
-- **CPU Detector Tests**: 2 failures due to missing ONNX model files
-- **ONNX Tensor Operations**: 2 test failures due to missing model configuration
+### Test Coverage Status (Updated)
+- **Overall**: Workspace tests show mixed results with some failures
+- **cpuinfer Crate**: 8/10 tests passing (80% pass rate)
+  - 2 failures: `test_detector_config` and `test_onnx_runtime_graceful_fallback`
+  - Root cause: Missing ONNX model files for testing
+- **Other Crates**: Need full test run to determine exact status
+- **Warning**: Multiple compiler warnings may indicate technical debt in tests
 
 ## Project Statistics 📊
 
@@ -208,30 +242,37 @@ Last Updated: 2025-08-25 (Post PRP-38 Advanced CLI Options)
 - Shell completions for major shells
 - Live display integration with GStreamer
 
-⚠️ **Production Blockers**:
-- 792 unwrap() calls requiring systematic replacement (+10 increase)
+⚠️ **Production Blockers** (Updated):
+- 796 unwrap() calls requiring systematic replacement 
 - 4 unimplemented!() property handlers causing guaranteed runtime panics
 - 2 active todo!() calls that will panic when executed
+- 11 TODO comments requiring implementation for complete functionality
 - Missing error propagation in critical paths
-- New CLI code introduced additional technical debt
+- 2 test failures affecting CI/CD reliability
+- Multiple compiler warnings indicating code quality issues
 
 ## Next Sprint Focus 🎯
 
 ### Immediate Actions (Week 1-2)
-1. **Critical**: Fix 4 unimplemented!() property handlers - guaranteed panics
-2. **Critical**: Complete 2 active todo!() implementations
-3. **Critical**: Start unwrap() replacement sprint - target 200 calls from 792
-4. **Medium**: Complete CLI command implementations (metrics, playlist)
+1. **HIGH PRIORITY**: REPL mode implementation (PRP-39) - leverages completed API foundation
+2. **Critical**: Fix 4 unimplemented!() property handlers - guaranteed panics
+3. **Critical**: Complete 2 active todo!() implementations  
+4. **Critical**: Fix 2 failing cpuinfer tests for CI/CD reliability
+5. **High**: Start unwrap() replacement sprint - target 200 calls from 796
 
 ### Short-term (Week 3-6)  
-4. **High**: REPL mode implementation (PRP-39)
-5. **Medium**: Remove global state in error classification
-6. **Medium**: Implement actual metadata extraction logic
+6. **Medium**: Address compiler warnings (async traits, dead code, unused imports)
+7. **Medium**: Remove global state in error classification
+8. **Medium**: Complete 11 remaining TODO comment implementations
+9. **Medium**: Implement actual metadata extraction logic
+10. **Medium**: Remove tokio dependency from both crates
 
 ### Mid-term (Week 7-12)
-7. **High**: DeepStream FFI bindings (PRP-04) 
-8. **Medium**: Progressive/lazy loading optimizations
-9. **Low**: Directory scanning async optimization
+11. **High**: DeepStream FFI bindings (PRP-04) 
+12. **Medium**: Progressive/lazy loading optimizations  
+13. **Medium**: Complete placeholder API implementations
+14. **Low**: Directory scanning async optimization
+15. **Low**: Clean up compiler warnings in examples and tests
 
 ## Production Readiness Assessment 🏭
 
@@ -244,13 +285,23 @@ Last Updated: 2025-08-25 (Post PRP-38 Advanced CLI Options)
 - Shell completions and automation support
 - Comprehensive test coverage (98.6%)
 
-### 🚨 Critical Blockers
-- **768 unwrap() calls** - Must be addressed for production stability
-- **4 unimplemented property handlers** - Runtime panic risk
+### 🚨 Critical Blockers (Updated)
+- **796 unwrap() calls** - Must be addressed for production stability
+- **4 unimplemented property handlers** - Runtime panic risk  
+- **2 active todo!() calls** - Will panic when executed
 - **Missing proper error propagation** - Silent failures possible
+- **Test infrastructure issues** - 2 tests failing, affecting CI/CD reliability
 
-### 📈 Recommendation
-With PRP-38 now complete, immediately focus on critical error handling issues. The project has excellent feature completeness but requires urgent production hardening to address the 4 unimplemented!() handlers and 792 unwrap() calls that pose significant runtime risks.
+### 📈 Recommendation (Updated)
+With PRP-38 complete and strong API foundation from PRP-41, prioritize high-impact developer experience features while addressing critical stability issues:
+
+**Priority 1**: REPL mode implementation (PRP-39) - leverages completed API foundation for immediate value
+**Priority 2**: Fix 4 unimplemented!() handlers and 2 todo!() panics (guaranteed failures)
+**Priority 3**: Address 796 unwrap() calls systematically (potential failures)  
+**Priority 4**: Fix test infrastructure issues for reliable CI/CD
+**Priority 5**: Complete 11 remaining TODO implementations for full functionality
+
+The codebase has excellent architectural foundations (61% complete) and should focus on delivering valuable user-facing features while systematically addressing technical debt.
 
 ## Development Guidelines 📝
 

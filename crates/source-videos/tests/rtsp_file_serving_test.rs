@@ -1,9 +1,7 @@
 use source_videos::{
-    RtspServerBuilder, VideoSourceConfig, VideoSourceType, 
-    FileContainer, Resolution, Framerate, VideoFormat, Result
+    RtspServerBuilder, VideoSourceConfig, VideoSourceType,
+    config_types::{FileContainer, Resolution, Framerate, VideoFormat}
 };
-use std::path::PathBuf;
-use std::time::Duration;
 use tempfile::TempDir;
 use std::fs;
 
@@ -114,9 +112,8 @@ fn test_rtsp_server_file_watching_integration() {
     
     let event = FileSystemEvent::Created(FileEventMetadata {
         path: test_file.clone(),
-        size: 13,
-        modified: std::time::SystemTime::now(),
-        is_dir: false,
+        size: Some(13),
+        modified: Some(std::time::SystemTime::now()),
         watcher_id: "test".to_string(),
     });
     
@@ -130,9 +127,8 @@ fn test_rtsp_server_file_watching_integration() {
     // Test file deletion
     let event = FileSystemEvent::Deleted(FileEventMetadata {
         path: test_file.clone(),
-        size: 13,
-        modified: std::time::SystemTime::now(),
-        is_dir: false,
+        size: Some(13),
+        modified: Some(std::time::SystemTime::now()),
         watcher_id: "test".to_string(),
     });
     

@@ -187,7 +187,13 @@ impl VideoSource {
                 capsfilter.sync_state_with_parent().ok();
                 
                 // Link decoder pad to videorate
-                let videorate_sink = videorate.static_pad("sink").unwrap();
+                let videorate_sink = match videorate.static_pad("sink") {
+                    Some(pad) => pad,
+                    None => {
+                        eprintln!("Failed to get videorate sink pad for source {}", source_id);
+                        return;
+                    }
+                };
                 if let Err(e) = pad.link(&videorate_sink) {
                     eprintln!("Failed to link decoder to videorate: {:?}", e);
                     return;
@@ -210,7 +216,13 @@ impl VideoSource {
                 };
                 
                 // Link capsfilter to compositor
-                let capsfilter_src = capsfilter.static_pad("src").unwrap();
+                let capsfilter_src = match capsfilter.static_pad("src") {
+                    Some(pad) => pad,
+                    None => {
+                        eprintln!("Failed to get capsfilter src pad for source {}", source_id);
+                        return;
+                    }
+                };
                 if let Err(e) = capsfilter_src.link(&sinkpad) {
                     eprintln!("Failed to link capsfilter to compositor: {:?}", e);
                     return;

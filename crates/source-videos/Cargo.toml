@@ -35,3 +35,7 @@ walkdir = "2.5"
 axum-test = "18.0.0"
 tempfile = "3.8"
 tokio-test = "0.4"
+
+[[bin]]
+name = "video-source"
+path = "src/main.rs"

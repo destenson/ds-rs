@@ -65,7 +65,9 @@ impl MediaFactoryBuilder {
         factory.set_eos_shutdown(self.eos_shutdown);
         factory.set_latency(self.latency);
         
-        factory.set_property("enable-rtcp", true);
+        // RTCP is enabled by default in GStreamer RTSP server
+        // The enable-rtcp property doesn't exist on RTSPMediaFactory
+        // Individual RTP elements in the pipeline will handle RTCP
         
         Ok(factory)
     }

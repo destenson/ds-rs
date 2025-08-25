@@ -10,6 +10,7 @@ use gstreamer::prelude::*;
 use gstreamer::glib;
 use std::sync::{Arc, Mutex};
 use std::collections::HashMap;
+use serde_json;
 
 /// Builder for creating configured pipelines with fluent API
 pub struct PipelineBuilder {
@@ -393,6 +394,61 @@ impl PipelineBuilder {
             let metadata_bridge = self.metadata_bridge.unwrap_or_else(|| {
                 Arc::new(Mutex::new(MetadataBridge::new()))
             });
+            
+            // Connect detector signals to metadata bridge
+            for (element_name, element) in &elements_map {
+                if element_name.contains("detector") || element_name.contains("nvinfer") {
+                    // Connect inference-results signal to metadata bridge
+                    let bridge_clone = metadata_bridge.clone();
+                    element.connect("inference-results", false, move |values| {
+                        if let (Some(frame_num), Some(json_str)) = (
+                            values[1].get::<u64>().ok(),
+                            values[2].get::<String>().ok()
+                        ) {
+                            // Parse the JSON and update the metadata bridge
+                            if let Ok(data) = serde_json::from_str::<serde_json::Value>(&json_str) {
+                                if let Some(detections) = data["detections"].as_array() {
+                                    let objects: Vec<crate::metadata::ObjectMeta> = detections.iter()
+                                        .enumerate()
+                                        .filter_map(|(idx, d)| {
+                                            let bbox = crate::metadata::BoundingBox::new(
+                                                d["x"].as_f64()? as f32,
+                                                d["y"].as_f64()? as f32,
+                                                d["width"].as_f64()? as f32,
+                                                d["height"].as_f64()? as f32,
+                                            );
+                                            
+                                            let mut obj_meta = crate::metadata::ObjectMeta::new(
+                                                frame_num * 1000 + idx as u64  // Unique ID per detection
+                                            );
+                                            
+                                            obj_meta.set_class(
+                                                d["class_id"].as_u64()? as i32,
+                                                d["class_name"].as_str()?
+                                            );
+                                            
+                                            obj_meta.set_detection_bbox(
+                                                bbox,
+                                                d["confidence"].as_f64()? as f32
+                                            );
+                                            
+                                            Some(obj_meta)
+                                        })
+                                        .collect();
+                                    
+                                    if let Ok(mut bridge) = bridge_clone.lock() {
+                                        let timestamp = gst::ClockTime::from_nseconds(frame_num * 1_000_000);
+                                        bridge.update_objects(objects, timestamp);
+                                    }
+                                }
+                            }
+                        }
+                        None
+                    });
+                    
+                    log::info!("Connected inference-results signal from {} to metadata bridge", element_name);
+                }
+            }
             
             // Find OSD elements and configure them
             for (element_name, element) in &elements_map {

@@ -1,3 +1,5 @@
+#![allow(unused)]
+
 //! Stream coordination for timing, synchronization and load balancing
 
 use crate::source::SourceId;

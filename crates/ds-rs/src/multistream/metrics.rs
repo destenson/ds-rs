@@ -1,3 +1,5 @@
+#![allow(unused)]
+
 //! Metrics collection and monitoring for multi-stream processing
 
 use crate::source::SourceId;

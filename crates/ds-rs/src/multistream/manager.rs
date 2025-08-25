@@ -1,3 +1,5 @@
+#![allow(unused)]
+
 //! Multi-stream manager for coordinating multiple detection pipelines
 
 use super::{

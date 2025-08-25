@@ -1,3 +1,5 @@
+#![allow(unused)]
+
 //! Resource management and monitoring for multi-stream processing
 
 use crate::source::SourceId;

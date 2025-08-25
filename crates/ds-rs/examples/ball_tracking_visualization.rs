@@ -90,12 +90,8 @@ impl BallTrackingApp {
                 .set_property("tiler", "height", 1080i32);
         }
 
-        // Use platform-appropriate sink
-        let sink_type = if cfg!(target_os = "windows") {
-            "d3dvideosink"
-        } else {
-            "nveglglessink"
-        };
+        // Use autovideosink for better cross-platform window handling
+        let sink_type = "autovideosink";
 
         
         let pipeline = builder
@@ -214,38 +210,94 @@ impl BallTrackingApp {
             running.store(false, Ordering::SeqCst);
         }).expect("Error setting Ctrl-C handler");
         
+        // Get the bus for message handling
+        let bus = self.pipeline.bus().unwrap();
+        
         // Monitor loop
         let start_time = std::time::Instant::now();
+        let mut last_stats_print = std::time::Instant::now();
         
         while self.running.load(Ordering::SeqCst) {
-            thread::sleep(Duration::from_secs(1));
-            
-            // Get rendering statistics
-            if let Ok(bridge) = self.metadata_bridge.lock() {
-                let stats = bridge.get_statistics();
-                let frame_count = stats.frames_processed;
-                
-                let elapsed = start_time.elapsed().as_secs_f64();
-                let fps = if elapsed > 0.0 {
-                    frame_count as f64 / elapsed
-                } else {
-                    0.0
-                };
-                
-                log::info!(
-                    "[{:.3}] Frames: {} | FPS: {:.1} | Objects rendered: {} | Buffer: {}",
-                    timestamp(),
-                    frame_count,
-                    fps,
-                    stats.frames_processed,
-                    stats.buffer_size
-                );
+            // Check for bus messages (non-blocking with 100ms timeout)
+            if let Some(msg) = bus.timed_pop(gst::ClockTime::from_mseconds(100)) {
+                use gst::MessageView;
+                match msg.view() {
+                    MessageView::Eos(..) => {
+                        log::info!("[{:.3}] Received EOS, stopping pipeline", timestamp());
+                        self.running.store(false, Ordering::SeqCst);
+                        break;
+                    },
+                    MessageView::Error(err) => {
+                        log::error!(
+                            "[{:.3}] Error from {:?}: {} ({:?})",
+                            timestamp(),
+                            err.src().map(|s| s.path_string()),
+                            err.error(),
+                            err.debug()
+                        );
+                        self.running.store(false, Ordering::SeqCst);
+                        break;
+                    },
+                    MessageView::Element(element_msg) => {
+                        // Check for window close messages from video sinks
+                        if let Some(structure) = element_msg.structure() {
+                            if structure.name() == "GstNavigationMessage" ||
+                               structure.name() == "application/x-gst-navigation" {
+                                // Check if it's a window close event
+                                if let Ok(event_type) = structure.get::<String>("event") {
+                                    if event_type == "window-closed" || event_type == "delete-event" {
+                                        log::info!("[{:.3}] Window closed, stopping pipeline", timestamp());
+                                        self.running.store(false, Ordering::SeqCst);
+                                        break;
+                                    }
+                                }
+                            }
+                        }
+                    },
+                    MessageView::Application(app_msg) => {
+                        if let Some(structure) = app_msg.structure() {
+                            if structure.name() == "window-closed" {
+                                log::info!("[{:.3}] Window closed (application message), stopping pipeline", timestamp());
+                                self.running.store(false, Ordering::SeqCst);
+                                break;
+                            }
+                        }
+                    },
+                    _ => {}
+                }
             }
             
-            // Check pipeline state
-            let (_, state, _) = self.pipeline.state(gst::ClockTime::from_seconds(0));
-            if state != gst::State::Playing && self.running.load(Ordering::SeqCst) {
-                log::warn!("[{:.3}] Pipeline not in PLAYING state: {:?}", timestamp(), state);
+            // Print statistics every second
+            if last_stats_print.elapsed() >= Duration::from_secs(1) {
+                last_stats_print = std::time::Instant::now();
+                
+                // Get rendering statistics
+                if let Ok(bridge) = self.metadata_bridge.lock() {
+                    let stats = bridge.get_statistics();
+                    let frame_count = stats.frames_processed;
+                    
+                    let elapsed = start_time.elapsed().as_secs_f64();
+                    let fps = if elapsed > 0.0 {
+                        frame_count as f64 / elapsed
+                    } else {
+                        0.0
+                    };
+                    
+                    log::info!(
+                        "[{:.3}] Frames: {} | FPS: {:.1} | Objects rendered: {} | Buffer: {}",
+                        timestamp(),
+                        frame_count,
+                        fps,
+                        stats.frames_processed,
+                        stats.buffer_size
+                    );
+                }
+                
+                // Check pipeline state
+                let (_, state, _) = self.pipeline.state(gst::ClockTime::from_seconds(0));
+                if state != gst::State::Playing && self.running.load(Ordering::SeqCst) {
+                    log::warn!("[{:.3}] Pipeline not in PLAYING state: {:?}", timestamp(), state);
+                }
             }
         }
         
@@ -258,6 +310,11 @@ fn main() -> Result<()> {
     env_logger::Builder::from_default_env()
         .filter_level(log::LevelFilter::Info)
         .init();
+    
+    // Enable GStreamer debug logging for our detector
+    unsafe {
+        std::env::set_var("GST_DEBUG", "cpudetector:5");
+    }
     
     log::info!("[{:.3}] Ball Tracking Visualization Example", timestamp());
     log::info!("[{:.3}] =====================================", timestamp());

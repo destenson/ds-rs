@@ -11,6 +11,7 @@ use std::sync::{LazyLock, Mutex};
 use gstcpuinfer::detector::{OnnxDetector, DetectorConfig};
 use crate::error::Result;
 use image::DynamicImage;
+use serde_json;
 
 static CAT: LazyLock<gst::DebugCategory> = LazyLock::new(|| {
     gst::DebugCategory::new(
@@ -143,10 +144,29 @@ impl CpuDetector {
     }
     
     fn emit_inference_results(&self, frame_num: u64, detections: &[gstcpuinfer::detector::Detection]) {
-        // For now, just log the detections
-        // Signal emission would require proper GObject signal registration
+        // Convert detections to a simple serializable format
+        let detection_data: Vec<serde_json::Value> = detections.iter().map(|d| {
+            serde_json::json!({
+                "class_name": d.class_name,
+                "class_id": d.class_id,
+                "confidence": d.confidence,
+                "x": d.x,
+                "y": d.y,
+                "width": d.width,
+                "height": d.height,
+            })
+        }).collect();
+        
+        let json_string = serde_json::json!({
+            "frame_num": frame_num,
+            "detections": detection_data,
+        }).to_string();
+        
+        // Emit the signal
+        self.obj().emit_by_name::<()>("inference-results", &[&frame_num, &json_string]);
+        
         if !detections.is_empty() {
-            log::debug!("Frame {}: {} detections", frame_num, detections.len());
+            log::debug!("Frame {}: {} detections emitted via signal", frame_num, detections.len());
         }
     }
     
@@ -173,7 +193,14 @@ impl ObjectSubclass for CpuDetector {
 impl ObjectImpl for CpuDetector {
     fn signals() -> &'static [glib::subclass::Signal] {
         static SIGNALS: LazyLock<Vec<glib::subclass::Signal>> = LazyLock::new(|| {
-            vec![]
+            vec![
+                glib::subclass::Signal::builder("inference-results")
+                    .param_types([
+                        u64::static_type(),     // frame_num
+                        String::static_type(),  // serialized detections (JSON)
+                    ])
+                    .build(),
+            ]
         });
         
         SIGNALS.as_ref()
@@ -346,8 +373,8 @@ impl ElementImpl for CpuDetector {
 
 impl BaseTransformImpl for CpuDetector {
     const MODE: gst_base::subclass::BaseTransformMode = gst_base::subclass::BaseTransformMode::AlwaysInPlace;
-    const PASSTHROUGH_ON_SAME_CAPS: bool = true;
-    const TRANSFORM_IP_ON_PASSTHROUGH: bool = true;
+    const PASSTHROUGH_ON_SAME_CAPS: bool = false;
+    const TRANSFORM_IP_ON_PASSTHROUGH: bool = false;
     
     fn start(&self) -> std::result::Result<(), gst::ErrorMessage> {
         self.ensure_detector_loaded();
@@ -357,6 +384,8 @@ impl BaseTransformImpl for CpuDetector {
     fn transform_ip(&self, buf: &mut gst::BufferRef) -> std::result::Result<gst::FlowSuccess, gst::FlowError> {
         let mut frame_count = self.frame_count.lock().unwrap();
         *frame_count += 1;
+        
+        gst::debug!(CAT, imp = self, "Processing frame {}", *frame_count);
         
         let settings = self.settings.lock().unwrap().clone();
         
@@ -382,7 +411,7 @@ impl BaseTransformImpl for CpuDetector {
                 if let Some(ref detector) = *self.detector.lock().unwrap() {
                     match detector.detect(&image) {
                         Ok(detections) => {
-                            gst::trace!(CAT, imp = self, 
+                            gst::debug!(CAT, imp = self, 
                                        "Frame {}: Detected {} objects", *frame_count, detections.len());
                             
                             // Emit signal with detection results

@@ -412,7 +412,7 @@ impl OnnxDetector {
             let num_anchors = len / 84;
             if num_anchors > 1000 && num_anchors < 10000 {
                 // Likely v8, v9, v11 format
-                // log::debug!("Detected YOLOv8+ format with {} anchors", num_anchors);
+                println!("Auto-detected YOLOv8+ format: {} values, {} anchors", len, num_anchors);
                 return YoloVersion::V8;
             }
         }
@@ -422,16 +422,16 @@ impl OnnxDetector {
             let num_anchors = len / 85;
             if num_anchors > 1000 {
                 // Likely v3-v7 format
-                // log::debug!("Detected YOLOv3-v7 format with {} anchors", num_anchors);
+                println!("Detected YOLOv3-v7 format with {} anchors", num_anchors);
                 return YoloVersion::V5; // Use v5 processing for v3-v7
             }
         }
         
         // Check for smaller models or different input sizes
         if len % 85 == 0 || len % 84 == 0 {
-            // log::info!("Detected YOLO format with {} total values", len);
-            // Default to newer format for smaller outputs
-            return if len % 84 == 0 { YoloVersion::V8 } else { YoloVersion::V5 };
+            let version = if len % 84 == 0 { YoloVersion::V8 } else { YoloVersion::V5 };
+            // log::info!("Auto-detected YOLO format with {} total values as {:?}", len, version);
+            return version;
         }
         
         // Unknown format

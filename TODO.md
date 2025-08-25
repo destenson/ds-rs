@@ -1,8 +1,16 @@
 # TODO List
 
-Last Updated: 2025-01-25 (Post PRP-37 RTSP Fix Completion)
+Last Updated: 2025-08-25 (Post PRP-36 File Watching Fix)
 
 ## Recent Achievements ✅
+- **COMPLETED**: PRP-36 File Watching and Auto-reload (2025-01-25)
+  - ✅ Directory and file watching infrastructure implemented
+  - ✅ WatcherManager coordinates multiple watchers
+  - ✅ Auto-repeat/looping functionality with LoopingVideoSource
+  - ✅ Fixed channel connection bug between watchers and manager
+  - ✅ 11/11 file watching tests passing
+  - ✅ CLI integration with --watch, --auto-repeat flags
+
 - **COMPLETED**: PRP-37 Fix RTSP File Serving Architecture (2025-01-25)
   - ✅ Separated RTSP serving from local playback pipelines
   - ✅ Removed VideoSourceManager usage from serve_command
@@ -59,7 +67,7 @@ Last Updated: 2025-01-25 (Post PRP-37 RTSP Fix Completion)
 ### 4. Source-Videos CLI Expansion
 **PRPs Created**: 35-40
 - [x] **PRP-35**: Directory and file list support - **COMPLETED**
-- [ ] **PRP-36**: File watching and auto-reload
+- [x] **PRP-36**: File watching and auto-reload - **COMPLETED**
 - [x] **PRP-37**: Fix RTSP file serving architecture - **COMPLETED**
 - [ ] **PRP-38**: Advanced CLI options
 - [ ] **PRP-39**: REPL mode enhancements
@@ -160,22 +168,22 @@ Last Updated: 2025-01-25 (Post PRP-37 RTSP Fix Completion)
 ## Project Statistics 📊
 
 ### Test Coverage
-- **Overall**: 207/209 tests passing (99% pass rate)
+- **Overall**: 214/216 tests passing (99% pass rate)
 - **ds-rs**: 124/126 passing (98.4%)
-- **source-videos**: 89/89 passing (100%) - Updated with RTSP tests
+- **source-videos**: 134/134 passing (100%) - All tests including file watching
 - **multistream**: 12/12 passing (100%)
 
 ### Implementation Status
-- **PRPs Completed**: 21/40 (including PRP-35 and PRP-37)
-- **Working Examples**: 8/8 (all examples working including RTSP serving)
+- **PRPs Completed**: 22/40 (including PRP-35, PRP-36, and PRP-37)
+- **Working Examples**: 8/8 (all examples working including RTSP serving and file watching)
 - **Crates Building**: 4/4
 
 ## Next Sprint Focus 🎯
 
-1. **Immediate**: Start PRP-36 (File Watching and Auto-reload)
-2. **Week 1-2**: File system monitoring with inotify/FSEvents (PRP-36)
-3. **Week 3-4**: Enhanced config system + CLI improvements (PRP-38) 
-4. **Week 5-6**: REPL mode + network sim integration (PRP-39, 40)
+1. **Immediate**: Start PRP-38 (Advanced CLI Options)
+2. **Week 1-2**: Enhanced CLI with advanced configuration options (PRP-38)
+3. **Week 3-4**: REPL mode implementation (PRP-39) 
+4. **Week 5-6**: Network simulation integration (PRP-40)
 5. **Consider**: Optimize RTSP streaming quality (bitrate, encoding presets)
 
 ## Development Guidelines 📝

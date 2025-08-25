@@ -211,7 +211,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     #[cfg(unix)]
     {
         gst::glib::unix_signal_add(
-            gst::glib::unix_signal_source::SIGINT,
+            2,
             move || {
                 println!("\n[{:.3}] Received interrupt signal, shutting down...", timestamp());
                 main_loop.quit();

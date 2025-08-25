@@ -111,7 +111,7 @@ class EndToEndTest:
                 # Check for detection output
                 detection_found = any("Detection" in line or "Object" in line for line in output)
                 if detection_found:
-                    logger.info("✓ Detection output found")
+                    logger.info(" Detection output found")
                 else:
                     logger.warning("No detection output found")
                 
@@ -158,9 +158,9 @@ class EndToEndTest:
             }
             
             if results[backend]['success']:
-                logger.info(f"✓ {backend} backend test passed")
+                logger.info(f" {backend} backend test passed")
             else:
-                logger.error(f"✗ {backend} backend test failed")
+                logger.error(f" {backend} backend test failed")
         
         self.test_results['multi_backend'] = results
         return all(r['success'] for r in results.values())
@@ -199,9 +199,9 @@ class EndToEndTest:
             }
             
             if test_results.success:
-                logger.info(f"✓ Source management tests passed ({test_results.passed} tests)")
+                logger.info(f" Source management tests passed ({test_results.passed} tests)")
             else:
-                logger.error(f"✗ Source management tests failed ({test_results.failed} failures)")
+                logger.error(f" Source management tests failed ({test_results.failed} failures)")
                 for failed in test_results.failed_tests:
                     logger.error(f"  Failed: {failed}")
             
@@ -238,7 +238,7 @@ class EndToEndTest:
         )
         
         if recovery_found:
-            logger.info("✓ Error recovery mechanisms detected")
+            logger.info(" Error recovery mechanisms detected")
         else:
             logger.warning("No error recovery patterns found in output")
         
@@ -290,7 +290,7 @@ class EndToEndTest:
                     for line in fps_lines[-5:]:  # Last 5 FPS measurements
                         logger.info(f"  {line}")
                 
-                logger.info("✓ Performance test completed")
+                logger.info(" Performance test completed")
                 return True
             else:
                 logger.error("ds-app crashed during performance test")

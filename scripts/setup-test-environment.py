@@ -14,7 +14,7 @@ def check_python_version():
     if sys.version_info < (3, 7):
         print(f"Error: Python 3.7+ required, found {sys.version}")
         return False
-    print(f"✓ Python {sys.version.split()[0]} detected")
+    print(f" Python {sys.version.split()[0]} detected")
     return True
 
 def check_package(package_name):
@@ -49,7 +49,7 @@ def install_requirements():
         )
         
         if result.returncode == 0:
-            print("✓ All packages installed successfully")
+            print(" All packages installed successfully")
             return True
         else:
             print(f"Error installing packages:\n{result.stderr}")
@@ -75,15 +75,15 @@ def check_installed_packages():
     all_required_installed = True
     for package, description in required.items():
         if check_package(package):
-            print(f"  ✓ {package:12} - {description}")
+            print(f"   {package:12} - {description}")
         else:
-            print(f"  ✗ {package:12} - {description} (MISSING)")
+            print(f"   {package:12} - {description} (MISSING)")
             all_required_installed = False
     
     print("\nChecking optional packages:")
     for package, description in optional.items():
         if check_package(package):
-            print(f"  ✓ {package:12} - {description}")
+            print(f"   {package:12} - {description}")
         else:
             print(f"  ○ {package:12} - {description} (not installed)")
     
@@ -109,9 +109,9 @@ def validate_test_files():
     
     for file_path, description in required_files:
         if file_path.exists():
-            print(f"  ✓ {file_path.name:35} - {description}")
+            print(f"   {file_path.name:35} - {description}")
         else:
-            print(f"  ✗ {file_path.name:35} - {description} (MISSING)")
+            print(f"   {file_path.name:35} - {description} (MISSING)")
             all_files_exist = False
     
     return all_files_exist

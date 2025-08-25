@@ -178,14 +178,14 @@ pub fn print_dll_diagnostic_report() {
         let all_valid = validations.iter().all(|v| v.is_valid);
         
         if all_valid {
-            println!("✓ All DLLs are properly configured!");
+            println!(" All DLLs are properly configured!");
         } else {
-            println!("✗ DLL configuration issues detected:\n");
+            println!(" DLL configuration issues detected:\n");
             
             for validation in validations {
                 if !validation.is_valid {
                     println!("  {} {}", 
-                        if validation.is_valid { "✓" } else { "✗" },
+                        if validation.is_valid { "OK" } else { "BAD" },
                         validation.dll_name
                     );
                     

@@ -55,6 +55,11 @@ fn test_packet_loss_simulation() {
         bandwidth_kbps: 0,
         connection_dropped: false,
         jitter_ms: 0,
+        duplicate_probability: 0.0,
+        allow_reordering: true,
+        min_delay_ms: 0,
+        max_delay_ms: 0,
+        delay_probability: 0.0,
     });
     
     let mut dropped = 0;
@@ -72,6 +77,11 @@ fn test_packet_loss_simulation() {
         bandwidth_kbps: 0,
         connection_dropped: false,
         jitter_ms: 0,
+        duplicate_probability: 0.0,
+        allow_reordering: true,
+        min_delay_ms: 0,
+        max_delay_ms: 0,
+        delay_probability: 0.0,
     });
     
     dropped = 0;
@@ -95,6 +105,11 @@ fn test_latency_simulation() {
         bandwidth_kbps: 0,
         connection_dropped: false,
         jitter_ms: 0,
+        duplicate_probability: 0.0,
+        allow_reordering: true,
+        min_delay_ms: 0,
+        max_delay_ms: 0,
+        delay_probability: 0.0,
     });
     assert_eq!(simulator.get_latency_delay(), Duration::ZERO);
     
@@ -105,6 +120,11 @@ fn test_latency_simulation() {
         bandwidth_kbps: 0,
         connection_dropped: false,
         jitter_ms: 0,
+        duplicate_probability: 0.0,
+        allow_reordering: true,
+        min_delay_ms: 0,
+        max_delay_ms: 0,
+        delay_probability: 0.0,
     });
     assert_eq!(simulator.get_latency_delay(), Duration::from_millis(100));
     
@@ -115,6 +135,11 @@ fn test_latency_simulation() {
         bandwidth_kbps: 0,
         connection_dropped: false,
         jitter_ms: 50,
+        duplicate_probability: 0.0,
+        allow_reordering: true,
+        min_delay_ms: 0,
+        max_delay_ms: 0,
+        delay_probability: 0.0,
     });
     let delay = simulator.get_latency_delay();
     assert!(delay >= Duration::from_millis(100));
@@ -224,6 +249,11 @@ fn test_gstreamer_simulator() {
         bandwidth_kbps: 1000,
         connection_dropped: false,
         jitter_ms: 20,
+        duplicate_probability: 0.0,
+        allow_reordering: true,
+        min_delay_ms: 0,
+        max_delay_ms: 0,
+        delay_probability: 0.0,
     };
     
     simulator.enable_with_conditions(conditions.clone());

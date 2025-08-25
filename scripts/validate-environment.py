@@ -23,16 +23,16 @@ def print_header(text):
     print(f"{CYAN}{'='*60}{NC}")
 
 def print_success(text):
-    print(f"{GREEN}✓{NC} {text}")
+    print(f"{GREEN}{NC} {text}")
 
 def print_error(text):
-    print(f"{RED}✗{NC} {text}")
+    print(f"{RED}{NC} {text}")
 
 def print_warning(text):
-    print(f"{YELLOW}⚠{NC} {text}")
+    print(f"{YELLOW}{NC} {text}")
 
 def print_info(text):
-    print(f"{CYAN}ℹ{NC} {text}")
+    print(f"{CYAN}{NC} {text}")
 
 def check_command(command, version_flag="--version"):
     """Check if a command is available and get its version"""

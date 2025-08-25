@@ -52,10 +52,10 @@ impl Application {
                 println!("[{:.3}]   Pending state: {:?}", now(), pending);
                 
                 if current == expected_state {
-                    println!("[{:.3}] ✓ Pipeline is in expected state: {:?}", now(), expected_state);
+                    println!("[{:.3}]  Pipeline is in expected state: {:?}", now(), expected_state);
                     Ok(true)
                 } else {
-                    eprintln!("[{:.3}] ✗ Pipeline state mismatch: expected {:?}, got {:?}", 
+                    eprintln!("[{:.3}]  Pipeline state mismatch: expected {:?}, got {:?}", 
                              now(), expected_state, current);
                     
                     // Log all elements' states for debugging

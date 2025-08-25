@@ -327,23 +327,23 @@ class TestOrchestrator:
                 )
                 
                 if result.returncode == expected_exit_code:
-                    logger.info(f"✓ {name} completed successfully")
+                    logger.info(f" {name} completed successfully")
                     return True
                 elif allow_failure:
-                    logger.warning(f"⚠ {name} failed but marked as allow_failure")
+                    logger.warning(f" {name} failed but marked as allow_failure")
                     return True
                 else:
-                    logger.error(f"✗ {name} failed with exit code {result.returncode}")
+                    logger.error(f" {name} failed with exit code {result.returncode}")
                     if result.stdout:
                         logger.debug(f"stdout: {result.stdout}")
                     if result.stderr:
                         logger.debug(f"stderr: {result.stderr}")
                         
             except subprocess.TimeoutExpired:
-                logger.error(f"✗ {name} timed out after {timeout} seconds")
+                logger.error(f" {name} timed out after {timeout} seconds")
                 
             except Exception as e:
-                logger.error(f"✗ {name} failed with error: {e}")
+                logger.error(f" {name} failed with error: {e}")
                 
         return False
         
@@ -518,9 +518,9 @@ class TestOrchestrator:
         
         # Report results
         if success:
-            logger.info(f"\n✓ Scenario '{scenario_name}' completed successfully")
+            logger.info(f"\n Scenario '{scenario_name}' completed successfully")
         else:
-            logger.error(f"\n✗ Scenario '{scenario_name}' failed")
+            logger.error(f"\n Scenario '{scenario_name}' failed")
             
         self.test_results.append({
             'scenario': scenario_name,
@@ -551,16 +551,16 @@ class TestOrchestrator:
         failed = total - passed
         
         for result in self.test_results:
-            status = "✓ PASSED" if result['success'] else "✗ FAILED"
+            status = " PASSED" if result['success'] else " FAILED"
             print(f"  {result['scenario']:20} - {status}")
             
         print("-"*60)
         print(f"Total: {total}, Passed: {passed}, Failed: {failed}")
         
         if failed == 0:
-            print("\n✓ All tests passed!")
+            print("\n All tests passed!")
         else:
-            print(f"\n✗ {failed} test(s) failed")
+            print(f"\n {failed} test(s) failed")
 
 def main():
     """Main entry point"""

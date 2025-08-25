@@ -156,6 +156,11 @@ fn run_test_scenarios(simulator: Arc<GStreamerNetworkSimulator>) -> Result<()> {
         bandwidth_kbps: 0,
         connection_dropped: false,
         jitter_ms: 0,
+        duplicate_probability: 0.0,
+        allow_reordering: true,
+        min_delay_ms: 0,
+        max_delay_ms: 0,
+        delay_probability: 0.0,
     });
     println!("Applied 5% packet loss");
     std::thread::sleep(Duration::from_secs(3));
@@ -167,6 +172,11 @@ fn run_test_scenarios(simulator: Arc<GStreamerNetworkSimulator>) -> Result<()> {
         bandwidth_kbps: 0,
         connection_dropped: false,
         jitter_ms: 100,
+        duplicate_probability: 0.0,
+        allow_reordering: true,
+        min_delay_ms: 0,
+        max_delay_ms: 0,
+        delay_probability: 0.0,
     });
     println!("Applied 500ms latency with 100ms jitter");
     std::thread::sleep(Duration::from_secs(3));
@@ -178,6 +188,11 @@ fn run_test_scenarios(simulator: Arc<GStreamerNetworkSimulator>) -> Result<()> {
         bandwidth_kbps: 500, // 500 kbps
         connection_dropped: false,
         jitter_ms: 0,
+        duplicate_probability: 0.0,
+        allow_reordering: true,
+        min_delay_ms: 0,
+        max_delay_ms: 0,
+        delay_probability: 0.0,
     });
     println!("Applied 500 kbps bandwidth limit");
     std::thread::sleep(Duration::from_secs(3));

@@ -54,6 +54,11 @@ fn demo_standalone_simulator() {
         bandwidth_kbps: 1000,
         connection_dropped: false,
         jitter_ms: 50,
+        duplicate_probability: 0.0,
+        allow_reordering: true,
+        min_delay_ms: 0,
+        max_delay_ms: 0,
+        delay_probability: 0.0,
     };
     
     simulator.apply_conditions(poor_conditions.clone());

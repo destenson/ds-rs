@@ -3060,6 +3060,7 @@ dependencies = [
  "clap",
  "clap_complete",
  "env_logger",
+ "glob",
  "gstreamer",
  "gstreamer-app",
  "gstreamer-rtsp",

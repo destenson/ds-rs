@@ -325,25 +325,102 @@ cargo run --example fault_tolerant_pipeline
 cargo run --example fault_tolerant_multi_stream
 ```
 
-### Test Video Generation and RTSP Server
+### Advanced CLI Interface (source-videos)
 
-The `source-videos` crate provides comprehensive test infrastructure:
+The `source-videos` crate provides a comprehensive command-line interface with multiple serving modes:
 
+#### Basic Usage
 ```bash
 # Navigate to source-videos crate
 cd crates/source-videos
 
-# Start RTSP server with test patterns
-cargo run --release -- rtsp
+# Serve all MP4 files from directory
+cargo run -- serve -d /media/videos -i "*.mp4"
 
+# Serve specific files with network simulation
+cargo run -- serve -f video1.mp4 -f video2.mkv --network-profile residential
+
+# Multiple sources with filtering and watching
+cargo run -- serve -d /videos -r --include "*.mp4" --exclude "*temp*" --watch
+```
+
+#### Advanced Commands
+
+**Playlist Mode** - Sequential, random, or shuffle playback:
+```bash
+# Sequential playlist with repeat
+cargo run -- playlist -d /videos --playlist-mode sequential --playlist-repeat all
+
+# Shuffled playlist with transitions
+cargo run -- playlist -d /videos --playlist-mode shuffle --transition-duration 2.0
+
+# Load from M3U playlist file
+cargo run -- playlist --playlist-file /path/to/playlist.m3u --crossfade
+```
+
+**Enhanced Serving** - Advanced filtering and control:
+```bash
+# Filter by format, duration, and date
+cargo run -- serve-files -d /videos --format mp4 --min-duration 60 --modified-since 2025-01-01
+
+# Daemon mode with monitoring
+cargo run -- serve-files -d /videos --daemon --pid-file /var/run/sv.pid --metrics --status-interval 30
+
+# Preview without starting (dry run)
+cargo run -- serve-files -d /videos --dry-run --include "*.mp4"
+```
+
+**Directory Monitoring** - Real-time file system watching:
+```bash
+# Monitor with real-time stats in JSON format
+cargo run -- monitor -d /videos --recursive --metrics --output-format json
+
+# Watch with CSV output for automation
+cargo run -- monitor -d /videos --output-format csv --list-streams
+```
+
+**Network Simulation** - Test with realistic network conditions:
+```bash
+# Test with poor network conditions
+cargo run -- simulate --network-profile poor -d /videos --duration 120 --metrics
+
+# Custom network conditions
+cargo run -- serve -d /videos --packet-loss 5 --latency 100 --bandwidth 1000
+
+# Per-source network profiles
+cargo run -- serve -d /videos --per-source-network "video1:3g,video2:wifi"
+```
+
+#### Shell Completions
+```bash
+# Generate completions for your shell
+cargo run -- completions bash > ~/.bash_completion.d/source-videos
+cargo run -- completions zsh > ~/.zsh/completions/_source-videos
+cargo run -- completions fish > ~/.config/fish/completions/source-videos.fish
+
+# Show comprehensive help with examples
+cargo run -- help-all
+```
+
+#### REST API Integration
+```bash
+# Start with REST API for automation
+cargo run -- serve -d /videos --api --api-port 3000 --api-address 127.0.0.1
+
+# Access API documentation
+# Visit: http://localhost:3000/api/docs
+```
+
+#### Legacy Commands
+```bash
 # Generate test video files
-cargo run --release -- file --output test.mp4 --pattern ball --duration 10
+cargo run -- generate --pattern ball --duration 10 --output test.mp4
 
 # Start interactive mode
-cargo run --release -- interactive
+cargo run -- interactive
 
-# List available patterns (25+ options)
-cargo run --release -- --help
+# List available test patterns (25+ options)
+cargo run -- list
 ```
 
 Available test patterns include:

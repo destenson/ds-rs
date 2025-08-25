@@ -9,7 +9,7 @@ fn main() {
     {
         let result = copy_onnx_dlls();
         if let Err(e) = result {
-            println!("cargo:warning=DLL setup issue: {}", e);
+            println!("cargo:warning=DLL setup issue: {e}");
         }
     }
     
@@ -25,7 +25,7 @@ fn copy_onnx_dlls() -> Result<(), String> {
     
     // Check environment variables for custom DLL paths
     if let Ok(dylib_path) = env::var("ORT_DYLIB_PATH") {
-        println!("cargo:warning=Using ORT_DYLIB_PATH: {}", dylib_path);
+        println!("cargo:warning=Using ORT_DYLIB_PATH: {dylib_path}");
         return Ok(());
     }
     
@@ -64,7 +64,7 @@ fn copy_onnx_dlls() -> Result<(), String> {
         // println!("cargo:warning=Found {} at: {}", dll_name, source.display());
         
         // Verify the DLL is valid (basic size check)
-        let metadata = fs::metadata(&source).map_err(|e| {
+        let metadata = fs::metadata(source).map_err(|e| {
             format!("Failed to read metadata for {}: {}", source.display(), e)
         })?;
         
@@ -88,7 +88,7 @@ fn copy_onnx_dlls() -> Result<(), String> {
                 }
             }
             
-            fs::copy(&source, &dest).map_err(|e| {
+            fs::copy(source, &dest).map_err(|e| {
                 format!("Failed to copy {} to {}: {}", dll_name, dest.display(), e)
             })?;
             
@@ -131,10 +131,9 @@ fn find_dll(profile_dir: &Path, dll_name: &str) -> Result<PathBuf, String> {
     
     // If not found, provide helpful error message
     Err(format!(
-        "Could not find {}. The ort crate should download it automatically. \
+        "Could not find {dll_name}. The ort crate should download it automatically. \
          You can also set ORT_DYLIB_PATH environment variable to point to the DLL location, \
-         or download ONNX Runtime manually from https://github.com/microsoft/onnxruntime/releases",
-        dll_name
+         or download ONNX Runtime manually from https://github.com/microsoft/onnxruntime/releases"
     ))
 }
 

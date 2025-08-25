@@ -41,17 +41,17 @@ fn copy_onnx_dlls() {
             // Copy to deps directory (for tests)
             let deps_dest = deps_dir.join(dll_name);
             if let Err(e) = fs::copy(&source, &deps_dest) {
-                println!("cargo:warning=Failed to copy {} to deps: {}", dll_name, e);
+                println!("cargo:warning=Failed to copy {dll_name} to deps: {e}");
             } else {
-                println!("cargo:warning=Copied {} to deps directory for tests", dll_name);
+                println!("cargo:warning=Copied {dll_name} to deps directory for tests");
             }
             
             // Copy to examples directory (for examples)
             let examples_dest = examples_dir.join(dll_name);
             if let Err(e) = fs::copy(&source, &examples_dest) {
-                println!("cargo:warning=Failed to copy {} to examples: {}", dll_name, e);
+                println!("cargo:warning=Failed to copy {dll_name} to examples: {e}");
             } else {
-                println!("cargo:warning=Copied {} to examples directory", dll_name);
+                println!("cargo:warning=Copied {dll_name} to examples directory");
             }
         } else {
             println!("cargo:warning=ONNX Runtime DLL not found: {}. This may cause runtime errors with ort feature.", source.display());

@@ -210,6 +210,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     
     #[cfg(unix)]
     {
+        let main_loop = main_loop.clone();
         gst::glib::unix_signal_add(
             2,
             move || {
@@ -222,10 +223,10 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     
     #[cfg(windows)]
     {
-        let main_loop_quit = main_loop.clone();
+        let main_loop = main_loop.clone();
         ctrlc::set_handler(move || {
             println!("\n[{:.3}] Received interrupt signal, shutting down...", timestamp());
-            main_loop_quit.quit();
+            main_loop.quit();
         })?;
     }
     

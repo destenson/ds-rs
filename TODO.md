@@ -1,41 +1,59 @@
 # TODO List
 
-Last Updated: 2025-08-24 (PRP-19 Network Simulation completed, PRP-12 Multi-stream next)
+Last Updated: 2025-08-24 (PRP-12 Fault Tolerance Integration completed)
 
 ## Code TODOs Found in Codebase
 
 ### High Priority TODOs 🔴
-- [ ] **Remove global state in error classification** (crates/ds-rs/src/error/classification.rs:309)
+- [ ] **Remove global state in error classification** (src/error/classification.rs:309)
   - GET RID OF THIS GLOBAL & dependency on lazy_static
   - Replace with proper dependency injection
   
-- [ ] **Implement DeepStream metadata processing** (crates/ds-rs/src/rendering/deepstream_renderer.rs:190,222)
+- [ ] **Implement DeepStream metadata processing** (src/rendering/deepstream_renderer.rs:190,222)
   - Implement actual DeepStream metadata processing
   - Create and attach actual NvDsObjectMeta
   - Critical for hardware acceleration features
 
 - [ ] **Fix unimplemented property handlers** (4 occurrences)
   - cpuinfer/src/cpudetector/imp.rs:258,272
-  - ds-rs/src/backend/cpu_vision/cpudetector/imp.rs:274,288
+  - src/backend/cpu_vision/cpudetector/imp.rs:274,288
   - Complete property getter/setter implementations
+  
+- [ ] **Implement real metadata extraction** (src/metadata/mod.rs:92)
+  - Replace todo!() with actual metadata extraction logic
+  - Currently returns mock data
 
 ### Medium Priority TODOs 🟡
-- [ ] **Mock backend conditional compilation** (crates/ds-rs/src/backend/mock.rs:48)
-  - Only include mock backend for testing with #[cfg(test)]
+- [ ] **Remove tokio dependency** (2 occurrences)
+  - Cargo.toml:53 - ds-rs crate
+  - source-videos/Cargo.toml:20
+  - Comment states: "we should not use tokio (async is ok though)"
   
-- [ ] **Implement source modification API** (crates/source-videos/src/manager.rs:215)
-  - Currently placeholder for future enhancement
-  - Add actual source config modification functionality
+- [ ] **Mock backend conditional compilation** (src/backend/mock.rs:48)
+  - Only include mock backend for testing with #[cfg(test)]
 
-- [ ] **Add custom metadata to buffers** (crates/ds-rs/src/backend/cpu_vision/cpudetector/imp.rs:154)
+- [ ] **Add custom metadata to buffers** (src/backend/cpu_vision/cpudetector/imp.rs:154)
   - Attach detection metadata to GStreamer buffers
   
-- [ ] **Test with real ONNX model** (crates/ds-rs/tests/cpu_backend_tests.rs:343)
+- [ ] **Test with real ONNX model** (tests/cpu_backend_tests.rs:343)
   - When real ONNX model is available, add proper tests
+  
+- [ ] **Implement DSL crate** (dsl/src/lib.rs:9)
+  - Contains single todo!() in test
+  - DeepStream Services Library implementation pending
+
+## Low Priority TODOs 🔵
+- [ ] **Clean up unused parameters** (53 underscore-prefixed variables)
+  - Common in callback closures and trait implementations
+  - Many are legitimate (required by trait signatures)
+  
+- [ ] **Review placeholder/mock implementations** (110+ occurrences)
+  - Many mock/stub/placeholder comments throughout codebase
+  - Evaluate which need real implementations vs test-only code
 
 ## Critical Priority 🔴
 
-### Production Reliability Issues
+### Production Reliability Issues ✅ COMPLETED
 - [x] **Enhanced Error Recovery** ✅ (PRP-34 COMPLETED - 2025-08-24)
   - Implemented retry mechanisms with exponential backoff and jitter
   - Added stream isolation with error boundaries (IsolatedSource, ErrorBoundary)
@@ -55,18 +73,14 @@ Last Updated: 2025-08-24 (PRP-19 Network Simulation completed, PRP-12 Multi-stre
   - Examples: network_simulation.rs, error_recovery_test.rs
   - All 12 network simulation tests passing
   
-- [ ] **Multi-stream Fault Tolerance** (PRP-12 - Builds on PRP-34)
-  - Integrate recovery modules with SourceController
-  - Add per-source recovery policies
-  - Implement automatic RTSP reconnection
-  - Health check scheduling with GLib timers
+- [x] **Fault-Tolerant Controller Integration** ✅ (PRP-12 Integration COMPLETED - 2025-08-24)
+  - Created FaultTolerantSourceController wrapper for simple, robust fault tolerance
+  - Integrated recovery modules with SourceController for automatic reconnection
+  - Added per-source recovery policies with independent tracking
+  - Implemented automatic error handling and retry logic
+  - Example: fault_tolerant_multi_stream.rs demonstrates multi-stream recovery
 
-### Active Critical Issues
-✅ **Core functionality working** - Application demonstrates basic features
-✅ **Error recovery implemented** - PRP-34 provides fault tolerance mechanisms
-✅ **Testing infrastructure ready** - PRP-19 network simulation enables comprehensive testing
-
-### Known Issues (Non-Critical)
+### Known Issues
 - [ ] **Float16 Model Support** (See BUGS.md)
   - YOLO models using float16 format fail to load
   - Workaround: Use float32 models
@@ -227,24 +241,26 @@ Last Updated: 2025-08-24 (PRP-19 Network Simulation completed, PRP-12 Multi-stre
 ## Statistics 📊
 
 ### Code Quality Metrics
-- **unwrap() calls**: Critical production unwrap() calls fixed (most remaining are in test code)
-- **Clippy warnings**: 100+ style warnings (uninlined format args, duplicated attributes, etc.) - non-critical
-- **TODO comments**: 6 remaining in code (4 high priority, 2 medium)
-- **todo!() macros**: 1 (in dsl test)
-- **unimplemented!()**: 4 occurrences (property handlers in cpudetector)
-- **Unused parameters**: 50+ underscore-prefixed variables (many legitimate - required by trait signatures)
-- **Ignored tests**: 1 test requiring runtime
-- **"For now" comments**: 30+ indicating temporary implementations
-- **Placeholder/stub implementations**: 20+ locations with stub/dummy/placeholder comments
+- **TODO comments**: 8 in code (4 high priority, 4 medium)
+- **todo!() macros**: 2 (metadata extraction, dsl test)
+- **unimplemented!()**: 6 occurrences (property handlers)
+- **Unused parameters**: 53 underscore-prefixed variables (many legitimate)
+- **Temporary implementations**: 32 "for now/actual/later" comments
+- **Mock/stub implementations**: 110+ placeholder references
 
 ### Project Status
 - **Critical Bugs**: 1 (Float16 model support - PRP-02)
 - **Build Status**: ✅ SUCCESS
-- **Test Status (ds-rs)**: 140/140 tests passing (100% pass rate ✅)
-- **Test Status (source-videos)**: 95/95 tests passing (100% pass rate ✅)
-- **PRP Progress**: 16/34 complete (47%), 3/34 in progress (9%), 15/34 not started (44%)
+- **Test Status (ds-rs)**: 127/127 tests passing (100% pass rate ✅)
+- **Test Status (source-videos)**: 83/83 tests passing (100% pass rate ✅)
+- **PRP Progress**: 19/34 complete (56%), 3/34 in progress (9%), 12/34 not started (35%)
 
 ### Recent Achievements
+- **2025-08-24**:
+  - **Completed PRP-12 Integration**: Fault-Tolerant Source Controller
+    - Created simple wrapper for automatic error recovery
+    - Integrated recovery modules with SourceController
+    - Added fault_tolerant_multi_stream.rs example
 - **2025-08-24**:
   - **Completed PRP-19**: Network Simulation for Error Recovery Testing
     - Added comprehensive network simulation to source-videos crate
@@ -270,20 +286,17 @@ Last Updated: 2025-08-24 (PRP-19 Network Simulation completed, PRP-12 Multi-stre
 ## Priority Focus
 
 ### Immediate Next Steps
-1. **Multi-stream Fault Tolerance** (PRP-12): Add retry mechanisms and stream isolation
-   - Implement exponential backoff for source reconnection
-   - Add circuit breaker pattern for failing sources
-   - Isolate stream failures to prevent cascade
-   - Add health monitoring for each source
+1. **DeepStream FFI Bindings** (PRP-04): Hardware acceleration support
+   - Implement actual NvDsMeta extraction
+   - Create proper FFI bindings for DeepStream
+   - Enable hardware-accelerated inference
+2. **Float16 Support** (PRP-02): Fix ONNX Runtime lifetime issues
+   - Resolve lifetime issues with f16 arrays
+   - Enable float16 YOLO models
    
-2. **Error Recovery Patterns**: Implement production-grade error handling
-   - Retry logic with configurable attempts
-   - Automatic RTSP reconnection
-   - Network timeout handling
-   - Graceful degradation on partial failures
-
-3. **Float16 Support** (PRP-02): Fix ONNX Runtime lifetime issues
-4. **DeepStream FFI** (PRP-04): Hardware acceleration support
+3. **Remove Global State**: Clean up error classification
+   - Replace lazy_static with dependency injection
+   - Improve error handling architecture
 
 ### Technical Debt
 - Mock implementations need replacement with real functionality

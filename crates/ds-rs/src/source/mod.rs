@@ -9,6 +9,7 @@ pub mod recovery;
 pub mod health;
 pub mod circuit_breaker;
 pub mod isolation;
+pub mod fault_tolerant_controller;
 
 use crate::error::{DeepStreamError, Result};
 use gstreamer as gst;
@@ -27,6 +28,7 @@ pub use recovery::{RecoveryConfig, RecoveryManager, RecoveryState, RecoveryStats
 pub use health::{HealthConfig, HealthMonitor, HealthStatus, SourceHealthMonitor};
 pub use circuit_breaker::{CircuitBreaker, CircuitBreakerConfig, CircuitBreakerManager, CircuitState};
 pub use isolation::{ErrorBoundary, IsolatedSource, IsolationManager, IsolationPolicy};
+pub use fault_tolerant_controller::FaultTolerantSourceController;
 
 pub const MAX_NUM_SOURCES: usize = 30;
 

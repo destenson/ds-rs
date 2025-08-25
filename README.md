@@ -4,6 +4,14 @@ A Rust port of NVIDIA's DeepStream runtime source addition/deletion reference ap
 
 ## Recent Updates
 
+### 2025-08-24: Fault-Tolerant Source Controller Integration (PRP-12 Integration)
+- ✅ **INTEGRATED: Error recovery with SourceController** - Automatic reconnection for failed sources
+- ✅ **ADDED: FaultTolerantSourceController wrapper** - Simple, robust fault tolerance without complexity
+- ✅ **CREATED: Automatic error handling** - Sources automatically retry on transient failures
+- ✅ **IMPLEMENTED: Circuit breaker integration** - Prevents cascade failures across sources
+- ✅ **ADDED: Per-source recovery tracking** - Independent recovery policies for each stream
+- ✅ **CREATED: fault_tolerant_multi_stream example** - Demonstrates production-ready multi-stream recovery
+
 ### 2025-08-24: Network Simulation for Error Recovery Testing (PRP-19)
 - ✅ **IMPLEMENTED: Network simulation capabilities** - Test error recovery with realistic network conditions
 - ✅ **ADDED: Packet loss simulation** - Random and burst patterns with configurable rates
@@ -269,8 +277,11 @@ cargo run --example detection_app -- file:///path/to/video.mp4
 # CPU detection demo (requires ONNX model)
 cargo run --example cpu_detection_demo --features cpu_vision,nalgebra,half
 
-# Fault-tolerant pipeline with error recovery (NEW)
+# Fault-tolerant pipeline with error recovery
 cargo run --example fault_tolerant_pipeline
+
+# Multi-stream fault tolerance with automatic recovery (NEW)
+cargo run --example fault_tolerant_multi_stream
 ```
 
 ### Test Video Generation and RTSP Server

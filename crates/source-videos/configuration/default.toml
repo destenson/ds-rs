@@ -6,49 +6,37 @@ address = "127.0.0.1"
 max_connections = 100
 
 [[sources]]
-name = "test-smpte"
-type = "test_pattern"
-pattern = "smpte"
-
-[sources.resolution]
-width = 1920
-height = 1080
-
-[sources.framerate]
-numerator = 30
-denominator = 1
-
-format = "i420"
-is_live = true
-
-[[sources]]
-name = "test-ball"
+name = "test-ball1"
 type = "test_pattern"
 pattern = "ball"
-
-[sources.resolution]
-width = 1280
-height = 720
-
-[sources.framerate]
-numerator = 25
-denominator = 1
-
+resolution = { width = 1920, height = 1080 }
+framerate = { numerator = 30, denominator = 1 }
 format = "i420"
 is_live = true
 
 [[sources]]
-name = "test-snow"
+name = "test-ball2"
 type = "test_pattern"
-pattern = "snow"
+pattern = "ball"
+resolution = { width = 1280, height = 720 }
+framerate = { numerator = 25, denominator = 1 }
+format = "i420"
+is_live = true
 
-[sources.resolution]
-width = 640
-height = 480
+[[sources]]
+name = "test-ball3"
+type = "test_pattern"
+pattern = "ball"
+resolution = { width = 640, height = 480 }
+framerate = { numerator = 15, denominator = 1 }
+format = "i420"
+is_live = true
 
-[sources.framerate]
-numerator = 15
-denominator = 1
-
+[[sources]]
+name = "test-ball4"
+type = "test_pattern"
+pattern = "ball"
+resolution = { width = 960, height = 720 }
+framerate = { numerator = 60002, denominator = 1000 }
 format = "i420"
 is_live = true

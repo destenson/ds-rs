@@ -1,0 +1,12 @@
+{
+  "permissions": {
+    "allow": [
+      "mcp__Cargo__cargo_run",
+      "mcp__Cargo__cargo_build",
+      "mcp__Cargo__cargo_check",
+      "mcp__Cargo__cargo_test"
+    ],
+    "deny": [],
+    "ask": []
+  }
+}

@@ -1,0 +1,161 @@
+{
+  "scenarios": {
+    "unit": {
+      "description": "Run unit tests only",
+      "crates": ["ds-rs", "source-videos", "cpuinfer"],
+      "test_args": ["--lib"],
+      "parallel": true,
+      "timeout": 300,
+      "requires_rtsp": false,
+      "requires_examples": false,
+      "backends": []
+    },
+    "integration": {
+      "description": "Run integration tests with RTSP server",
+      "crates": ["ds-rs", "source-videos"],
+      "test_args": ["--test", "*"],
+      "parallel": false,
+      "timeout": 600,
+      "requires_rtsp": true,
+      "requires_examples": false,
+      "backends": ["mock", "standard"],
+      "rtsp_config": {
+        "port": 8554,
+        "mount_points": ["/test1", "/test2"],
+        "patterns": ["smpte", "ball"]
+      }
+    },
+    "e2e": {
+      "description": "Run end-to-end tests with real video sources",
+      "crates": ["ds-rs"],
+      "test_args": [],
+      "parallel": false,
+      "timeout": 900,
+      "requires_rtsp": true,
+      "requires_examples": true,
+      "backends": ["standard"],
+      "examples": ["cross_platform", "detection_app", "runtime_demo"],
+      "rtsp_config": {
+        "port": 8554,
+        "mount_points": ["/live"],
+        "patterns": ["smpte", "ball", "snow"]
+      }
+    },
+    "backend": {
+      "description": "Test different backend combinations",
+      "crates": ["ds-rs"],
+      "test_args": ["--test", "backend_tests"],
+      "parallel": false,
+      "timeout": 600,
+      "requires_rtsp": false,
+      "requires_examples": false,
+      "backends": ["mock", "standard", "deepstream"]
+    },
+    "multistream": {
+      "description": "Test multi-stream scenarios",
+      "crates": ["ds-rs"],
+      "test_args": ["--test", "multistream_tests"],
+      "parallel": false,
+      "timeout": 900,
+      "requires_rtsp": true,
+      "requires_examples": false,
+      "backends": ["standard"],
+      "rtsp_config": {
+        "port": 8554,
+        "mount_points": ["/stream1", "/stream2", "/stream3", "/stream4"],
+        "patterns": ["smpte", "ball", "snow", "circular"]
+      }
+    },
+    "performance": {
+      "description": "Run performance benchmarks",
+      "crates": ["ds-rs", "source-videos"],
+      "test_args": ["--bench"],
+      "parallel": false,
+      "timeout": 1200,
+      "requires_rtsp": true,
+      "requires_examples": false,
+      "backends": ["standard"],
+      "rtsp_config": {
+        "port": 8554,
+        "mount_points": ["/perf"],
+        "patterns": ["smpte"],
+        "framerate": 60
+      }
+    },
+    "all": {
+      "description": "Run all tests",
+      "crates": ["ds-rs", "source-videos", "cpuinfer"],
+      "test_args": [],
+      "parallel": false,
+      "timeout": 1800,
+      "requires_rtsp": true,
+      "requires_examples": true,
+      "backends": ["mock", "standard"]
+    }
+  },
+  "environments": {
+    "ci": {
+      "parallel": false,
+      "fail_fast": true,
+      "verbose": true,
+      "generate_reports": true,
+      "artifact_dir": "test-artifacts"
+    },
+    "local": {
+      "parallel": true,
+      "fail_fast": false,
+      "verbose": false,
+      "generate_reports": false,
+      "artifact_dir": null
+    }
+  },
+  "rtsp_server": {
+    "default_port": 8554,
+    "startup_delay": 3,
+    "shutdown_delay": 1,
+    "health_check_retries": 5,
+    "health_check_interval": 1
+  },
+  "timeouts": {
+    "unit": 300,
+    "integration": 600,
+    "e2e": 900,
+    "default": 300,
+    "rtsp_startup": 30,
+    "rtsp_shutdown": 10
+  },
+  "dependencies": {
+    "cargo": {
+      "required": true,
+      "min_version": "1.70.0",
+      "check_command": ["cargo", "--version"]
+    },
+    "gstreamer": {
+      "required": false,
+      "min_version": "1.16.0",
+      "check_command": ["gst-inspect-1.0", "--version"],
+      "env_vars": {
+        "GST_PLUGIN_PATH": "${PROJECT_ROOT}/target/debug/deps",
+        "GST_DEBUG": "2"
+      }
+    },
+    "python": {
+      "required": false,
+      "min_version": "3.8",
+      "check_command": ["python", "--version"]
+    }
+  },
+  "reports": {
+    "formats": ["json", "junit", "html"],
+    "output_dir": "test-results",
+    "include_coverage": false,
+    "include_timing": true
+  },
+  "retry": {
+    "max_attempts": 3,
+    "delay": 5,
+    "exponential_backoff": true,
+    "jitter": true,
+    "retryable_tests": ["integration", "e2e", "multistream"]
+  }
+}

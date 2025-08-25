@@ -453,6 +453,18 @@ impl OnnxDetector {
         let x_scale = img_width as f32 / self.input_width as f32;
         let y_scale = img_height as f32 / self.input_height as f32;
         
+        // Check if we need to handle transposed format
+        // Some models output [1, 85, 25200] instead of [1, 25200, 85]
+        let first_few_objectness_scores: Vec<f32> = (0..5.min(num_anchors))
+            .map(|i| outputs[i * output_size + 4])
+            .collect();
+        
+        // If all objectness scores are very low or high, might be transposed
+        let avg_obj = first_few_objectness_scores.iter().sum::<f32>() / first_few_objectness_scores.len() as f32;
+        if avg_obj < 0.001 || avg_obj > 100.0 {
+            println!("Warning: Unusual objectness scores, might need transposed processing. Avg: {}", avg_obj);
+        }
+        
         // Process each anchor/detection
         for i in 0..num_anchors {
             let offset = i * output_size;
@@ -479,6 +491,12 @@ impl OnnxDetector {
                     max_class_score = class_score;
                     best_class_id = class_id;
                 }
+            }
+            
+            // Debug: Print top classes for high-confidence detections
+            if objectness > 0.7 && i < 5 {
+                println!("High conf detection: obj={:.2}, best_class={} ({:.2})", 
+                         objectness, best_class_id, max_class_score);
             }
             
             // Combined confidence

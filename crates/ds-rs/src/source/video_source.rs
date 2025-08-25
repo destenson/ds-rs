@@ -28,39 +28,83 @@ impl VideoSource {
     pub fn new(source_id: SourceId, uri: &str) -> Result<Self> {
         let bin_name = format!("source-bin-{:02}", source_id.0);
         
-        // Fix Windows file URI format
-        let fixed_uri = if cfg!(target_os = "windows") && uri.starts_with("file://") {
-            // Normalize file URIs on Windows
-            let normalized = if uri.starts_with("file:///") {
-                // Already has three slashes, keep as is
-                uri.to_string()
-            } else {
-                // Has only two slashes, need to add one for absolute paths
-                let path = uri.strip_prefix("file://").unwrap_or(uri);
-                // Only add extra slash if path starts with / (absolute Unix-style path)
-                if path.starts_with('/') {
-                    format!("file://{}", path)
-                } else {
-                    format!("file:///{}", path)
-                }
-            };
-            normalized.replace('\\', "/")
+        // Handle special test source URI
+        let (source_bin, final_uri) = if uri == "videotestsrc://" {
+            // Create a bin with videotestsrc for testing
+            let bin = gst::Bin::builder()
+                .name(&bin_name)
+                .build();
+            
+            let src = gst::ElementFactory::make("videotestsrc")
+                .name(&format!("testsrc-{}", source_id.0))
+                .property_from_str("pattern", "ball")  // Ball pattern
+                .property("is-live", true)
+                .build()
+                .map_err(|_| DeepStreamError::ElementCreation {
+                    element: format!("videotestsrc for source {}", source_id)
+                })?;
+            
+            let capsfilter = gst::ElementFactory::make("capsfilter")
+                .name(&format!("testcaps-{}", source_id.0))
+                .build()
+                .map_err(|_| DeepStreamError::ElementCreation {
+                    element: format!("capsfilter for source {}", source_id)
+                })?;
+            
+            let caps = gst::Caps::builder("video/x-raw")
+                .field("width", 640i32)
+                .field("height", 480i32)
+                .field("framerate", gst::Fraction::new(30, 1))
+                .build();
+            capsfilter.set_property("caps", &caps);
+            
+            bin.add_many([&src, &capsfilter])?;
+            src.link(&capsfilter)?;
+            
+            // Create ghost pad
+            let src_pad = capsfilter.static_pad("src").unwrap();
+            let ghost_pad = gst::GhostPad::with_target(&src_pad)?;
+            ghost_pad.set_active(true)?;
+            bin.add_pad(&ghost_pad)?;
+            
+            (bin.upcast(), uri.to_string())
         } else {
-            uri.to_string()
+            // Fix Windows file URI format
+            let fixed_uri = if cfg!(target_os = "windows") && uri.starts_with("file://") {
+                // Normalize file URIs on Windows
+                let normalized = if uri.starts_with("file:///") {
+                    // Already has three slashes, keep as is
+                    uri.to_string()
+                } else {
+                    // Has only two slashes, need to add one for absolute paths
+                    let path = uri.strip_prefix("file://").unwrap_or(uri);
+                    // Only add extra slash if path starts with / (absolute Unix-style path)
+                    if path.starts_with('/') {
+                        format!("file://{}", path)
+                    } else {
+                        format!("file:///{}", path)
+                    }
+                };
+                normalized.replace('\\', "/")
+            } else {
+                uri.to_string()
+            };
+            
+            let source_bin = gst::ElementFactory::make("uridecodebin")
+                .name(&bin_name)
+                .property("uri", &fixed_uri)
+                .build()
+                .map_err(|_| DeepStreamError::ElementCreation {
+                    element: format!("uridecodebin for source {}", source_id)
+                })?;
+            
+            (source_bin, fixed_uri)
         };
-        
-        let source_bin = gst::ElementFactory::make("uridecodebin")
-            .name(&bin_name)
-            .property("uri", &fixed_uri)
-            .build()
-            .map_err(|_| DeepStreamError::ElementCreation {
-                element: format!("uridecodebin for source {}", source_id)
-            })?;
         
         Ok(Self {
             source_bin,
             source_id,
-            uri: fixed_uri,
+            uri: final_uri,
             state: Arc::new(Mutex::new(SourceState::Idle)),
             pad_added_handler: None,
         })
@@ -99,6 +143,41 @@ impl VideoSource {
             .unwrap_or_default();
         let timestamp = format!("{:.3}", now.as_secs_f64());
         println!("[{}] Connecting pad-added callback for source {}", timestamp, self.source_id);
+        
+        // For test sources (videotestsrc://), directly connect since they have static pads
+        if self.uri == "videotestsrc://" {
+            if let Some(src_pad) = self.source_bin.static_pad("src") {
+                // For compositor (Standard backend), request a pad and configure position
+                let is_compositor = streammux.factory()
+                    .map(|f| f.name() == "compositor")
+                    .unwrap_or(false);
+                
+                if is_compositor {
+                    if let Some(sinkpad) = streammux.request_pad_simple("sink_%u") {
+                        // Set position for this video on the compositor
+                        let x_pos = (self.source_id.0 % 2) * 640;
+                        let y_pos = (self.source_id.0 / 2) * 480;
+                        sinkpad.set_property("xpos", x_pos as i32);
+                        sinkpad.set_property("ypos", y_pos as i32);
+                        
+                        if let Err(e) = src_pad.link(&sinkpad) {
+                            eprintln!("Failed to link test source to compositor: {:?}", e);
+                        } else {
+                            println!("[{}] Linked test source {} to compositor", timestamp, self.source_id);
+                        }
+                    }
+                } else {
+                    // For other muxers, use normal pad naming
+                    let pad_name = format!("sink_{}", self.source_id.0);
+                    if let Some(sinkpad) = streammux.request_pad_simple(&pad_name) {
+                        if let Err(e) = src_pad.link(&sinkpad) {
+                            eprintln!("Failed to link test source to mux: {:?}", e);
+                        }
+                    }
+                }
+            }
+            return Ok(());
+        }
         
         self.connect_pad_added(streammux, |decodebin, pad, source_id, mux| {
             let caps = pad.current_caps().unwrap_or_else(|| pad.query_caps(None));

@@ -266,8 +266,8 @@ fn main() -> Result<()> {
     let app = BallTrackingApp::new()?;
     
     // Add video sources (RTSP streams or files)
-    // Example with test patterns
-    app.add_source("videotestsrc pattern=ball ! video/x-raw,width=640,height=480,framerate=30/1")?;
+    // For test patterns, use a special URI format that will be handled
+    app.add_source("videotestsrc://")?;
     
     // For RTSP streams from source-videos server:
     // app.add_source("rtsp://127.0.0.1:8554/test1")?;
@@ -286,7 +286,7 @@ fn main() -> Result<()> {
             thread::sleep(Duration::from_secs(5));
             log::info!("[{:.3}] Adding second source dynamically", timestamp());
             let _ = app_controller.add_source(
-                "videotestsrc pattern=ball ! video/x-raw,width=640,height=480,framerate=30/1"
+                "videotestsrc://"
             );
         }
     });

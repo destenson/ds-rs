@@ -156,7 +156,7 @@ pub struct WatchConfig {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct ServerConfig {
+pub struct RtspServerConfig {
     #[serde(default = "default_rtsp_port")]
     pub port: u16,
     
@@ -167,11 +167,11 @@ pub struct ServerConfig {
     pub max_connections: u32,
     
     #[serde(default)]
-    pub authentication: Option<AuthConfig>,
+    pub authentication: Option<BasicAuthConfig>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct AuthConfig {
+pub struct BasicAuthConfig {
     pub username: String,
     pub password: String,
 }
@@ -179,7 +179,7 @@ pub struct AuthConfig {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct AppConfig {
     #[serde(default)]
-    pub server: ServerConfig,
+    pub server: RtspServerConfig,
     
     #[serde(default)]
     pub sources: Vec<VideoSourceConfig>,
@@ -274,7 +274,7 @@ impl AppConfig {
     }
 }
 
-impl Default for ServerConfig {
+impl Default for RtspServerConfig {
     fn default() -> Self {
         Self {
             port: default_rtsp_port(),
@@ -288,7 +288,7 @@ impl Default for ServerConfig {
 impl Default for AppConfig {
     fn default() -> Self {
         Self {
-            server: ServerConfig::default(),
+            server: RtspServerConfig::default(),
             sources: vec![
                 VideoSourceConfig::test_pattern("test-1", "smpte"),
                 VideoSourceConfig::test_pattern("test-2", "ball"),

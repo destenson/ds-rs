@@ -177,7 +177,7 @@ impl MetadataBridge {
     /// Process inference results and prepare for rendering
     pub fn process_inference_results(
         &mut self,
-        detections: Vec<crate::backend::cpu_vision::detector::Detection>,
+        detections: Vec<gstcpuinfer::detector::Detection>,
         timestamp: gst::ClockTime,
         frame_width: u32,
         frame_height: u32,

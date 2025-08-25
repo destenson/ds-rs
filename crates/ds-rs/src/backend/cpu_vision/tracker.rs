@@ -1,7 +1,7 @@
 #![allow(unused)]
 #![cfg(feature = "nalgebra")]
 
-use super::detector::Detection;
+use gstcpuinfer::detector::Detection;
 use nalgebra::Point2;
 use std::collections::HashMap;
 

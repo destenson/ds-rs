@@ -8,7 +8,7 @@ pub async fn get_config(
     let config = state.current_config.read().await;
     
     Ok(Json(ConfigResponse {
-        server: ServerConfig {
+        server: ApiServerConfig {
             port: 8554,
             address: "0.0.0.0".to_string(),
             max_connections: None,
@@ -37,7 +37,7 @@ pub async fn get_defaults(
     State(_state): State<Arc<ApiState>>,
 ) -> ApiResult<Json<ConfigResponse>> {
     Ok(Json(ConfigResponse {
-        server: ServerConfig {
+        server: ApiServerConfig {
             port: 8554,
             address: "0.0.0.0".to_string(),
             max_connections: Some(100),

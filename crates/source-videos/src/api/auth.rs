@@ -11,14 +11,14 @@ const AUTH_HEADER: &str = "authorization";
 const API_KEY_HEADER: &str = "x-api-key";
 
 #[derive(Clone)]
-pub struct AuthConfig {
+pub struct ApiAuthConfig {
     pub enabled: bool,
     pub token: Option<String>,
     pub api_key: Option<String>,
     pub bypass_local: bool,
 }
 
-impl Default for AuthConfig {
+impl Default for ApiAuthConfig {
     fn default() -> Self {
         Self {
             enabled: false,
@@ -29,7 +29,7 @@ impl Default for AuthConfig {
     }
 }
 
-impl AuthConfig {
+impl ApiAuthConfig {
     pub fn from_env() -> Self {
         let enabled = std::env::var("API_AUTH_ENABLED")
             .unwrap_or_else(|_| "false".to_string())
@@ -78,7 +78,7 @@ pub async fn auth_middleware(
         return Ok(next.run(request).await);
     }
     
-    let auth_config = AuthConfig::from_env();
+    let auth_config = ApiAuthConfig::from_env();
     
     // If auth is not enabled, allow all requests
     if !auth_config.enabled {
@@ -119,7 +119,7 @@ pub fn require_auth(enabled: bool) -> impl Fn(Request, Next) -> std::pin::Pin<Bo
                 return Ok(next.run(req).await);
             }
             
-            let auth_config = AuthConfig::from_env();
+            let auth_config = ApiAuthConfig::from_env();
             
             // Check Authorization header
             if let Some(auth_header) = req.headers().get(AUTH_HEADER) {

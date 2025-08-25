@@ -3,7 +3,7 @@
 //! This module provides metadata structures that can be attached to GStreamer buffers
 //! to carry object detection and tracking information through the pipeline.
 
-use crate::backend::cpu_vision::detector::Detection;
+use gstcpuinfer::detector::Detection;
 use gstreamer as gst;
 
 /// Object detection metadata that can be attached to GStreamer buffers
@@ -97,7 +97,7 @@ impl ProbeData {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::backend::cpu_vision::detector::Detection;
+    use gstcpuinfer::detector::Detection;
     
     #[test]
     fn test_detection_meta_creation() {

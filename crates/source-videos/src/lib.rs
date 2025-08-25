@@ -19,7 +19,7 @@ pub mod runtime;
 pub mod source;
 pub mod watch;
 
-pub use config_types::{AppConfig, ServerConfig, VideoSourceConfig, VideoSourceType, DirectoryConfig, FileListConfig, FilterConfig, WatchConfig};
+pub use config_types::{AppConfig, RtspServerConfig, VideoSourceConfig, VideoSourceType, DirectoryConfig, FileListConfig, FilterConfig, WatchConfig};
 pub use directory::{DirectoryScanner, BatchSourceLoader};
 pub use error::{Result, SourceVideoError};
 pub use file::{FileGenerator, BatchFileGenerator, generate_test_file};

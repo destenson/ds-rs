@@ -140,14 +140,14 @@ pub struct ServerInfoResponse {
 // Configuration Models
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ConfigResponse {
-    pub server: ServerConfig,
+    pub server: ApiServerConfig,
     pub sources: Vec<VideoSourceConfig>,
     pub network: Option<NetworkConfig>,
     pub watch: Option<WatchConfig>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct ServerConfig {
+pub struct ApiServerConfig {
     pub port: u16,
     pub address: String,
     pub max_connections: Option<usize>,

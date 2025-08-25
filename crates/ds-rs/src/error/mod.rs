@@ -1,6 +1,8 @@
 pub mod classification;
 
 use thiserror::Error;
+#[cfg(feature = "cpu_vision")]
+use gstcpuinfer::detector::DetectorError;
 
 #[derive(Error, Debug)]
 pub enum DeepStreamError {
@@ -66,6 +68,18 @@ pub enum DeepStreamError {
     
     #[error("Unknown error: {0}")]
     Unknown(String),
+}
+
+// Conversion from cpuinfer DetectorError
+#[cfg(feature = "cpu_vision")]
+impl From<DetectorError> for DeepStreamError {
+    fn from(err: DetectorError) -> Self {
+        match err {
+            DetectorError::Configuration(msg) => DeepStreamError::Configuration(msg),
+            DetectorError::ModelLoading(msg) => DeepStreamError::Configuration(format!("Model loading: {}", msg)),
+            DetectorError::Inference(msg) => DeepStreamError::ProcessingFailed { reason: msg },
+        }
+    }
 }
 
 pub type Result<T> = std::result::Result<T, DeepStreamError>;

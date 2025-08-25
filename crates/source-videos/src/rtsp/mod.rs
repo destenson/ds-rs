@@ -1,6 +1,6 @@
 pub mod factory;
 
-use crate::config::{ServerConfig, VideoSourceConfig};
+use crate::config::{RtspServerConfig, VideoSourceConfig};
 use crate::error::{Result, SourceVideoError};
 use crate::watch::FileSystemEvent;
 use crate::network::{NetworkProfile, NetworkConditions};
@@ -22,7 +22,7 @@ pub struct RtspServer {
 }
 
 impl RtspServer {
-    pub fn new(config: ServerConfig) -> Result<Self> {
+    pub fn new(config: RtspServerConfig) -> Result<Self> {
         let server = rtsp_server::RTSPServer::new();
         
         server.set_service(&config.port.to_string());
@@ -226,7 +226,7 @@ impl RtspServer {
 }
 
 pub struct RtspServerBuilder {
-    config: ServerConfig,
+    config: RtspServerConfig,
     sources: Vec<VideoSourceConfig>,
     global_network_profile: Option<NetworkProfile>,
     per_source_network: HashMap<String, NetworkProfile>,
@@ -236,7 +236,7 @@ pub struct RtspServerBuilder {
 impl RtspServerBuilder {
     pub fn new() -> Self {
         Self {
-            config: ServerConfig::default(),
+            config: RtspServerConfig::default(),
             sources: Vec::new(),
             global_network_profile: None,
             per_source_network: HashMap::new(),

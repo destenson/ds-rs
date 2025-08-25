@@ -1,16 +1,18 @@
-pub mod detector;
 #[cfg(feature = "nalgebra")]
 pub mod tracker;
 pub mod elements;
 pub mod metadata;
 pub mod cpudetector;
 
+// Re-export detector types from cpuinfer crate
+pub use gstcpuinfer::detector::{OnnxDetector, DetectorConfig, Detection, YoloVersion, DetectorError};
+
 use crate::error::Result;
 
 /// CPU Vision Backend for object detection and tracking
 /// Uses ONNX Runtime for inference and pure Rust tracking algorithms
 pub struct CpuVisionBackend {
-    detector: Option<detector::OnnxDetector>,
+    detector: Option<OnnxDetector>,
     #[cfg(feature = "nalgebra")]
     tracker: tracker::CentroidTracker,
 }
@@ -25,11 +27,11 @@ impl CpuVisionBackend {
     }
     
     pub fn load_model(&mut self, model_path: &str) -> Result<()> {
-        self.detector = Some(detector::OnnxDetector::new(model_path)?);
+        self.detector = Some(OnnxDetector::new(model_path)?);
         Ok(())
     }
     
-    pub fn detector(&self) -> Option<&detector::OnnxDetector> {
+    pub fn detector(&self) -> Option<&OnnxDetector> {
         self.detector.as_ref()
     }
     

@@ -1,6 +1,6 @@
 //! Pool of detection pipelines for concurrent processing
 
-use crate::backend::cpu_vision::detector::{OnnxDetector, DetectorConfig, Detection};
+use gstcpuinfer::detector::{OnnxDetector, DetectorConfig, Detection};
 use crate::source::SourceId;
 use crate::error::Result;
 use std::sync::{Arc, Mutex, RwLock};

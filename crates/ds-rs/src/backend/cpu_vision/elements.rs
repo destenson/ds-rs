@@ -1,6 +1,6 @@
 #![allow(unused)]
 use crate::error::{DeepStreamError, Result};
-use super::detector::{OnnxDetector, DetectorConfig};
+use gstcpuinfer::detector::{OnnxDetector, DetectorConfig};
 use super::metadata::DetectionMeta;
 use gstreamer as gst;
 use gstreamer::prelude::*;

@@ -8,7 +8,7 @@ use gstreamer_base::subclass::prelude::*;
 use gstreamer_video as gst_video;
 use gstreamer_video::prelude::*;
 use std::sync::{LazyLock, Mutex};
-use crate::backend::cpu_vision::detector::{OnnxDetector, DetectorConfig};
+use gstcpuinfer::detector::{OnnxDetector, DetectorConfig};
 use crate::error::Result;
 use image::DynamicImage;
 
@@ -59,7 +59,7 @@ pub struct CpuDetector {
 
 impl CpuDetector {
     fn initialize_detector(&self, settings: &Settings) -> Result<OnnxDetector> {
-        use crate::backend::cpu_vision::detector::{OnnxDetector, DetectorConfig};
+        use gstcpuinfer::detector::{OnnxDetector, DetectorConfig};
         let config = DetectorConfig {
             model_path: Some(settings.model_path.clone()),
             input_width: settings.input_width,
@@ -142,7 +142,7 @@ impl CpuDetector {
         }
     }
     
-    fn emit_inference_results(&self, frame_num: u64, detections: &[crate::backend::cpu_vision::detector::Detection]) {
+    fn emit_inference_results(&self, frame_num: u64, detections: &[gstcpuinfer::detector::Detection]) {
         // For now, just log the detections
         // Signal emission would require proper GObject signal registration
         if !detections.is_empty() {
@@ -150,7 +150,7 @@ impl CpuDetector {
         }
     }
     
-    fn attach_detection_metadata(&self, _buf: &mut gst::BufferRef, detections: &[crate::backend::cpu_vision::detector::Detection]) {
+    fn attach_detection_metadata(&self, _buf: &mut gst::BufferRef, detections: &[gstcpuinfer::detector::Detection]) {
         // TODO: Attach custom metadata to buffer
         // For now, we could use custom metadata or simply pass through
         // This would be where we'd attach DetectionMeta to the buffer

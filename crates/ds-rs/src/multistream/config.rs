@@ -2,7 +2,7 @@
 
 use super::ResourceLimits;
 use super::StreamPriority;
-use crate::backend::cpu_vision::detector::DetectorConfig;
+use gstcpuinfer::detector::DetectorConfig;
 use std::time::Duration;
 use serde::{Deserialize, Serialize};
 

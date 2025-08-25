@@ -1,12 +1,13 @@
+#![allow(unused)]
 //! Ball tracking visualization example
 //! 
 //! This example demonstrates real-time bounding box rendering around detected balls
 //! using the integrated detection and rendering pipeline.
 
 use ds_rs::{
-    init, timestamp, Result,
-    BackendManager, PipelineBuilder, RenderingConfig, MetadataBridge,
-    SourceController, SourceEvent,
+    init, timestamp, Result, DeepStreamError,
+    BackendManager, PipelineBuilder, MetadataBridge,
+    SourceController, SourceEvent, SourceId,
 };
 use gstreamer as gst;
 use gstreamer::prelude::*;
@@ -31,14 +32,14 @@ impl BallTrackingApp {
         
         // Create backend manager
         let backend_manager = Arc::new(BackendManager::new()?);
-        log::info!("[{:.3}] Using {} backend", timestamp(), backend_manager.get_backend_type());
+        log::info!("[{:.3}] Using {} backend", timestamp(), backend_manager.backend_type());
         
         // Create metadata bridge for connecting detection to rendering
         let metadata_bridge = Arc::new(Mutex::new(MetadataBridge::new()));
         
         // Build pipeline with ball tracking rendering
         let pipeline = PipelineBuilder::new("ball-tracking-viz")
-            .backend(backend_manager.get_backend_type())
+            .backend(backend_manager.backend_type())
             // Source mux for multiple video inputs
             .add_element("streammux", "nvstreammux")
             .set_property("streammux", "width", 1920i32)
@@ -80,30 +81,53 @@ impl BallTrackingApp {
             .with_metadata_bridge(metadata_bridge.clone())
             .build()?;
         
-        // Get the GStreamer pipeline
-        let gst_pipeline = pipeline.get_gst_pipeline().clone();
+        // Store the pipeline returned from builder as Arc for SourceController
+        let pipeline_arc = Arc::new(pipeline);
+        
+        // Get the streammux element from the pipeline
+        let streammux = pipeline_arc.get_by_name("streammux")
+            .ok_or_else(|| DeepStreamError::ElementNotFound { element: "streammux".to_string() })?;
         
         // Create source controller for dynamic source management
         let source_controller = Arc::new(SourceController::new(
-            gst_pipeline.clone(),
-            backend_manager.clone(),
-        )?);
+            pipeline_arc.clone(),
+            streammux,
+        ));
         
         // Set up event handler for source events
         let event_handler = source_controller.get_event_handler();
         let metadata_bridge_clone = metadata_bridge.clone();
         
-        event_handler.on(SourceEvent::SourceAdded, move |source_id| {
-            log::info!("[{:.3}] Source {} added to pipeline", timestamp(), source_id);
+        event_handler.register_callback(move |event| {
+            match event {
+                SourceEvent::SourceAdded { id, uri } => {
+                    log::info!("[{:.3}] Source {:?} added to pipeline (URI: {})", timestamp(), id, uri);
+                },
+                SourceEvent::SourceRemoved { id } => {
+                    log::info!("[{:.3}] Source {:?} removed from pipeline", timestamp(), id);
+                },
+                SourceEvent::StateChanged { id, old_state, new_state } => {
+                    log::debug!("[{:.3}] Source {:?} state changed from {:?} to {:?}", timestamp(), id, old_state, new_state);
+                },
+                SourceEvent::Eos { id } => {
+                    log::info!("[{:.3}] Source {:?} reached end-of-stream", timestamp(), id);
+                },
+                SourceEvent::PadAdded { id, pad_name } => {
+                    log::info!("[{:.3}] Source {:?} pad added: {:?}", timestamp(), id, pad_name);
+                },
+                SourceEvent::PadRemoved { id, pad_name } => {
+                    log::info!("[{:.3}] Source {:?} pad removed: {:?}", timestamp(), id, pad_name);
+                },
+                SourceEvent::Warning { id, warning } => {
+                    log::warn!("[{:.3}] Source {:?} warning: {:?}", timestamp(), id, warning);
+                },
+                SourceEvent::Error { id, error } => {
+                    log::error!("[{:.3}] Source {:?} error: {:?}", timestamp(), id, error);
+                },
+            }
         });
         
-        event_handler.on(SourceEvent::SourceRemoved, move |source_id| {
-            log::info!("[{:.3}] Source {} removed from pipeline", timestamp(), source_id);
-        });
-        
-        event_handler.on(SourceEvent::SourceError, move |source_id| {
-            log::error!("[{:.3}] Error with source {}", timestamp(), source_id);
-        });
+        let gst_pipeline = pipeline_arc.gst_pipeline().clone();
         
         Ok(Self {
             pipeline: gst_pipeline,
@@ -114,15 +138,15 @@ impl BallTrackingApp {
     }
     
     /// Add a video source
-    fn add_source(&self, uri: &str) -> Result<()> {
+    fn add_source(&self, uri: &str) -> Result<SourceId> {
         log::info!("[{:.3}] Adding source: {}", timestamp(), uri);
-        self.source_controller.add_source(uri)?;
-        Ok(())
+        let id = self.source_controller.add_source(uri)?;
+        Ok(id)
     }
     
     /// Remove a video source
-    fn remove_source(&self, source_id: &str) -> Result<()> {
-        log::info!("[{:.3}] Removing source: {}", timestamp(), source_id);
+    fn remove_source(&self, source_id: SourceId) -> Result<()> {
+        log::info!("[{:.3}] Removing source: {:?}", timestamp(), source_id);
         self.source_controller.remove_source(source_id)?;
         Ok(())
     }
@@ -130,7 +154,8 @@ impl BallTrackingApp {
     /// Start the pipeline
     fn start(&self) -> Result<()> {
         log::info!("[{:.3}] Starting ball tracking visualization pipeline", timestamp());
-        self.pipeline.set_state(gst::State::Playing)?;
+        self.pipeline.set_state(gst::State::Playing)
+            .map_err(|e| DeepStreamError::Pipeline(format!("Failed to set pipeline to playing: {:?}", e)))?;
         self.running.store(true, Ordering::SeqCst);
         Ok(())
     }
@@ -139,7 +164,8 @@ impl BallTrackingApp {
     fn stop(&self) -> Result<()> {
         log::info!("[{:.3}] Stopping pipeline", timestamp());
         self.running.store(false, Ordering::SeqCst);
-        self.pipeline.set_state(gst::State::Null)?;
+        self.pipeline.set_state(gst::State::Null)
+            .map_err(|e| DeepStreamError::Pipeline(format!("Failed to set pipeline to null: {:?}", e)))?;
         Ok(())
     }
     
@@ -153,7 +179,6 @@ impl BallTrackingApp {
         }).expect("Error setting Ctrl-C handler");
         
         // Monitor loop
-        let mut frame_count = 0u64;
         let start_time = std::time::Instant::now();
         
         while self.running.load(Ordering::SeqCst) {
@@ -162,7 +187,7 @@ impl BallTrackingApp {
             // Get rendering statistics
             if let Ok(bridge) = self.metadata_bridge.lock() {
                 let stats = bridge.get_statistics();
-                frame_count = stats.frames_processed;
+                let frame_count = stats.frames_processed;
                 
                 let elapsed = start_time.elapsed().as_secs_f64();
                 let fps = if elapsed > 0.0 {

@@ -115,8 +115,29 @@ curl -X POST http://localhost:3000/api/v1/sources/batch \
 
 See the `examples/` directory for complete automation scripts:
 
-- `api_automation.sh` - Bash/curl examples
+- `api_automation.sh` - Basic API usage with curl
 - `api_automation.py` - Python client implementation
+- `live_display_automation.sh` - Bash script with GStreamer display
+- `live_display_automation.py` - Python with GStreamer integration
+- `live_display_automation.ps1` - PowerShell for Windows
+
+### Live Display Example
+
+Start sources and display them with GStreamer:
+
+```bash
+# Start API server
+cargo run -- serve --api --api-port 3000
+
+# In another terminal, run automation
+./examples/live_display_automation.sh
+```
+
+The live display scripts will:
+1. Start RTSP server with test patterns
+2. Launch GStreamer pipelines to display streams
+3. Provide interactive control (network simulation, metrics, etc.)
+4. Support multiple display modes (individual, mosaic, tiled)
 
 ## Error Handling
 

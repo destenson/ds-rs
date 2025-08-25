@@ -63,7 +63,14 @@ impl LoopingVideoSource {
     }
     
     pub fn get_loop_count(&self) -> u32 {
-        self.loop_count.lock().unwrap_or_else(|_| panic!("Lock poisoned")).clone()
+        self.loop_count.lock()
+            .unwrap_or_else(|poisoned| {
+                // If the lock is poisoned, recover by returning the poisoned data
+                // This is safe for a simple u32 value
+                eprintln!("WARNING: Lock poisoned in get_loop_count, recovering");
+                poisoned.into_inner()
+            })
+            .clone()
     }
     
     pub fn reset_loop_count(&self) {
@@ -73,7 +80,14 @@ impl LoopingVideoSource {
     }
     
     pub fn is_looping_active(&self) -> bool {
-        self.is_looping.lock().unwrap_or_else(|_| panic!("Lock poisoned")).clone()
+        self.is_looping.lock()
+            .unwrap_or_else(|poisoned| {
+                // If the lock is poisoned, recover by returning the poisoned data
+                // This is safe for a simple bool value
+                eprintln!("WARNING: Lock poisoned in is_looping_active, recovering");
+                poisoned.into_inner()
+            })
+            .clone()
     }
     
     fn setup_loop_handling(&mut self) -> Result<()> {

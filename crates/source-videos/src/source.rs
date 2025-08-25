@@ -307,6 +307,58 @@ impl VideoSource for RtspSource {
     }
 }
 
+/// A source that always returns errors, used for unexpanded directory/file list sources
+struct ErrorSource {
+    config: VideoSourceConfig,
+    error_message: String,
+    id: String,
+}
+
+impl ErrorSource {
+    fn new(config: VideoSourceConfig, error_message: String) -> Self {
+        let id = format!("error-{}", uuid::Uuid::new_v4());
+        Self { config, error_message, id }
+    }
+}
+
+impl VideoSource for ErrorSource {
+    fn get_id(&self) -> &str {
+        &self.id
+    }
+    
+    fn get_name(&self) -> &str {
+        &self.config.name
+    }
+    
+    fn get_uri(&self) -> String {
+        format!("error://{}", self.error_message)
+    }
+    
+    fn get_state(&self) -> SourceState {
+        SourceState::Error(self.error_message.clone())
+    }
+    
+    fn start(&mut self) -> Result<()> {
+        Err(SourceVideoError::config(&self.error_message))
+    }
+    
+    fn stop(&mut self) -> Result<()> {
+        Ok(()) // Allow stop to succeed
+    }
+    
+    fn pause(&mut self) -> Result<()> {
+        Err(SourceVideoError::config(&self.error_message))
+    }
+    
+    fn resume(&mut self) -> Result<()> {
+        Err(SourceVideoError::config(&self.error_message))
+    }
+    
+    fn get_pipeline(&self) -> Option<&gst::Pipeline> {
+        None
+    }
+}
+
 pub fn create_source(config: VideoSourceConfig) -> Box<dyn VideoSource> {
     match &config.source_type {
         VideoSourceType::TestPattern { .. } => {
@@ -320,11 +372,21 @@ pub fn create_source(config: VideoSourceConfig) -> Box<dyn VideoSource> {
         }
         VideoSourceType::Directory { .. } => {
             // Directory sources should be expanded to individual file sources before this point
-            panic!("Directory sources should be expanded before creating video source")
+            // Return an error source instead of panicking
+            eprintln!("WARNING: Directory sources should be expanded before creating video source");
+            Box::new(ErrorSource::new(
+                config,
+                "Directory sources must be expanded to individual file sources before creation".to_string()
+            ))
         }
         VideoSourceType::FileList { .. } => {
-            // FileList sources should be expanded to individual file sources before this point
-            panic!("FileList sources should be expanded before creating video source")
+            // FileList sources should be expanded to individual file sources before this point  
+            // Return an error source instead of panicking
+            eprintln!("WARNING: FileList sources should be expanded before creating video source");
+            Box::new(ErrorSource::new(
+                config,
+                "FileList sources must be expanded to individual file sources before creation".to_string()
+            ))
         }
     }
 }

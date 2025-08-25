@@ -89,7 +89,12 @@ impl MetadataExtractor {
 
         #[cfg(not(test))]
         {
-            todo!("Real metadata extraction not implemented");
+            // Return an error instead of panicking
+            // Real DeepStream metadata extraction requires FFI bindings to nvds_meta.h
+            // For now, return a clear error message
+            Err(MetadataError::ExtractionFailed(
+                "DeepStream metadata extraction not yet implemented. Using mock backend for testing.".to_string()
+            ))
         }
     }
     

@@ -59,6 +59,39 @@ impl DirectoryWatcher {
         })
     }
     
+    pub fn new_with_sender<P: AsRef<Path>>(
+        path: P, 
+        recursive: bool,
+        tx: mpsc::Sender<FileSystemEvent>
+    ) -> Result<Self> {
+        let path = path.as_ref().to_path_buf();
+        
+        if !path.exists() {
+            return Err(SourceVideoError::config(format!(
+                "Watch path does not exist: {}",
+                path.display()
+            )));
+        }
+        
+        if !path.is_dir() {
+            return Err(SourceVideoError::config(format!(
+                "Watch path is not a directory: {}",
+                path.display()
+            )));
+        }
+        
+        Ok(Self {
+            id: Uuid::new_v4().to_string(),
+            path,
+            recursive,
+            tx,
+            rx: None,
+            watcher: None,
+            debounce_duration: Duration::from_millis(500),
+            last_events: HashMap::new(),
+        })
+    }
+    
     pub fn with_debounce(mut self, duration: Duration) -> Self {
         self.debounce_duration = duration;
         self
@@ -308,6 +341,35 @@ impl FileWatcherInstance {
         })
     }
     
+    pub fn new_with_sender<P: AsRef<Path>>(
+        path: P,
+        tx: mpsc::Sender<FileSystemEvent>
+    ) -> Result<Self> {
+        let path = path.as_ref().to_path_buf();
+        
+        if !path.exists() {
+            return Err(SourceVideoError::config(format!(
+                "File does not exist: {}",
+                path.display()
+            )));
+        }
+        
+        if !path.is_file() {
+            return Err(SourceVideoError::config(format!(
+                "Path is not a file: {}",
+                path.display()
+            )));
+        }
+        
+        Ok(Self {
+            path,
+            tx,
+            rx: None,
+            watcher: None,
+            id: Uuid::new_v4().to_string(),
+        })
+    }
+    
     pub fn get_id(&self) -> &str {
         &self.id
     }
@@ -470,7 +532,7 @@ impl WatcherManager {
         path: P,
         recursive: bool,
     ) -> Result<String> {
-        let mut watcher = DirectoryWatcher::new(path, recursive)?;
+        let mut watcher = DirectoryWatcher::new_with_sender(path, recursive, self.tx.clone())?;
         let id = watcher.get_id().to_string();
         
         watcher.start().await?;
@@ -482,7 +544,7 @@ impl WatcherManager {
     }
     
     pub async fn add_file_watcher<P: AsRef<Path>>(&mut self, path: P) -> Result<String> {
-        let mut watcher = FileWatcherInstance::new(path)?;
+        let mut watcher = FileWatcherInstance::new_with_sender(path, self.tx.clone())?;
         let id = watcher.get_id().to_string();
         
         watcher.start().await?;

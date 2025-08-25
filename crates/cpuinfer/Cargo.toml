@@ -12,7 +12,7 @@ onnx = ["dep:ort", "half", "dep:ndarray"]
 static = []
 capi = []
 half = ["dep:half"]
-darknet = ["dep:darknet"]
+# darknet = ["dep:darknet"]
 ort = ["dep:ort"]
 
 [lib]
@@ -21,7 +21,7 @@ crate-type = ["cdylib", "rlib"]
 path = "src/lib.rs"
 
 [dependencies]
-darknet = { version = "0.4.0", optional = true }
+# darknet = { version = "0.4.0", optional = true }
 gstreamer.workspace = true
 gstreamer-base.workspace = true
 gstreamer-video.workspace = true

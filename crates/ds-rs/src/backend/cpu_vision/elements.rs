@@ -629,7 +629,10 @@ pub fn connect_metadata_bridge_to_cpu_osd(
     
     #[cfg(not(feature = "cairo-rs"))]
     {
-        log::warn!("Cairo rendering disabled - cairo-rs feature not enabled");
+        log::warn!("BOUNDING BOX RENDERING DISABLED - cairo-rs feature not enabled!");
+        log::warn!("To enable bounding box visualization, rebuild with:");
+        log::warn!("  cargo run --features cairo-rs --example ball_tracking_visualization ...");
+        log::warn!("Or add 'cairo-rs' to default features in Cargo.toml");
     }
     
     Ok(())

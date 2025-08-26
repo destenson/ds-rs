@@ -5,12 +5,12 @@ edition.workspace = true
 description.workspace = true
 
 [features]
-default = ["std", "onnx", "cpu_vision", "cairo-rs"]
+default = ["std", "onnx", "cpu_vision", "cairo-rs", "logging"]
 std = []
 onnx = ["ort", "ndarray", "half"]
 cpu_vision = ["nalgebra", "onnx"]
 half = ["dep:half", "ort?/half", "cpuinfer/half"]
-logging = ["gstreamer/log"]
+logging = ["gstreamer/log", "cpuinfer/log"]
 serde = ["gstreamer/serde"]
 # gst_v1_16 = ["gstreamer/v1_16"]
 # gst_v1_18 = ["gstreamer/v1_18"]

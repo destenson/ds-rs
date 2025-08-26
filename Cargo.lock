@@ -630,6 +630,7 @@ dependencies = [
  "gstreamer-video",
  "half",
  "image",
+ "log",
  "ndarray",
  "once_cell",
  "ort",

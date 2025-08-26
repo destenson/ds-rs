@@ -300,6 +300,36 @@ command = "timeout 30"
 cwd = "."
 timeout = 35
 
+# Viewing test with degraded network (no inference)
+[scenarios.network-view-degraded]
+description = "Video playback with network degradation but no inference"
+timeout = 300
+parallel = false
+
+[scenarios.network-view-degraded.setup.rtsp_server]
+enabled = true
+port = 8562
+api_port = 9562
+
+[[scenarios.network-view-degraded.setup.rtsp_server.streams]]
+source = "crates/ds-rs/tests/test_video.mp4"
+mount_point = "test"
+network_profile = "poor"  # 10% packet loss, 200ms latency
+auto_repeat = true
+
+[[scenarios.network-view-degraded.steps]]
+name = "view-degraded-stream"
+command = "gst-launch-1.0 rtspsrc location=rtsp://127.0.0.1:8562/file_0_test_video ! decodebin ! autovideosink"
+cwd = "."
+background = true
+timeout = 60
+
+[[scenarios.network-view-degraded.steps]]
+name = "wait-for-playback"
+command = "timeout 30"
+cwd = "."
+timeout = 35
+
 # Simple inference test with perfect network
 [scenarios.network-inference-simple]
 description = "Simple inference test with no network degradation"
@@ -325,6 +355,38 @@ background = true
 timeout = 60
 
 [[scenarios.network-inference-simple.steps]]
+name = "wait-for-processing"
+command = "timeout 30"
+cwd = "."
+timeout = 35
+
+# Optimized inference test (frame skipping)
+[scenarios.network-inference-optimized]
+description = "Inference with optimization strategies (frame skipping, buffering)"
+timeout = 300
+parallel = false
+
+[scenarios.network-inference-optimized.setup.rtsp_server]
+enabled = true
+port = 8563
+api_port = 9563
+
+[[scenarios.network-inference-optimized.setup.rtsp_server.streams]]
+source = "crates/ds-rs/tests/test_video.mp4"
+mount_point = "test"
+network_profile = "perfect"
+auto_repeat = true
+
+[[scenarios.network-inference-optimized.steps]]
+name = "run-optimized-inference"
+# Add frame skipping or other optimization flags when available
+# For now using standard example, but could be enhanced with optimizations
+command = "cargo run --release --example ball_tracking_visualization -- -t rtsp -i rtsp://127.0.0.1:8563/file_0_test_video"
+cwd = "crates/ds-rs"
+background = true
+timeout = 60
+
+[[scenarios.network-inference-optimized.steps]]
 name = "wait-for-processing"
 command = "timeout 30"
 cwd = "."

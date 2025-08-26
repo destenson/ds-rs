@@ -561,13 +561,33 @@ impl OnnxDetector {
             // Combined confidence
             let confidence = objectness * max_class_score;
             
+            // Validate confidence is in proper range
+            if confidence < 0.0 || confidence > 1.0 {
+                // Skip invalid confidence values silently
+                continue;
+            }
+            
             if confidence >= self.confidence_threshold {
+                // Scale width and height (already in pixels from model)
+                let scaled_w = w * x_scale;
+                let scaled_h = h * y_scale;
+                
+                // cx and cy are already scaled during sigmoid application
                 // Convert from center format to top-left format
-                // and scale to original image size
-                let x = ((cx - w / 2.0) * x_scale).max(0.0);
-                let y = ((cy - h / 2.0) * y_scale).max(0.0);
-                let width = (w * x_scale).min(img_width as f32 - x);
-                let height = (h * y_scale).min(img_height as f32 - y);
+                let x = (cx - scaled_w / 2.0).max(0.0).min(img_width as f32);
+                let y = (cy - scaled_h / 2.0).max(0.0).min(img_height as f32);
+                let width = scaled_w.min(img_width as f32 - x);
+                let height = scaled_h.min(img_height as f32 - y);
+                
+                // Skip invalid bounding boxes
+                if width <= 0.0 || height <= 0.0 {
+                    continue;
+                }
+                
+                // Skip extremely small boxes (likely false positives)
+                if width < 5.0 || height < 5.0 {
+                    continue;
+                }
                 
                 detections.push(Detection {
                     x,
@@ -584,7 +604,15 @@ impl OnnxDetector {
         }
         
         // Apply Non-Maximum Suppression
-        let filtered_detections = self.apply_nms(detections);
+        let mut filtered_detections = self.apply_nms(detections);
+        
+        // Limit maximum detections per frame to prevent excessive false positives
+        const MAX_DETECTIONS_PER_FRAME: usize = 100;
+        if filtered_detections.len() > MAX_DETECTIONS_PER_FRAME {
+            // Sort by confidence and keep top detections
+            filtered_detections.sort_by(|a, b| b.confidence.partial_cmp(&a.confidence).unwrap());
+            filtered_detections.truncate(MAX_DETECTIONS_PER_FRAME);
+        }
         
         // log::debug!("YOLOv5: Postprocessed {} anchors, {} detections after NMS", 
         //           num_anchors, filtered_detections.len());
@@ -709,24 +737,24 @@ impl OnnxDetector {
     fn create_mock_yolo_output(&self) -> Vec<f32> {
         let num_anchors = 25200; // Typical for 640x640 YOLOv5
         let output_size = 85; // 4 bbox + 1 objectness + 80 classes
-        let mut outputs = vec![0.0; num_anchors * output_size];
+        let mut outputs = vec![-10.0; num_anchors * output_size]; // Initialize with low logits
         
-        // Add a few mock detections
-        // Detection 1: Person at center
-        outputs[0] = 320.0;  // cx
-        outputs[1] = 320.0;  // cy
-        outputs[2] = 100.0;  // width
-        outputs[3] = 200.0;  // height
-        outputs[4] = 0.9;    // objectness
-        outputs[5] = 0.95;   // person class score
+        // Add a few mock detections with proper logit values
+        // Detection 1: Person at center (logit values that will become reasonable after sigmoid)
+        outputs[0] = 0.0;    // cx logit (sigmoid(0) = 0.5, * 640 = 320)
+        outputs[1] = 0.0;    // cy logit (sigmoid(0) = 0.5, * 640 = 320)
+        outputs[2] = 100.0;  // width (in pixels, not sigmoidified)
+        outputs[3] = 200.0;  // height (in pixels, not sigmoidified)
+        outputs[4] = 2.2;    // objectness logit (sigmoid(2.2) ≈ 0.9)
+        outputs[5] = 3.0;    // person class score logit (sigmoid(3.0) ≈ 0.95)
         
         // Detection 2: Car
-        outputs[85] = 200.0;  // cx
-        outputs[86] = 400.0;  // cy
-        outputs[87] = 150.0;  // width
-        outputs[88] = 80.0;   // height
-        outputs[89] = 0.85;   // objectness
-        outputs[90 + 2] = 0.9; // car class score
+        outputs[85] = -0.8;  // cx logit (sigmoid(-0.8) ≈ 0.31, * 640 ≈ 200)
+        outputs[86] = 0.5;   // cy logit (sigmoid(0.5) ≈ 0.62, * 640 ≈ 400)
+        outputs[87] = 150.0; // width
+        outputs[88] = 80.0;  // height
+        outputs[89] = 1.7;   // objectness logit (sigmoid(1.7) ≈ 0.85)
+        outputs[90 + 2] = 2.2; // car class score logit
         
         outputs
     }

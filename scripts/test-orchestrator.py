@@ -216,6 +216,9 @@ class TestOrchestrator:
         logger.info(f"Updating network condition for stream {stream_index}")
         success = self.network_manager.update_network_condition('rtsp_server', stream_index, condition)
         
+        if not success:
+            logger.error(f"Failed to update network condition")
+        
         if wait > 0:
             logger.info(f"Waiting {wait} seconds after network update")
             time.sleep(wait)
@@ -256,7 +259,8 @@ class TestOrchestrator:
                     )
                     
                     logger.info(f"Applying network condition at t={elapsed:.1f}s")
-                    self.network_manager.update_network_condition('rtsp_server', stream_index, network_cond)
+                    if not self.network_manager.update_network_condition('rtsp_server', stream_index, network_cond):
+                        logger.error(f"Failed to update network condition")
                     condition_index += 1
             
             time.sleep(1)

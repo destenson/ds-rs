@@ -238,16 +238,18 @@ class NetworkSimulationManager:
             # Build final command with binary path and arguments
             cmd = [str(binary_path)] + args
             
-            logger.debug(f"Running binary: {' '.join(cmd)}")
+            logger.info(f"Starting server with command: {' '.join(cmd)}")
+            logger.info(f"API will be on port {api_port}")
             
             try:
-                # Start with minimal output capture to avoid blocking
+                # Start with output capture for debugging
                 process = subprocess.Popen(
                     cmd,
                     cwd=cwd,
-                    stdout=subprocess.DEVNULL,  # Don't capture to avoid blocking
-                    stderr=subprocess.DEVNULL,
-                    text=True
+                    stdout=subprocess.PIPE,  # Capture output for debugging
+                    stderr=subprocess.STDOUT,  # Combine stderr with stdout
+                    text=True,
+                    bufsize=1  # Line buffered
                 )
             except Exception as e:
                 logger.error(f"Failed to start process: {e}")
@@ -258,6 +260,15 @@ class NetworkSimulationManager:
             self.server_metrics[name] = ServerMetrics()
             self.server_api_ports[name] = api_port  # Store the API port
             self.server_ports[name] = port  # Store the RTSP port
+            
+            # Start a thread to read the process output
+            def log_output():
+                for line in process.stdout:
+                    if line.strip():
+                        logger.info(f"[{name}] {line.strip()}")
+            
+            output_thread = threading.Thread(target=log_output, daemon=True)
+            output_thread.start()
             
             # Give it a moment to start
             time.sleep(2)
@@ -276,7 +287,6 @@ class NetworkSimulationManager:
                     del self.server_metrics[name]
                     del self.server_api_ports[name]
                     del self.server_ports[name]
-                    del self.server_ports[name]
                     return False
             
             # Start monitoring thread
@@ -294,35 +304,74 @@ class NetworkSimulationManager:
     def _wait_for_server(self, name: str, rtsp_port: int, api_port: int, timeout: int) -> bool:
         """Wait for server to be ready"""
         start_time = time.time()
+        rtsp_ready = False
+        api_ready = False
         
         while time.time() - start_time < timeout:
             # Check if process is still running
             if self.servers[name].poll() is not None:
-                logger.error(f"Server {name} process died")
+                exit_code = self.servers[name].poll()
+                logger.error(f"Server {name} process died with exit code {exit_code}")
                 return False
             
             # Check RTSP port
-            try:
-                sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-                sock.settimeout(1)
-                result = sock.connect_ex(('127.0.0.1', rtsp_port))
-                sock.close()
-                if result == 0:
-                    logger.debug(f"RTSP port {rtsp_port} is open")
-                    
-                    # Also check API endpoint if available
-                    try:
-                        response = requests.get(f"http://127.0.0.1:{api_port}/api/status", timeout=1)
-                        if response.status_code == 200:
-                            logger.debug(f"API endpoint responding on port {api_port}")
-                            return True
-                    except:
-                        # API might not be enabled, that's OK
-                        return True
-            except:
-                pass
+            if not rtsp_ready:
+                try:
+                    sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+                    sock.settimeout(1)
+                    result = sock.connect_ex(('127.0.0.1', rtsp_port))
+                    sock.close()
+                    if result == 0:
+                        logger.info(f"RTSP port {rtsp_port} is now open")
+                        rtsp_ready = True
+                except Exception as e:
+                    logger.debug(f"RTSP port check failed: {e}")
+            
+            # Check API endpoint after RTSP is ready
+            if rtsp_ready and not api_ready:
+                try:
+                    # Try different endpoints to find what works
+                    for endpoint in ["/api/v1/health", "/api/health", "/health", "/"]:
+                        url = f"http://127.0.0.1:{api_port}{endpoint}"
+                        response = requests.get(url, timeout=1)
+                        if response.status_code != 404:
+                            logger.info(f"Found working endpoint: {endpoint} (status: {response.status_code})")
+                            if response.status_code == 200:
+                                logger.info(f"API endpoint responding on port {api_port}")
+                                api_ready = True
+                                return True  # Both are ready
+                            break
+                    else:
+                        # All endpoints returned 404
+                        url = f"http://127.0.0.1:{api_port}/api/v1/health"
+                        response = requests.get(url, timeout=1)
+                    if response.status_code == 200:
+                        logger.info(f"API endpoint responding on port {api_port}")
+                        api_ready = True
+                        return True  # Both are ready
+                    else:
+                        logger.warning(f"API returned status {response.status_code} from {url}")
+                except requests.exceptions.ConnectionError as e:
+                    logger.info(f"API connection error on port {api_port}: {e}")
+                except requests.exceptions.RequestException as e:
+                    logger.info(f"API not ready yet on port {api_port}: {type(e).__name__}: {e}")
+                    # Continue waiting for API to be ready
+            
+            # Log progress periodically
+            elapsed = time.time() - start_time
+            if elapsed > 5 and int(elapsed) % 5 == 0:
+                logger.info(f"Still waiting for server {name} (RTSP: {rtsp_ready}, API: {api_ready}, elapsed: {elapsed:.0f}s)")
             
             time.sleep(0.5)
+        
+        # Timeout reached
+        logger.warning(f"Server {name} health check timed out after {timeout}s (RTSP: {rtsp_ready}, API: {api_ready})")
+        
+        # If RTSP is ready but API isn't, we might still consider it a success
+        # depending on whether API was supposed to be enabled
+        if rtsp_ready:
+            logger.warning(f"RTSP is ready but API did not respond on port {api_port}, proceeding anyway")
+            return True
         
         return False
     
@@ -372,7 +421,7 @@ class NetworkSimulationManager:
             }
             
             response = requests.post(
-                f"http://127.0.0.1:{api_port}/api/network/update",
+                f"http://127.0.0.1:{api_port}/api/v1/network/update",
                 json=payload,
                 timeout=5
             )

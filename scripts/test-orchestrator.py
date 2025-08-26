@@ -147,13 +147,13 @@ class ProcessManager:
 class TestOrchestrator:
     """Main test orchestration class with network simulation support"""
     
-    def __init__(self, config_path: Path):
+    def __init__(self, config_path: Path, force_rebuild: bool = False):
         self.config_path = config_path
         self.config = self._load_config()
         self.process_manager = ProcessManager()
         self.project_root = Path(__file__).parent.parent
         self.test_results = []
-        self.network_manager = NetworkSimulationManager() if NETWORK_SIMULATION_AVAILABLE else None
+        self.network_manager = NetworkSimulationManager(force_rebuild=force_rebuild) if NETWORK_SIMULATION_AVAILABLE else None
         self.inference_metrics = {}
         
     def _load_config(self) -> Dict:
@@ -667,6 +667,12 @@ def main():
     )
     
     parser.add_argument(
+        '--rebuild',
+        action='store_true',
+        help='Force rebuild of binaries even if they exist'
+    )
+    
+    parser.add_argument(
         '--dry-run',
         action='store_true',
         help='Show what would be executed without running tests'
@@ -714,7 +720,7 @@ def main():
             logger.warning(f"Network config not found: {network_config_path}, using default config")
     
     # Create orchestrator
-    orchestrator = TestOrchestrator(config_path)
+    orchestrator = TestOrchestrator(config_path, force_rebuild=args.rebuild)
     
     # List scenarios if requested
     if args.list:

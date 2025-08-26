@@ -5,7 +5,7 @@ edition.workspace = true
 description.workspace = true
 
 [features]
-default = ["std", "onnx", "cpu_vision"]
+default = ["std", "onnx", "cpu_vision", "cairo-rs"]
 std = []
 onnx = ["ort", "ndarray", "half"]
 cpu_vision = ["nalgebra", "onnx"]

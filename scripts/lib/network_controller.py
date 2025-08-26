@@ -106,6 +106,7 @@ class NetworkSimulationManager:
         self.servers: Dict[str, subprocess.Popen] = {}
         self.server_configs: Dict[str, List[StreamConfig]] = {}
         self.server_metrics: Dict[str, ServerMetrics] = {}
+        self.server_api_ports: Dict[str, int] = {}  # Track API ports for each server
         self.server_ports: Dict[str, int] = {}  # Store actual port for each server
         self._lock = threading.Lock()
         self._monitor_threads: Dict[str, threading.Thread] = {}
@@ -160,6 +161,7 @@ class NetworkSimulationManager:
                 stream = streams[0]
                 args.extend(["serve", "-f", stream.source_path])
                 args.extend(["--port", str(port)])
+                args.extend(["--api"])  # Enable API server
                 args.extend(["--api-port", str(api_port)])
                 if stream.auto_repeat:
                     args.append("--auto-repeat")
@@ -167,6 +169,7 @@ class NetworkSimulationManager:
             else:
                 # Multi-stream mode with different conditions
                 args.extend(["serve-files", "--port", str(port)])
+                args.extend(["--api"])  # Enable API server
                 args.extend(["--api-port", str(api_port)])
                 
                 # Add all files
@@ -253,7 +256,8 @@ class NetworkSimulationManager:
             self.servers[name] = process
             self.server_configs[name] = streams
             self.server_metrics[name] = ServerMetrics()
-            self.server_ports[name] = port  # Store the actual port used
+            self.server_api_ports[name] = api_port  # Store the API port
+            self.server_ports[name] = port  # Store the RTSP port
             
             # Give it a moment to start
             time.sleep(2)
@@ -270,6 +274,8 @@ class NetworkSimulationManager:
                     del self.servers[name]
                     del self.server_configs[name]
                     del self.server_metrics[name]
+                    del self.server_api_ports[name]
+                    del self.server_ports[name]
                     del self.server_ports[name]
                     return False
             
@@ -349,9 +355,11 @@ class NetworkSimulationManager:
             logger.error(f"Server {name} not found")
             return False
         
-        # Find API port (assumes it's RTSP port + 1000)
-        # This would need to be tracked properly in production
-        api_port = self.base_port + 1000 + list(self.servers.keys()).index(name)
+        # Use the stored API port
+        api_port = self.server_api_ports.get(name)
+        if api_port is None:
+            logger.error(f"API port not found for server {name}")
+            return False
         
         try:
             # Update via API

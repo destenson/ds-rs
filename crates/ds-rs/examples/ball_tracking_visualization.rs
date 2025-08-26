@@ -4,6 +4,7 @@
 //! This example demonstrates real-time bounding box rendering around detected balls
 //! using the integrated detection and rendering pipeline.
 
+use clap::{Parser, ValueEnum};
 use ds_rs::{
     init, timestamp, Result, DeepStreamError,
     BackendManager, BackendType, PipelineBuilder, MetadataBridge,
@@ -16,6 +17,60 @@ use std::sync::atomic::{AtomicBool, Ordering};
 use std::thread;
 use std::time::Duration;
 
+/// Input source type for the ball tracking visualization
+#[derive(Debug, Clone, ValueEnum)]
+enum SourceType {
+    /// Use a file path or URI
+    File,
+    /// Use RTSP stream
+    Rtsp,
+    /// Use videotestsrc test pattern
+    Test,
+    /// Use webcam/camera device
+    Camera,
+}
+
+/// Ball tracking visualization application
+#[derive(Parser, Debug)]
+#[command(author, version, about, long_about = None)]
+struct Args {
+    /// Input source type
+    #[arg(short = 't', long, value_enum, default_value = "file")]
+    source_type: SourceType,
+    
+    /// Input source (file path, RTSP URL, camera device index, or ignored for test pattern)
+    #[arg(short = 'i', long)]
+    input: Option<String>,
+    
+    /// Add additional sources (can be specified multiple times)
+    #[arg(short = 'a', long = "add-source")]
+    additional_sources: Vec<String>,
+    
+    /// Log level (error, warn, info, debug, trace)
+    #[arg(short = 'l', long, default_value = "info")]
+    log_level: String,
+    
+    /// Enable GStreamer debug output
+    #[arg(short = 'g', long)]
+    gst_debug: bool,
+    
+    /// Number of tiler rows for multiple sources
+    #[arg(long, default_value = "2")]
+    tiler_rows: i32,
+    
+    /// Number of tiler columns for multiple sources  
+    #[arg(long, default_value = "2")]
+    tiler_columns: i32,
+    
+    /// Output width
+    #[arg(long, default_value = "1920")]
+    width: i32,
+    
+    /// Output height
+    #[arg(long, default_value = "1080")]
+    height: i32,
+}
+
 /// Main application state
 struct BallTrackingApp {
     pipeline: gst::Pipeline,
@@ -26,7 +81,7 @@ struct BallTrackingApp {
 
 impl BallTrackingApp {
     /// Create a new ball tracking application
-    fn new() -> Result<Self> {
+    fn new(args: &Args) -> Result<Self> {
         // Initialize DeepStream/GStreamer
         init()?;
         
@@ -47,8 +102,8 @@ impl BallTrackingApp {
         // Standard backend uses compositor which doesn't have width/height properties
         if backend_manager.backend_type() == BackendType::DeepStream {
             builder = builder
-                .set_property("streammux", "width", 1920i32)
-                .set_property("streammux", "height", 1080i32)
+                .set_property("streammux", "width", args.width)
+                .set_property("streammux", "height", args.height)
                 .set_property("streammux", "batch-size", 1i32)
                 .set_property("streammux", "batched-push-timeout", 40000i32);
         }
@@ -84,10 +139,10 @@ impl BallTrackingApp {
         // Only set tiler width/height for DeepStream backend
         if backend_manager.backend_type() == BackendType::DeepStream {
             builder = builder
-                .set_property("tiler", "rows", 2i32)
-                .set_property("tiler", "columns", 2i32)
-                .set_property("tiler", "width", 1920i32)
-                .set_property("tiler", "height", 1080i32);
+                .set_property("tiler", "rows", args.tiler_rows)
+                .set_property("tiler", "columns", args.tiler_columns)
+                .set_property("tiler", "width", args.width)
+                .set_property("tiler", "height", args.height);
         }
 
         // Use autovideosink for better cross-platform window handling
@@ -306,58 +361,102 @@ impl BallTrackingApp {
 }
 
 fn main() -> Result<()> {
+    // Parse command-line arguments
+    let args = Args::parse();
+    
     // Initialize logging
+    let log_level = match args.log_level.to_lowercase().as_str() {
+        "error" => log::LevelFilter::Error,
+        "warn" => log::LevelFilter::Warn,
+        "info" => log::LevelFilter::Info,
+        "debug" => log::LevelFilter::Debug,
+        "trace" => log::LevelFilter::Trace,
+        _ => log::LevelFilter::Info,
+    };
+    
     env_logger::Builder::from_default_env()
-        .filter_level(log::LevelFilter::Info)
+        .filter_level(log_level)
         .init();
     
-    // Enable GStreamer debug logging for our detector
-    unsafe {
-        std::env::set_var("GST_DEBUG", "cpudetector:5");
+    // Enable GStreamer debug logging if requested
+    if args.gst_debug {
+        unsafe {
+            std::env::set_var("GST_DEBUG", "cpudetector:5,*:3");
+        }
     }
     
     log::info!("[{:.3}] Ball Tracking Visualization Example", timestamp());
     log::info!("[{:.3}] =====================================", timestamp());
+    log::debug!("[{:.3}] Arguments: {:?}", timestamp(), args);
     
     // Create application
-    let app = BallTrackingApp::new()?;
+    let app = BallTrackingApp::new(&args)?;
     
-    // Add video sources (RTSP streams or files)
-    // Use the downloaded test video with people and cars
-    let video_path = std::env::current_dir()
-        .unwrap()
-        .join("crates")
-        .join("ds-rs")
-        .join("tests")
-        .join("test_video.mp4");
+    // Prepare the primary source URI based on source type
+    let primary_source = match args.source_type {
+        SourceType::File => {
+            if let Some(input) = args.input {
+                // Check if it's already a URI or a path
+                if input.starts_with("file://") || input.starts_with("http://") || input.starts_with("https://") {
+                    input
+                } else {
+                    // Convert file path to URI
+                    let path = std::path::PathBuf::from(&input);
+                    let abs_path = if path.is_absolute() {
+                        path
+                    } else {
+                        std::env::current_dir()?.join(path)
+                    };
+                    format!("file:///{}", abs_path.display().to_string().replace("\\", "/"))
+                }
+            } else {
+                // Default to test video if no input provided
+                let video_path = std::env::current_dir()?
+                    .join("crates")
+                    .join("ds-rs")
+                    .join("tests")
+                    .join("test_video.mp4");
+                
+                if video_path.exists() {
+                    format!("file:///{}", video_path.display().to_string().replace("\\", "/"))
+                } else {
+                    log::warn!("[{:.3}] Default test video not found, using test pattern", timestamp());
+                    "videotestsrc://".to_string()
+                }
+            }
+        },
+        SourceType::Rtsp => {
+            args.input.unwrap_or_else(|| {
+                log::info!("[{:.3}] No RTSP URL provided, using default rtsp://127.0.0.1:8554/test1", timestamp());
+                "rtsp://127.0.0.1:8554/test1".to_string()
+            })
+        },
+        SourceType::Test => {
+            "videotestsrc://".to_string()
+        },
+        SourceType::Camera => {
+            let device_index = args.input.as_ref().and_then(|s| s.parse::<i32>().ok()).unwrap_or(0);
+            #[cfg(unix)]
+            let uri = format!("v4l2:///dev/video{}", device_index);
+            #[cfg(windows)]
+            let uri = format!("ksvideosrc://device-index={}", device_index);
+            #[cfg(not(any(unix, windows)))]
+            let uri = "videotestsrc://".to_string();
+            uri
+        },
+    };
     
-    let video_uri = format!("file:///{}", video_path.display().to_string().replace("\\", "/"));
-    log::info!("Using video: {}", video_uri);
-    app.add_source(&video_uri)?;
+    log::info!("[{:.3}] Adding primary source: {}", timestamp(), primary_source);
+    app.add_source(&primary_source)?;
     
-    // For test patterns:
-    // app.add_source("videotestsrc://")?;
-    
-    // For RTSP streams from source-videos server:
-    // app.add_source("rtsp://127.0.0.1:8554/test1")?;
-    
-    // For video files:
-    // app.add_source("file:///path/to/video.mp4")?;
+    // Add any additional sources
+    for (i, source) in args.additional_sources.iter().enumerate() {
+        log::info!("[{:.3}] Adding additional source {}: {}", timestamp(), i + 1, source);
+        app.add_source(source)?;
+    }
     
     // Start pipeline
     app.start()?;
-    
-    // Optional: Add another source after 5 seconds (demonstrates dynamic addition)
-    // thread::spawn({
-    //     let app_controller = app.source_controller.clone();
-    //     move || {
-    //         thread::sleep(Duration::from_secs(5));
-    //         log::info!("[{:.3}] Adding second source dynamically", timestamp());
-    //         let _ = app_controller.add_source(
-    //             "videotestsrc://"
-    //         );
-    //     }
-    // });
     
     // Run main loop
     app.run()?;

@@ -2,6 +2,8 @@
 
 ## False detections
 
+The biggest problem we're seeing today is false detections in the ball tracking example. The CPU detector is detecting a lot of objects that aren't there, and this is causing the tracker to behave erratically.
+
 ```log
 PS C:\Users\deste\repos\ds-rs> cargo r --example ball_tracking_visualization --all-features
     Finished `dev` profile [unoptimized + debuginfo] target(s) in 0.54s

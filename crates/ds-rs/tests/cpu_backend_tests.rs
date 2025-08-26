@@ -34,44 +34,50 @@ fn test_cpu_detector_creation() {
     
     #[cfg(feature = "ort")]
     {
-        // With ort feature, should succeed but fall back to mock detection when file doesn't exist
+        // With ort feature, constructor succeeds but detection will fail without model
         assert!(result.is_ok());
         let detector = result.unwrap();
         
-        // Should work with mock detection
+        // Detection should fail without a real model
         use image::DynamicImage;
         let image = DynamicImage::new_rgb8(640, 640);
-        let detections = detector.detect(&image).unwrap();
-        assert!(!detections.is_empty());
+        let detection_result = detector.detect(&image);
+        assert!(detection_result.is_err());
     }
     
     #[cfg(not(feature = "ort"))]
     {
-        // Without ort feature, should still work in mock mode
-        assert!(result.is_ok());
+        // Without ort feature, should fail
+        assert!(result.is_err());
     }
     
-    // Test with DetectorConfig for mock detector
+    // Test with DetectorConfig without model
     let config = DetectorConfig {
-        model_path: None,  // No model, use mock
+        model_path: None,  // No model
         input_width: 416,
         input_height: 416,
         confidence_threshold: 0.3,
         ..Default::default()
     };
     
-    let detector = OnnxDetector::new_with_config(config);
-    assert!(detector.is_ok());
-    let detector = detector.unwrap();
+    #[cfg(feature = "ort")]
+    {
+        let detector = OnnxDetector::new_with_config(config);
+        assert!(detector.is_ok());
+        let detector = detector.unwrap();
+        
+        // Detection should fail without a model
+        use image::DynamicImage;
+        let image = DynamicImage::new_rgb8(640, 480);
+        let detections = detector.detect(&image);
+        assert!(detections.is_err()); // Should fail without model
+    }
     
-    // Test mock detection
-    use image::DynamicImage;
-    let image = DynamicImage::new_rgb8(640, 480);
-    let detections = detector.detect(&image);
-    assert!(detections.is_ok());
-    let detections = detections.unwrap();
-    // Mock detector should return some detections
-    assert!(!detections.is_empty());
+    #[cfg(not(feature = "ort"))]
+    {
+        let detector = OnnxDetector::new_with_config(config);
+        assert!(detector.is_err()); // Should fail without ort feature
+    }
 }
 
 #[test]
@@ -324,7 +330,11 @@ fn test_onnx_tensor_operations() {
     use ds_rs::backend::cpu_vision::{OnnxDetector, DetectorConfig};
     use image::DynamicImage;
     
-    // Create detector with mock mode (no actual model file)
+    // Skip this test since we removed mock detector support
+    // Real ONNX model testing requires an actual model file
+    
+    // TODO: When a real ONNX model is available, test with an actual model
+    // For now, just verify that detector creation fails without a model
     let config = DetectorConfig {
         model_path: None,
         input_width: 640,
@@ -334,11 +344,10 @@ fn test_onnx_tensor_operations() {
     
     let detector = OnnxDetector::new_with_config(config).unwrap();
     
-    // Test preprocessing
+    // Test that detection fails without a model
     let image = DynamicImage::new_rgb8(1920, 1080);
-    // This should work with mock detector
     let result = detector.detect(&image);
-    assert!(result.is_ok());
+    assert!(result.is_err());
     
     // TODO: When a real ONNX model is available, test with:
     // let config = DetectorConfig {

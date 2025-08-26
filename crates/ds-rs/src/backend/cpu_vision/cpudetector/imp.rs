@@ -85,8 +85,7 @@ impl CpuDetector {
                     *detector_guard = Some(detector);
                 },
                 Err(e) => {
-                    gst::warning!(CAT, imp = self, "Failed to load detector: {}, using mock", e);
-                    *detector_guard = Some(OnnxDetector::new_mock());
+                    panic!("Failed to load ONNX model: {}", e);
                 }
             }
         }

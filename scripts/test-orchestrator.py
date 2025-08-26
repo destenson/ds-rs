@@ -58,25 +58,60 @@ class ProcessManager:
             logger.warning(f"Process {name} already running, stopping it first")
             self.stop_process(name)
             
-        logger.info(f"Starting process {name}: {command}")
+        logger.info(f"Starting process {name}: {command} (cwd: {cwd})")
         
         # Merge environment variables
         process_env = os.environ.copy()
         if env:
             process_env.update(env)
-            
-        # Start the process
-        process = subprocess.Popen(
-            command,
-            shell=True,
-            cwd=cwd,
-            env=process_env,
-            stdout=subprocess.PIPE,
-            stderr=subprocess.PIPE,
-            text=True
-        )
+        process_env.update({'RUST_BACKTRACE': '1', 'RUST_LOG': 'info', "GST_DEBUG": "3"})
+
+        # Start the process with DEVNULL to avoid blocking on Windows
+        # For RTSP server, we don't need to capture output during normal operation
+        if name == 'rtsp_server':
+            process = subprocess.Popen(
+                command,
+                shell=True,
+                cwd=cwd,
+                env=process_env,
+                stdout=subprocess.DEVNULL,
+                stderr=subprocess.DEVNULL,
+                text=True
+            )
+        else:
+            # For other processes, keep the pipes
+            process = subprocess.Popen(
+                command,
+                shell=True,
+                cwd=cwd,
+                env=process_env,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+                text=True
+            )
         
         self.processes[name] = process
+        
+        # Check if process started successfully (give it a moment)
+        time.sleep(0.5)
+        if process.poll() is not None:
+            logger.error(f"Process {name} died immediately with exit code {process.poll()}")
+            del self.processes[name]
+            return None
+        
+        # Start output reader thread to prevent blocking
+        if name != 'rtsp_server':
+            def read_output():
+                try:
+                    for line in process.stdout:
+                        logger.debug(f"[{name}] {line.strip()}")
+                except:
+                    pass
+            
+            import threading
+            thread = threading.Thread(target=read_output, daemon=True)
+            thread.start()
+        
         return process
         
     def stop_process(self, name: str) -> bool:
@@ -412,11 +447,15 @@ class TestOrchestrator:
                 
             else:
                 # Traditional RTSP server start without network simulation
-                self.process_manager.start_process(
+                process = self.process_manager.start_process(
                     'rtsp_server',
                     server_config['command'],
                     cwd=self.project_root / server_config['cwd']
                 )
+                
+                if process is None:
+                    logger.error("Failed to start RTSP server process")
+                    return False
                 
                 # Wait for startup
                 startup_delay = server_config.get('startup_delay', 5)
@@ -427,6 +466,11 @@ class TestOrchestrator:
                 if 'health_check' in server_config:
                     if not self._wait_for_health_check(server_config['health_check']):
                         logger.error("RTSP server health check failed")
+                        # Check if process is still running
+                        if 'rtsp_server' in self.process_manager.processes:
+                            proc = self.process_manager.processes['rtsp_server']
+                            if proc.poll() is not None:
+                                logger.error(f"RTSP server process died with exit code {proc.poll()}")
                         return False
                     
         # Create test files if needed
@@ -614,10 +658,22 @@ def main():
     # Find config file
     config_path = Path(args.config)
     if not config_path.is_absolute():
-        config_path = Path(__file__).parent.parent / args.config
+        # Try relative to current directory first
+        if config_path.exists():
+            config_path = config_path.resolve()
+        else:
+            # Try relative to project root
+            config_path = Path(__file__).parent.parent / args.config
+            if not config_path.exists():
+                # Try relative to scripts directory
+                config_path = Path(__file__).parent / args.config.replace('scripts/', '').replace('scripts\\', '')
         
     if not config_path.exists():
         logger.error(f"Configuration file not found: {config_path}")
+        logger.info(f"Searched in:")
+        logger.info(f"  - {Path(args.config).resolve()}")
+        logger.info(f"  - {Path(__file__).parent.parent / args.config}")
+        logger.info(f"  - {Path(__file__).parent / args.config}")
         sys.exit(1)
         
     # Check if we're running network inference tests

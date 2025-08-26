@@ -74,20 +74,19 @@ pub fn create_cpu_detector(name: Option<&str>, model_path: Option<&str>) -> Resu
                         log::info!("CPU detector loaded ONNX model: {}", model);
                     },
                     Err(e) => {
-                        log::warn!("Failed to load ONNX model {}: {}", model, e);
-                        *detector.lock().unwrap() = Some(OnnxDetector::new_mock());
-                        log::info!("Using mock detector instead");
+                        log::error!("Failed to load ONNX model {}: {}", model, e);
+                        // Keep detector as None - will fail at runtime if used
                     }
                 }
             },
             false => {
-                log::warn!("Model file not found: {}, using mock detector", model);
-                *detector.lock().unwrap() = Some(OnnxDetector::new_mock());
+                log::error!("Model file not found: {}", model);
+                // Keep detector as None - will fail at runtime if used
             }
         }
     } else {
-        log::info!("No model path provided, using mock detector");
-        *detector.lock().unwrap() = Some(OnnxDetector::new_mock());
+        log::warn!("No model path provided for CPU detector");
+        // Keep detector as None - will fail at runtime if used
     }
     
     // Add probe to process buffers and run detection

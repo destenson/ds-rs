@@ -83,13 +83,14 @@ impl ControlApi {
             .route("/health/live", get(routes::health::liveness))
             .route("/health/ready", get(routes::health::readiness))
             .route("/metrics", get(routes::health::metrics))
+            .route("/status", get(routes::health::health_check))  // Alias for health check
             
             // Source management
             .route("/sources", get(routes::sources::list_sources))
             .route("/sources", post(routes::sources::add_source))
-            .route("/sources/:id", get(routes::sources::get_source))
-            .route("/sources/:id", delete(routes::sources::remove_source))
-            .route("/sources/:id", put(routes::sources::update_source))
+            .route("/sources/{id}", get(routes::sources::get_source))
+            .route("/sources/{id}", delete(routes::sources::remove_source))
+            .route("/sources/{id}", put(routes::sources::update_source))
             .route("/sources/batch", post(routes::sources::batch_operations))
             
             // Server control
@@ -112,6 +113,7 @@ impl ControlApi {
             .route("/network/conditions", put(routes::network::set_conditions))
             .route("/network/status", get(routes::network::get_status))
             .route("/network/reset", post(routes::network::reset_network))
+            .route("/network/update", post(routes::network::set_conditions))  // Alias for set_conditions
             
             // Operations
             .route("/generate", post(routes::operations::generate_video))

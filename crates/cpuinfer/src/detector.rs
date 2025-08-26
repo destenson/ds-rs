@@ -439,6 +439,11 @@ impl OnnxDetector {
         YoloVersion::V5
     }
     
+    /// Apply sigmoid activation function
+    fn sigmoid(x: f32) -> f32 {
+        1.0 / (1.0 + (-x).exp())
+    }
+    
     /// Process YOLOv5 outputs
     fn postprocess_yolov5(&self, outputs: &[f32], img_width: u32, img_height: u32) -> Result<Vec<Detection>> {
         let mut detections = Vec::new();
@@ -487,7 +492,7 @@ impl OnnxDetector {
         // Process each anchor/detection
         for i in 0..num_anchors {
             // Extract bbox and scores based on format
-            let (cx, cy, w, h, objectness) = if is_transposed {
+            let (cx_raw, cy_raw, w, h, objectness_raw) = if is_transposed {
                 // Transposed format [1, 85, 25200]: feature_idx * num_anchors + anchor_idx
                 (
                     outputs[0 * num_anchors + i],  // cx at position [0][i]
@@ -508,6 +513,11 @@ impl OnnxDetector {
                 )
             };
             
+            // Apply sigmoid activation to objectness and coordinates (YOLOv5 requirement)
+            let objectness = Self::sigmoid(objectness_raw);
+            let cx = Self::sigmoid(cx_raw) * self.input_width as f32;
+            let cy = Self::sigmoid(cy_raw) * self.input_height as f32;
+            
             // Skip low confidence detections
             if objectness < self.confidence_threshold {
                 continue;
@@ -524,7 +534,7 @@ impl OnnxDetector {
             let mut best_class_id = 0;
             
             for class_id in 0..num_classes {
-                let class_score = if is_transposed {
+                let class_score_raw = if is_transposed {
                     // Transposed: class scores at position [5+class_id][i]
                     outputs[(5 + class_id) * num_anchors + i]
                 } else {
@@ -532,6 +542,9 @@ impl OnnxDetector {
                     let offset = i * output_size;
                     outputs[offset + 5 + class_id]
                 };
+                
+                // Apply sigmoid activation to class score
+                let class_score = Self::sigmoid(class_score_raw);
                 
                 if class_score > max_class_score {
                     max_class_score = class_score;

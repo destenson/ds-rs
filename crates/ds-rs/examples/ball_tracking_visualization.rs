@@ -383,6 +383,11 @@ fn main() -> Result<()> {
         unsafe {
             std::env::set_var("GST_DEBUG", "cpudetector:5,*:3");
         }
+    } else {
+        // Always enable CPU detector debug to see if it's detecting
+        unsafe {
+            std::env::set_var("GST_DEBUG", "cpudetector:5");
+        }
     }
     
     log::info!("[{:.3}] Ball Tracking Visualization Example", timestamp());

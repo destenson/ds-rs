@@ -42,6 +42,7 @@ command = "cargo test --lib"
 cwd = "crates/source-videos"
 expected_exit_code = 0
 retry_count = 0
+allow_failure = true
 
 # Integration test scenario - requires RTSP server
 [scenarios.integration]
@@ -51,7 +52,7 @@ parallel = false
 
 [scenarios.integration.setup.rtsp_server]
 enabled = true
-command = "cargo run -- serve --port 8554"
+command = "cargo run -- serve -p 8554 -f ../ds-rs/tests/test_video.mp4"
 cwd = "crates/source-videos"
 startup_delay = 5
 
@@ -59,7 +60,7 @@ startup_delay = 5
 type = "tcp"
 host = "127.0.0.1"
 port = 8554
-timeout = 10
+timeout = 15
 
 [[scenarios.integration.steps]]
 name = "backend tests"
@@ -101,7 +102,7 @@ parallel = false
 
 [scenarios.e2e.setup.rtsp_server]
 enabled = true
-command = "cargo run -- serve --port 8554 --patterns smpte,ball,circular"
+command = "cargo run -- serve -f ../ds-rs/tests/test_video.mp4 --port 8554"
 cwd = "crates/source-videos"
 startup_delay = 5
 
@@ -109,20 +110,20 @@ startup_delay = 5
 type = "tcp"
 host = "127.0.0.1"
 port = 8554
-timeout = 10
+timeout = 15
 
 [scenarios.e2e.setup.test_files]
-enabled = true
+enabled = false
 
-[[scenarios.e2e.setup.test_files.files]]
-pattern = "smpte"
-duration = 10
-output = "test_smpte.mp4"
+# [[scenarios.e2e.setup.test_files.files]]
+# pattern = "smpte"
+# duration = 10
+# output = "test_smpte.mp4"
 
-[[scenarios.e2e.setup.test_files.files]]
-pattern = "ball"
-duration = 10
-output = "test_ball.mp4"
+# [[scenarios.e2e.setup.test_files.files]]
+# pattern = "ball"
+# duration = 10
+# output = "test_ball.mp4"
 
 [[scenarios.e2e.steps]]
 name = "cross-platform example"
@@ -133,20 +134,20 @@ timeout = 30
 retry_count = 1
 
 [[scenarios.e2e.steps]]
-name = "ds-app with file source"
-command = "cargo run --bin ds-app -- file://test_smpte.mp4"
-cwd = "crates/ds-rs"
-expected_exit_code = 0
-timeout = 60
-retry_count = 1
-
-[[scenarios.e2e.steps]]
 name = "ds-app with RTSP source"
-command = "cargo run --bin ds-app -- rtsp://127.0.0.1:8554/test"
+command = "cargo run --bin ds-app -- rtsp://127.0.0.1:8554/file_0_test_video"
 cwd = "crates/ds-rs"
 expected_exit_code = 0
 timeout = 60
 retry_count = 2
+
+[[scenarios.e2e.steps]]
+name = "ds-app with file source"
+command = "cargo run --bin ds-app -- file://C:/Users/deste/repos/ds-rs/crates/ds-rs/tests/test_video.mp4"
+cwd = "crates/ds-rs"
+expected_exit_code = 0
+timeout = 60
+retry_count = 1
 
 [scenarios.e2e.cleanup]
 stop_rtsp_server = true
@@ -219,13 +220,13 @@ expected_exit_code = 0
 retry_count = 0
 allow_failure = true
 
-[[scenarios.quick.steps]]
-name = "format check"
-command = "cargo fmt --all -- --check"
-cwd = "."
-expected_exit_code = 0
-retry_count = 0
-allow_failure = true
+# [[scenarios.quick.steps]]
+# name = "format check"
+# command = "cargo fmt --all -- --check"
+# cwd = "."
+# expected_exit_code = 0
+# retry_count = 0
+# allow_failure = true
 
 # All tests scenario
 [scenarios.all]

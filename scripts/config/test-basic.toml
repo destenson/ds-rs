@@ -59,7 +59,7 @@ timeout = 180
 
 [scenarios.rtsp-minimal.setup.rtsp_server]
 enabled = true
-command = "cargo run --release -- serve -f ../ds-rs/tests/test_video.mp4 --port 8554"
+command = "cargo run --release -- serve -f ../ds-rs/tests/test_video.mp4 --port 8554 --api --api-port 9554"
 cwd = "crates/source-videos"
 startup_delay = 20
 

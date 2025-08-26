@@ -52,7 +52,7 @@ parallel = false
 
 [scenarios.integration.setup.rtsp_server]
 enabled = true
-command = "cargo run -- serve -p 8554 -f ../ds-rs/tests/test_video.mp4"
+command = "cargo run -- serve -p 8554 -f ../ds-rs/tests/test_video.mp4 --api --api-port 9554"
 cwd = "crates/source-videos"
 startup_delay = 5
 
@@ -102,7 +102,7 @@ parallel = false
 
 [scenarios.e2e.setup.rtsp_server]
 enabled = true
-command = "cargo run -- serve -f ../ds-rs/tests/test_video.mp4 --port 8554"
+command = "cargo run -- serve -f ../ds-rs/tests/test_video.mp4 --port 8554 --api --api-port 9554"
 cwd = "crates/source-videos"
 startup_delay = 5
 

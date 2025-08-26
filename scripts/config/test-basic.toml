@@ -1,0 +1,79 @@
+# Basic test configuration for quick validation
+
+[defaults]
+rust_log = "info"
+cargo_term_color = "always"
+
+# All tests scenario
+[scenarios.all]
+description = "Run all basic tests"
+timeout = 300
+include_scenarios = ["unit-quick", "example-simple"]
+
+# Simple unit test
+[scenarios.unit-quick]
+description = "Quick unit test for ds-rs"
+timeout = 120
+
+[[scenarios.unit-quick.steps]]
+name = "ds-rs unit tests"
+command = "cargo test --lib"
+cwd = "crates/ds-rs"
+expected_exit_code = 0
+
+# Simple example run (no RTSP needed)
+[scenarios.example-simple]
+description = "Run simple example without RTSP"
+timeout = 60
+
+[[scenarios.example-simple.steps]]
+name = "cross-platform example"
+command = "cargo run --example cross_platform"
+cwd = "crates/ds-rs"
+expected_exit_code = 0
+timeout = 30
+
+# Test with local file (no server needed)
+[scenarios.local-file]
+description = "Test with local video file"
+timeout = 120
+
+[[scenarios.local-file.steps]]
+name = "build ds-app"
+command = "cargo build --bin ds-app"
+cwd = "crates/ds-rs"
+expected_exit_code = 0
+timeout = 60
+
+[[scenarios.local-file.steps]]
+name = "check test video exists"
+command = "dir tests\\test_video.mp4"
+cwd = "crates/ds-rs"
+expected_exit_code = 0
+timeout = 5
+
+# Minimal RTSP test
+[scenarios.rtsp-minimal]
+description = "Minimal RTSP server test"
+timeout = 180
+
+[scenarios.rtsp-minimal.setup.rtsp_server]
+enabled = true
+command = "cargo run --release -- serve -f ../ds-rs/tests/test_video.mp4 --port 8554"
+cwd = "crates/source-videos"
+startup_delay = 20
+
+[scenarios.rtsp-minimal.setup.rtsp_server.health_check]
+type = "tcp"
+host = "127.0.0.1"
+port = 8554
+timeout = 60
+
+[[scenarios.rtsp-minimal.steps]]
+name = "verify server is running"
+command = "echo Server should be running on port 8554"
+expected_exit_code = 0
+timeout = 5
+
+[scenarios.rtsp-minimal.cleanup]
+stop_rtsp_server = true

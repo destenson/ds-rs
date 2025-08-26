@@ -5,6 +5,34 @@
 //! It supports multiple YOLO versions (v3-v12) with automatic format detection and
 //! includes a mock detector for testing without actual models.
 
+// Use log crate if available, otherwise use eprintln
+#[cfg(feature = "log")]
+use log::{debug, info, trace, warn};
+
+#[cfg(not(feature = "log"))]
+macro_rules! debug {
+    ($($arg:tt)*) => { eprintln!("[DEBUG] {}", format!($($arg)*)) };
+}
+
+#[cfg(not(feature = "log"))]
+macro_rules! info {
+    ($($arg:tt)*) => { eprintln!("[INFO] {}", format!($($arg)*)) };
+}
+
+#[cfg(not(feature = "log"))]
+macro_rules! trace {
+    ($($arg:tt)*) => { 
+        if std::env::var("RUST_LOG").map(|v| v.contains("trace")).unwrap_or(false) {
+            eprintln!("[TRACE] {}", format!($($arg)*))
+        }
+    };
+}
+
+#[cfg(not(feature = "log"))]
+macro_rules! warn {
+    ($($arg:tt)*) => { eprintln!("[WARN] {}", format!($($arg)*)) };
+}
+
 // Error types for the detector
 #[derive(Debug, thiserror::Error)]
 pub enum DetectorError {
@@ -76,8 +104,8 @@ impl Default for DetectorConfig {
             model_path: None,
             input_width: 640,
             input_height: 640,
-            confidence_threshold: 0.5,
-            nms_threshold: 0.4,
+            confidence_threshold: 0.15,  // Balanced confidence threshold for better detection
+            nms_threshold: 0.45,  // Standard YOLO NMS threshold
             num_threads: 4,
             yolo_version: YoloVersion::Auto,
             class_names: None,
@@ -198,13 +226,6 @@ impl OnnxDetector {
             // Check if we have a real session or should use mock
             let session = match self.session.as_ref() {
                 Some(s) => s,
-                #[cfg(test)]
-                None => {
-                    // Use mock detection when no model is loaded
-                    let mock_output = self.create_mock_yolo_output();
-                    return self.postprocess_outputs(&mock_output, image.width(), image.height());
-                }
-                #[cfg(not(test))]
                 None => {
                     return Err(DetectorError::Inference(
                         "No ONNX model loaded for detection".to_string()
@@ -371,7 +392,7 @@ impl OnnxDetector {
             v => v,
         };
         
-        // log::debug!("Processing outputs with YOLO version: {:?}", version);
+        // debug!("Processing outputs with YOLO version: {:?}", version);
         
         match version {
             // Classic format with objectness (v3-v7)
@@ -388,7 +409,7 @@ impl OnnxDetector {
             YoloVersion::V10 => {
                 // V10 uses one-to-one predictions, may need special handling
                 // For now, treat similar to v8 but log the difference
-                // log::info!("Processing YOLOv10 with NMS-free design");
+                // info!("Processing YOLOv10 with NMS-free design");
                 self.postprocess_yolov8(outputs, img_width, img_height)
             },
             YoloVersion::Auto => {
@@ -430,12 +451,12 @@ impl OnnxDetector {
         // Check for smaller models or different input sizes
         if len % 85 == 0 || len % 84 == 0 {
             let version = if len % 84 == 0 { YoloVersion::V8 } else { YoloVersion::V5 };
-            // log::info!("Auto-detected YOLO format with {} total values as {:?}", len, version);
+            // info!("Auto-detected YOLO format with {} total values as {:?}", len, version);
             return version;
         }
         
         // Unknown format
-        // log::warn!("Unknown YOLO output format with {} elements, defaulting to V5", len);
+        // warn!("Unknown YOLO output format with {} elements, defaulting to V5", len);
         YoloVersion::V5
     }
     
@@ -454,14 +475,28 @@ impl OnnxDetector {
         let output_size = 85; // 4 bbox + 1 objectness + 80 classes
         let num_anchors = outputs.len() / output_size;
         
-        // Debug: Check the range of values to understand the format (commented out for production)
-        // let mut min_val = f32::MAX;
-        // let mut max_val = f32::MIN;
-        // for &v in outputs.iter().take(1000) {
-        //     if v < min_val { min_val = v; }
-        //     if v > max_val { max_val = v; }
-        // }
-        // println!("Output value range: [{:.3}, {:.3}]", min_val, max_val);
+        // Check the range of values to understand the format
+        let mut min_val = f32::MAX;
+        let mut max_val = f32::MIN;
+        let mut max_objectness = 0.0f32;
+        for i in 0..num_anchors.min(100) {
+            let obj_idx = if outputs.len() == num_anchors * 85 {
+                i * 85 + 4  // Normal format
+            } else {
+                4 * num_anchors + i  // Transposed format
+            };
+            if obj_idx < outputs.len() {
+                let obj = outputs[obj_idx];
+                if obj > max_objectness { max_objectness = obj; }
+            }
+        }
+        for &v in outputs.iter().take(1000) {
+            if v < min_val { min_val = v; }
+            if v > max_val { max_val = v; }
+        }
+        debug!("YOLOv5 output range: [{:.3}, {:.3}], max objectness: {:.3}", min_val, max_val, max_objectness);
+        debug!("Total outputs: {}, num_anchors: {}, confidence_threshold: {}", 
+                 outputs.len(), num_anchors, self.confidence_threshold);
         
         // Scale factors to convert from model coordinates to image coordinates
         let x_scale = img_width as f32 / self.input_width as f32;
@@ -478,21 +513,23 @@ impl OnnxDetector {
                 outputs[4 * num_anchors + 1], // Transposed: second anchor objectness
             ];
             
-            // Uncomment for debugging format issues:
-            // println!("Format detection:");
-            // println!("  If normal [25200,85]: obj[0]={:.6}, obj[1]={:.6}", obj_positions[0], obj_positions[1]);
-            // println!("  If transposed [85,25200]: obj[0]={:.6}, obj[1]={:.6}", obj_positions[2], obj_positions[3]);
+            // Format detection
+            trace!("Format detection:");
+            trace!("  If normal [25200,85]: obj[0]={:.6}, obj[1]={:.6}", obj_positions[0], obj_positions[1]);
+            trace!("  If transposed [85,25200]: obj[0]={:.6}, obj[1]={:.6}", obj_positions[2], obj_positions[3]);
             
             // If normal format has very low objectness, it's probably transposed
-            obj_positions[0] < 0.001 && obj_positions[1] < 0.001
+            let transposed = obj_positions[0] < 0.001 && obj_positions[1] < 0.001;
+            debug!("Detected format: {}", if transposed { "TRANSPOSED" } else { "NORMAL" });
+            transposed
         };
         
-        // println!("Using {} format", if is_transposed { "TRANSPOSED" } else { "NORMAL" });
+        // println!("[DEBUG] Using {} format", if is_transposed { "TRANSPOSED" } else { "NORMAL" });
         
         // Process each anchor/detection
         for i in 0..num_anchors {
             // Extract bbox and scores based on format
-            let (cx_raw, cy_raw, w, h, objectness_raw) = if is_transposed {
+            let (cx_raw, cy_raw, w_raw, h_raw, objectness_raw) = if is_transposed {
                 // Transposed format [1, 85, 25200]: feature_idx * num_anchors + anchor_idx
                 (
                     outputs[0 * num_anchors + i],  // cx at position [0][i]
@@ -513,10 +550,24 @@ impl OnnxDetector {
                 )
             };
             
-            // Apply sigmoid activation to objectness and coordinates (YOLOv5 requirement)
-            let objectness = Self::sigmoid(objectness_raw);
-            let cx = Self::sigmoid(cx_raw) * self.input_width as f32;
-            let cy = Self::sigmoid(cy_raw) * self.input_height as f32;
+            // IMPORTANT: ONNX exported YOLOv5 models output preprocessed values:
+            // - Coordinates are in pixel space relative to MODEL INPUT size (640x640)
+            // - Sigmoid is already applied to confidence scores
+            // - Coordinates need to be kept as-is (they're already in the 640x640 space)
+            let objectness = objectness_raw;
+            let cx = cx_raw;  // In 640x640 pixel space
+            let cy = cy_raw;  // In 640x640 pixel space
+            let w = w_raw;    // In 640x640 pixel space
+            let h = h_raw;    // In 640x640 pixel space
+            
+            // Log detection details
+            if i < 5 {
+                trace!("Anchor {}: raw_obj={:.3}, obj={:.3}, cx={:.1}, cy={:.1}, w={:.1}, h={:.1}", 
+                         i, objectness_raw, objectness, cx, cy, w, h);
+            }
+            if objectness > 0.01 && i < 100 {
+                debug!("High confidence anchor {} objectness: {:.3}", i, objectness);
+            }
             
             // Skip low confidence detections
             if objectness < self.confidence_threshold {
@@ -528,6 +579,22 @@ impl OnnxDetector {
             //     println!("Anchor {}: cx={:.1}, cy={:.1}, w={:.1}, h={:.1}, obj={:.3}", 
             //              i, cx, cy, w, h, objectness);
             // }
+            
+            // Sanity check: skip if coordinates are invalid
+            if cx < 0.0 || cy < 0.0 || w <= 0.0 || h <= 0.0 {
+                continue;
+            }
+            
+            // Skip boxes outside model's input dimensions (likely errors)
+            // Note: Some valid boxes may extend slightly beyond boundaries
+            if cx > self.input_width as f32 * 1.5 || cy > self.input_height as f32 * 1.5 {
+                continue;
+            }
+            
+            // Skip extremely large boxes (likely errors)
+            if w > self.input_width as f32 || h > self.input_height as f32 {
+                continue;
+            }
             
             // Find best class
             let mut max_class_score = 0.0;
@@ -543,8 +610,8 @@ impl OnnxDetector {
                     outputs[offset + 5 + class_id]
                 };
                 
-                // Apply sigmoid activation to class score
-                let class_score = Self::sigmoid(class_score_raw);
+                // ONNX models already have sigmoid applied to class scores
+                let class_score = class_score_raw;
                 
                 if class_score > max_class_score {
                     max_class_score = class_score;
@@ -561,21 +628,37 @@ impl OnnxDetector {
             // Combined confidence
             let confidence = objectness * max_class_score;
             
+            // Log high confidence detections before filtering
+            if confidence > 0.005 {
+                info!("Detection candidate: confidence={:.3}, obj={:.3}, class_score={:.3}, class_id={}", 
+                          confidence, objectness, max_class_score, best_class_id);
+            }
+            
             // Validate confidence is in proper range
             if confidence < 0.0 || confidence > 1.0 {
-                // Skip invalid confidence values silently
+                warn!("Invalid confidence value: {:.6} (obj={:.6}, class={:.6})", 
+                          confidence, objectness, max_class_score);
+                continue;
+            }
+            
+            // Additional validation: Skip detections with abnormally high raw values
+            // This catches cases where the model outputs are corrupted
+            if objectness > 100.0 || max_class_score > 100.0 {
+                warn!("Detected corrupted output: obj={:.3}, class={:.3} - skipping", 
+                          objectness, max_class_score);
                 continue;
             }
             
             if confidence >= self.confidence_threshold {
-                // Scale width and height (already in pixels from model)
+                // Scale coordinates to image size
+                let scaled_cx = cx * x_scale;
+                let scaled_cy = cy * y_scale;
                 let scaled_w = w * x_scale;
                 let scaled_h = h * y_scale;
                 
-                // cx and cy are already scaled during sigmoid application
                 // Convert from center format to top-left format
-                let x = (cx - scaled_w / 2.0).max(0.0).min(img_width as f32);
-                let y = (cy - scaled_h / 2.0).max(0.0).min(img_height as f32);
+                let x = (scaled_cx - scaled_w / 2.0).max(0.0);
+                let y = (scaled_cy - scaled_h / 2.0).max(0.0);
                 let width = scaled_w.min(img_width as f32 - x);
                 let height = scaled_h.min(img_height as f32 - y);
                 
@@ -589,6 +672,18 @@ impl OnnxDetector {
                     continue;
                 }
                 
+                // Validate class ID is within expected range
+                if best_class_id >= num_classes {
+                    continue;
+                }
+                
+                let class_name = self.class_names.get(best_class_id)
+                    .unwrap_or(&"unknown".to_string())
+                    .clone();
+                    
+                // eprintln!("[INFO] Detection added: {} (class_id={}) at ({:.1}, {:.1}) size={:.1}x{:.1} conf={:.3}", 
+                //           class_name, best_class_id, x, y, width, height, confidence);
+                
                 detections.push(Detection {
                     x,
                     y,
@@ -596,9 +691,7 @@ impl OnnxDetector {
                     height,
                     confidence,
                     class_id: best_class_id,
-                    class_name: self.class_names.get(best_class_id)
-                        .unwrap_or(&"unknown".to_string())
-                        .clone(),
+                    class_name,
                 });
             }
         }
@@ -614,8 +707,8 @@ impl OnnxDetector {
             filtered_detections.truncate(MAX_DETECTIONS_PER_FRAME);
         }
         
-        // log::debug!("YOLOv5: Postprocessed {} anchors, {} detections after NMS", 
-        //           num_anchors, filtered_detections.len());
+        debug!("YOLOv5: Postprocessed {} anchors, {} detections after NMS", 
+                  num_anchors, filtered_detections.len());
         
         Ok(filtered_detections)
     }
@@ -667,6 +760,13 @@ impl OnnxDetector {
                 let width = (w * x_scale).min(img_width as f32 - x);
                 let height = (h * y_scale).min(img_height as f32 - y);
                 
+                let class_name = self.class_names.get(best_class_id)
+                    .unwrap_or(&"unknown".to_string())
+                    .clone();
+                    
+                // eprintln!("[INFO] Detection added: {} (class_id={}) at ({:.1}, {:.1}) size={:.1}x{:.1} conf={:.3}", 
+                //           class_name, best_class_id, x, y, width, height, confidence);
+                
                 detections.push(Detection {
                     x,
                     y,
@@ -674,9 +774,7 @@ impl OnnxDetector {
                     height,
                     confidence,
                     class_id: best_class_id,
-                    class_name: self.class_names.get(best_class_id)
-                        .unwrap_or(&"unknown".to_string())
-                        .clone(),
+                    class_name,
                 });
             }
         }
@@ -684,7 +782,7 @@ impl OnnxDetector {
         // Apply NMS
         let filtered_detections = self.apply_nms(detections);
         
-        // log::debug!("YOLOv8/v9: Postprocessed {} anchors, {} detections after NMS", 
+        // debug!("YOLOv8/v9: Postprocessed {} anchors, {} detections after NMS", 
         //           num_anchors, filtered_detections.len());
         
         Ok(filtered_detections)
@@ -788,9 +886,10 @@ impl OnnxDetector {
     /// Set the YOLO version for output processing
     pub fn set_yolo_version(&mut self, version: YoloVersion) {
         self.yolo_version = version;
-        // log::info!("Set YOLO version to: {:?}", version);
+        // info!("Set YOLO version to: {:?}", version);
     }
     
+    #[cfg(test)]
     /// Create a mock detector for testing without an actual model
     pub fn new_mock() -> Self {
         Self {
@@ -800,7 +899,7 @@ impl OnnxDetector {
             environment: None,
             input_width: 640,
             input_height: 640,
-            confidence_threshold: 0.5,
+            confidence_threshold: 0.5,  // Higher threshold for mock detector
             nms_threshold: 0.4,
             class_names: Self::default_class_names(),
             yolo_version: YoloVersion::Auto,

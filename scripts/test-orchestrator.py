@@ -398,7 +398,30 @@ class TestOrchestrator:
                 # Build stream configurations
                 streams = []
                 if 'streams' in server_config:
-                    for stream_cfg in server_config['streams']:
+                    for i, stream_cfg in enumerate(server_config['streams']):
+                        # Validate source file exists
+                        source_file = self.project_root / stream_cfg['source']
+                        if not source_file.exists():
+                            logger.error(f"Source file not found: {source_file}")
+                            logger.info(f"Current working directory: {Path.cwd()}")
+                            logger.info(f"Project root: {self.project_root}")
+                            
+                            # Try to find similar files
+                            possible_locations = [
+                                self.project_root / "crates" / "ds-rs" / "tests" / "test_video.mp4",
+                                self.project_root / "crates" / "source-videos" / "tests" / "test_video.mp4",
+                                Path(stream_cfg['source'])  # Try as absolute path
+                            ]
+                            
+                            for loc in possible_locations:
+                                if loc.exists():
+                                    logger.info(f"Found similar file at: {loc}")
+                                    source_file = loc
+                                    break
+                            else:
+                                logger.error(f"Could not find source file for stream {i}")
+                                return False
+                        
                         network_cond = NetworkCondition(
                             profile=stream_cfg.get('network_profile'),
                             scenario=stream_cfg.get('network_scenario'),
@@ -409,7 +432,7 @@ class TestOrchestrator:
                         )
                         
                         stream = StreamConfig(
-                            source_path=str(self.project_root / stream_cfg['source']),
+                            source_path=str(source_file),
                             mount_point=stream_cfg.get('mount_point', 'test'),
                             network_condition=network_cond,
                             auto_repeat=stream_cfg.get('auto_repeat', True)

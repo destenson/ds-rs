@@ -432,8 +432,13 @@ class NetworkSimulationManager:
             else:
                 logger.error(f"Failed to update network condition: {response.text}")
                 return False
+        except requests.exceptions.RequestException as e:
+            logger.error(f"Request error updating network condition: {e}")
+            if hasattr(e, 'response') and e.response is not None:
+                logger.error(f"Response status: {e.response.status_code}, body: {e.response.text}")
+            return False
         except Exception as e:
-            logger.error(f"Error updating network condition: {e}")
+            logger.error(f"Unexpected error updating network condition: {e}")
             return False
     
     def stop_server(self, name: str) -> bool:

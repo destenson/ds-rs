@@ -270,6 +270,36 @@ validation = "check_high_latency_handling"
 max_latency_ms = 1000
 buffer_strategy = "adaptive"
 
+# Simple test with perfect network
+[scenarios.network-inference-simple]
+description = "Simple test with no network degradation"
+timeout = 300
+parallel = false
+
+[scenarios.network-inference-simple.setup.rtsp_server]
+enabled = true
+port = 8560
+api_port = 9560
+
+[[scenarios.network-inference-simple.setup.rtsp_server.streams]]
+source = "crates/ds-rs/tests/test_video.mp4"
+mount_point = "test"
+network_profile = "perfect"  # No network degradation
+auto_repeat = true
+
+[[scenarios.network-inference-simple.steps]]
+name = "run-visualization"
+command = "cargo run --example ball_tracking_visualization -- -t rtsp -i rtsp://127.0.0.1:8560/file_0_test_video"
+cwd = "crates/ds-rs"
+background = true
+timeout = 60
+
+[[scenarios.network-inference-simple.steps]]
+name = "wait-for-playback"
+command = "timeout 30"
+cwd = "."
+timeout = 35
+
 # Performance benchmark under network stress
 [scenarios.network-inference-benchmark]
 description = "Benchmark inference performance under various network conditions"

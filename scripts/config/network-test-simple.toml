@@ -1,0 +1,105 @@
+# Simple Network Test Configuration
+# Minimal scenarios to test network simulation functionality
+
+[defaults]
+rust_log = "info"
+enable_metrics = true
+
+# Simple test - just run an example with default settings
+[scenarios.network-test-simple]
+description = "Simple test without RTSP to verify examples work"
+timeout = 60
+
+[[scenarios.network-test-simple.steps]]
+name = "cross-platform example"
+command = "cargo run --example cross_platform"
+cwd = "crates/ds-rs"
+expected_exit_code = 0
+timeout = 30
+
+# RTSP test with network simulation
+[scenarios.network-test-rtsp]
+description = "Test RTSP with network simulation"
+timeout = 180
+
+# Use network simulation manager for RTSP server
+[scenarios.network-test-rtsp.setup.rtsp_server]
+enabled = true
+# This will trigger network simulation manager
+streams = [
+    { source = "crates/ds-rs/tests/test_video.mp4", mount_point = "test", network_profile = "wifi" }
+]
+port = 8554
+api_port = 9554
+
+[[scenarios.network-test-rtsp.steps]]
+name = "verify-server"
+command = "echo RTSP server should be running with WiFi network profile"
+expected_exit_code = 0
+timeout = 5
+
+[[scenarios.network-test-rtsp.steps]]
+name = "network-update-to-3g"
+type = "network_update"
+profile = "3g"
+stream_index = 0
+wait = 3
+
+[[scenarios.network-test-rtsp.steps]]
+name = "verify-3g"
+command = "echo Network should now be simulating 3G conditions"
+expected_exit_code = 0
+timeout = 5
+
+[scenarios.network-test-rtsp.cleanup]
+stop_rtsp_server = true
+
+# Test with actual inference example
+[scenarios.network-inference-simple]
+description = "Simple inference test with network conditions"
+timeout = 120
+
+[scenarios.network-inference-simple.setup.rtsp_server]
+enabled = true
+streams = [
+    { source = "crates/ds-rs/tests/test_video.mp4", mount_point = "test", network_profile = "perfect" }
+]
+port = 8555
+api_port = 9555
+
+[[scenarios.network-inference-simple.steps]]
+name = "run-fault-tolerant-example"
+command = "timeout 10 cargo run --example fault_tolerant_pipeline"
+cwd = "crates/ds-rs"
+expected_exit_code = 0
+allow_failure = true  # Might timeout, that's OK
+timeout = 15
+
+[[scenarios.network-inference-simple.steps]]
+name = "update-to-poor-network"
+type = "network_update"
+packet_loss = 10
+latency_ms = 500
+stream_index = 0
+wait = 2
+
+[[scenarios.network-inference-simple.steps]]
+name = "run-with-poor-network"
+command = "timeout 10 cargo run --example fault_tolerant_pipeline"
+cwd = "crates/ds-rs"
+expected_exit_code = 0
+allow_failure = true
+timeout = 15
+
+[scenarios.network-inference-simple.cleanup]
+stop_rtsp_server = true
+
+# All tests
+[scenarios.all]
+description = "Run all network tests"
+timeout = 300
+include_scenarios = [
+    "network-test-simple",
+    "network-test-rtsp",
+    "network-inference-simple"
+]

@@ -530,7 +530,7 @@ pub fn connect_metadata_bridge_to_cpu_osd(
         
         if let Some(objects) = detections {
             if !objects.is_empty() {
-                log::info!("🎯 Drawing {} detections at timestamp {:?}", objects.len(), timestamp);
+                log::info!("Drawing {} detections at timestamp {:?}", objects.len(), timestamp);
             }
             
             // Set drawing properties

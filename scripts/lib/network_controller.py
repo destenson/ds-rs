@@ -100,11 +100,13 @@ class ServerMetrics:
 class NetworkSimulationManager:
     """Manages source-videos servers with network simulation"""
     
-    def __init__(self, base_port: int = 8554):
+    def __init__(self, base_port: int = 8554, force_rebuild: bool = False):
         self.base_port = base_port
+        self.force_rebuild = force_rebuild  # Force rebuild binaries even if they exist
         self.servers: Dict[str, subprocess.Popen] = {}
         self.server_configs: Dict[str, List[StreamConfig]] = {}
         self.server_metrics: Dict[str, ServerMetrics] = {}
+        self.server_ports: Dict[str, int] = {}  # Store actual port for each server
         self._lock = threading.Lock()
         self._monitor_threads: Dict[str, threading.Thread] = {}
         self._stop_monitors = threading.Event()
@@ -120,6 +122,23 @@ class NetworkSimulationManager:
     ) -> bool:
         """Start an RTSP server with network simulation"""
         
+        # Validate source files exist
+        for stream in streams:
+            source_path = Path(stream.source_path)
+            if not source_path.is_absolute():
+                # Try relative to project root
+                project_root = Path(__file__).parent.parent.parent
+                source_path = project_root / source_path
+            
+            if not source_path.exists():
+                logger.error(f"Source file not found: {source_path}")
+                logger.info(f"Searched in:")
+                logger.info(f"  - {Path(stream.source_path).resolve()}")
+                logger.info(f"  - {source_path}")
+                return False
+            else:
+                logger.debug(f"Found source file: {source_path}")
+        
         with self._lock:
             # Stop existing server if running
             if name in self.servers:
@@ -132,31 +151,31 @@ class NetworkSimulationManager:
             if api_port is None:
                 api_port = port + 1000  # API port offset
             
-            # Build command line
-            cmd = ["cargo", "run", "--release", "--"]
+            # Build command line arguments (binary path will be added later)
+            args = []
             
             # Handle multiple streams
             if len(streams) == 1:
                 # Single stream mode
                 stream = streams[0]
-                cmd.extend(["serve", "-f", stream.source_path])
-                cmd.extend(["--port", str(port)])
-                cmd.extend(["--api-port", str(api_port)])
+                args.extend(["serve", "-f", stream.source_path])
+                args.extend(["--port", str(port)])
+                args.extend(["--api-port", str(api_port)])
                 if stream.auto_repeat:
-                    cmd.append("--auto-repeat")
-                cmd.extend(stream.network_condition.to_cli_args())
+                    args.append("--auto-repeat")
+                args.extend(stream.network_condition.to_cli_args())
             else:
                 # Multi-stream mode with different conditions
-                cmd.extend(["serve-files", "--port", str(port)])
-                cmd.extend(["--api-port", str(api_port)])
+                args.extend(["serve-files", "--port", str(port)])
+                args.extend(["--api-port", str(api_port)])
                 
                 # Add all files
                 for stream in streams:
-                    cmd.extend(["-f", stream.source_path])
+                    args.extend(["-f", stream.source_path])
                 
                 # If all streams have same network condition, apply globally
                 if all(s.network_condition == streams[0].network_condition for s in streams):
-                    cmd.extend(streams[0].network_condition.to_cli_args())
+                    args.extend(streams[0].network_condition.to_cli_args())
                 else:
                     # Per-source network conditions
                     conditions = []
@@ -164,30 +183,94 @@ class NetworkSimulationManager:
                         if stream.network_condition.profile:
                             conditions.append(f"{stream.mount_point}:{stream.network_condition.profile}")
                     if conditions:
-                        cmd.extend(["--per-source-network", ",".join(conditions)])
+                        args.extend(["--per-source-network", ",".join(conditions)])
             
             # Start the server
             logger.info(f"Starting RTSP server {name} on port {port}")
-            logger.debug(f"Command: {' '.join(cmd)}")
             
             cwd = str(Path(__file__).parent.parent.parent / "crates" / "source-videos")
-            process = subprocess.Popen(
-                cmd,
-                cwd=cwd,
-                stdout=subprocess.PIPE,
-                stderr=subprocess.PIPE,
-                text=True
-            )
+            logger.debug(f"Working directory: {cwd}")
+            
+            # Check if working directory exists
+            if not Path(cwd).exists():
+                logger.error(f"Working directory does not exist: {cwd}")
+                return False
+            
+            # Check if binary already exists
+            project_root = Path(cwd).parent.parent
+            if os.name == 'nt':  # Windows
+                binary_path = project_root / "target" / "debug" / "video-source.exe"
+            else:  # Linux/macOS
+                binary_path = project_root / "target" / "debug" / "video-source"
+            
+            # Only build if binary doesn't exist or force rebuild is requested
+            if not binary_path.exists() or self.force_rebuild:
+                if self.force_rebuild:
+                    logger.info(f"Force rebuild requested, building video-source...")
+                else:
+                    logger.info(f"Binary not found at {binary_path}, building...")
+                    
+                build_cmd = ["cargo", "build", "--bin", "video-source"]
+                build_result = subprocess.run(
+                    build_cmd,
+                    cwd=cwd,
+                    capture_output=True,
+                    text=True,
+                    timeout=120  # 2 minutes for build
+                )
+                
+                if build_result.returncode != 0:
+                    logger.error(f"Failed to build video-source: {build_result.stderr[:500]}")
+                    return False
+                else:
+                    logger.info(f"Build complete")
+                    
+                # Check again after build
+                if not binary_path.exists():
+                    logger.error(f"Binary still not found after build at {binary_path}")
+                    return False
+            else:
+                logger.debug(f"Using existing binary: {binary_path}")
+            
+            # Build final command with binary path and arguments
+            cmd = [str(binary_path)] + args
+            
+            logger.debug(f"Running binary: {' '.join(cmd)}")
+            
+            try:
+                # Start with minimal output capture to avoid blocking
+                process = subprocess.Popen(
+                    cmd,
+                    cwd=cwd,
+                    stdout=subprocess.DEVNULL,  # Don't capture to avoid blocking
+                    stderr=subprocess.DEVNULL,
+                    text=True
+                )
+            except Exception as e:
+                logger.error(f"Failed to start process: {e}")
+                return False
             
             self.servers[name] = process
             self.server_configs[name] = streams
             self.server_metrics[name] = ServerMetrics()
+            self.server_ports[name] = port  # Store the actual port used
+            
+            # Give it a moment to start
+            time.sleep(2)
             
             # Wait for server to be ready
             if wait_for_ready:
                 if not self._wait_for_server(name, port, api_port, timeout):
                     logger.error(f"Server {name} failed to start")
-                    self.stop_server(name)
+                    if process.poll() is not None:
+                        logger.error(f"Process died with exit code: {process.poll()}")
+                    # Clean up on failure
+                    process.terminate()
+                    process.wait(timeout=5)
+                    del self.servers[name]
+                    del self.server_configs[name]
+                    del self.server_metrics[name]
+                    del self.server_ports[name]
                     return False
             
             # Start monitoring thread
@@ -324,6 +407,7 @@ class NetworkSimulationManager:
             del self.servers[name]
             del self.server_configs[name]
             del self.server_metrics[name]
+            del self.server_ports[name]
             if name in self._monitor_threads:
                 del self._monitor_threads[name]
             
@@ -336,10 +420,10 @@ class NetworkSimulationManager:
     
     def get_rtsp_urls(self, name: str) -> List[str]:
         """Get RTSP URLs for all streams on a server"""
-        if name not in self.server_configs:
+        if name not in self.server_configs or name not in self.server_ports:
             return []
         
-        port = self.base_port + list(self.servers.keys()).index(name)
+        port = self.server_ports[name]  # Use the actual stored port
         urls = []
         for stream in self.server_configs[name]:
             urls.append(f"rtsp://127.0.0.1:{port}/{stream.mount_point}")

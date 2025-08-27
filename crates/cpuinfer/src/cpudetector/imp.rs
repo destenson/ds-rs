@@ -449,7 +449,28 @@ impl BaseTransformImpl for CpuDetector {
         Ok(())
     }
     
-    fn transform_ip(&self, buf: &mut gstreamer::BufferRef) -> Result<gstreamer::FlowSuccess, gstreamer::FlowError> {
+    fn transform_caps(
+        &self,
+        direction: gstreamer::PadDirection,
+        caps: &gstreamer::Caps,
+        filter: Option<&gstreamer::Caps>,
+    ) -> Option<gstreamer::Caps> {
+        // Since we're a passthrough element that doesn't modify the video format,
+        // we return the same caps for both directions
+        gstreamer::debug!(CAT, imp = self, 
+            "transform_caps called with direction {:?}, caps: {}", direction, caps);
+        
+        let same_caps = caps.clone();
+        
+        // Apply optional filter
+        if let Some(filter) = filter {
+            Some(filter.intersect_with_mode(&same_caps, gstreamer::CapsIntersectMode::First))
+        } else {
+            Some(same_caps)
+        }
+    }
+    
+    fn transform_ip_passthrough(&self, buf: &gstreamer::Buffer) -> Result<gstreamer::FlowSuccess, gstreamer::FlowError> {
         let mut frame_count = self.frame_count.lock().unwrap();
         *frame_count += 1;
         
@@ -468,8 +489,7 @@ impl BaseTransformImpl for CpuDetector {
             .map_err(|_| gstreamer::FlowError::NotSupported)?;
         
         // Map buffer for reading (we don't modify the video data)
-        let _map = buf.map_readable().map_err(|_| gstreamer::FlowError::Error)?;
-        let frame = gst_video::VideoFrameRef::from_buffer_ref_readable(buf, &info)
+        let frame = gst_video::VideoFrameRef::from_buffer_ref_readable(buf.as_ref(), &info)
             .map_err(|_| gstreamer::FlowError::Error)?;
         
         // Convert frame to image for detection

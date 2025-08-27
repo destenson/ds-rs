@@ -10,7 +10,7 @@ glib::wrapper! {
 pub fn register(plugin: &gstreamer::Plugin) -> Result<(), glib::BoolError> {
     gstreamer::Element::register(
         Some(plugin),
-        "cpudetector",
+        "cpuinfer",
         gstreamer::Rank::NONE,
         CpuDetector::static_type(),
     )

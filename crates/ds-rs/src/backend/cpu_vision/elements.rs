@@ -1,6 +1,5 @@
 #![allow(unused)]
 use crate::error::{DeepStreamError, Result};
-use gstcpuinfer::detector::{OnnxDetector, DetectorConfig};
 use super::metadata::DetectionMeta;
 use gstreamer as gst;
 use gstreamer::prelude::*;
@@ -14,19 +13,24 @@ use cairo;
 use super::tracker::CentroidTracker;
 
 /// Create a CPU detector element that performs object detection
-/// This creates a bin containing an identity element with a probe for detection
+/// This creates a bin containing the cpudetector element from the cpuinfer plugin
 pub fn create_cpu_detector(name: Option<&str>, model_path: Option<&str>) -> Result<gst::Element> {
     let bin = gst::Bin::builder()
         .name(name.unwrap_or("cpu-detector"))
         .build();
     
-    // Create identity element to pass through video
-    let identity = gst::ElementFactory::make("identity")
-        .name("detector-identity")
+    // Create cpudetector element from the cpuinfer plugin
+    let detector = gst::ElementFactory::make("cpudetector")
+        .name("detector")
         .build()
         .map_err(|_| DeepStreamError::ElementCreation {
-            element: "identity".to_string(),
+            element: "cpudetector".to_string(),
         })?;
+    
+    // Configure the detector with model path if provided
+    if let Some(path) = model_path {
+        detector.set_property("model-path", path);
+    }
     
     // Create queue for buffering - make it leaky to prevent blocking
     let queue = gst::ElementFactory::make("queue")
@@ -40,98 +44,17 @@ pub fn create_cpu_detector(name: Option<&str>, model_path: Option<&str>) -> Resu
             element: "queue".to_string(),
         })?;
     
-    bin.add_many([&queue, &identity])?;
-    queue.link(&identity)?;
+    bin.add_many([&queue, &detector])?;
+    queue.link(&detector)?;
     
     // Create ghost pads
     let sink_pad = queue.static_pad("sink").unwrap();
-    let src_pad = identity.static_pad("src").unwrap();
+    let src_pad = detector.static_pad("src").unwrap();
     
     bin.add_pad(&gst::GhostPad::with_target(&sink_pad)?)?;
     bin.add_pad(&gst::GhostPad::with_target(&src_pad)?)?;
     
-    // Initialize ONNX detector
-    let detector = Arc::new(Mutex::new(None::<OnnxDetector>));
-    let frame_counter = Arc::new(Mutex::new(0u64));
-    
-    if let Some(model) = model_path {
-        // Try to load the ONNX model
-        match std::path::Path::new(model).exists() {
-            true => {
-                let config = DetectorConfig {
-                    model_path: Some(model.to_string()),
-                    input_width: 640,
-                    input_height: 640,
-                    confidence_threshold: 0.5,
-                    nms_threshold: 0.4,
-                    num_threads: 4,
-                    ..Default::default()
-                };
-                
-                match OnnxDetector::new_with_config(config) {
-                    Ok(onnx_detector) => {
-                        *detector.lock().unwrap() = Some(onnx_detector);
-                        log::info!("CPU detector loaded ONNX model: {}", model);
-                    },
-                    Err(e) => {
-                        log::error!("Failed to load ONNX model {}: {}", model, e);
-                        // Keep detector as None - will fail at runtime if used
-                    }
-                }
-            },
-            false => {
-                log::error!("Model file not found: {}", model);
-                // Keep detector as None - will fail at runtime if used
-            }
-        }
-    } else {
-        log::warn!("No model path provided for CPU detector");
-        // Keep detector as None - will fail at runtime if used
-    }
-    
-    // Add probe to process buffers and run detection
-    let detector_clone = detector.clone();
-    let frame_counter_clone = frame_counter.clone();
-    
-    src_pad.add_probe(gst::PadProbeType::BUFFER, move |_pad, info| {
-        if let Some(buffer) = info.buffer() {
-            let mut detector_guard = detector_clone.lock().unwrap();
-            if let Some(ref detector) = *detector_guard {
-                // Convert buffer to image and run detection
-                match extract_image_from_buffer(buffer) {
-                    Ok(image) => {
-                        match detector.detect(&image) {
-                            Ok(detections) => {
-                                let mut counter = frame_counter_clone.lock().unwrap();
-                                *counter += 1;
-                                
-                                log::debug!("Frame {}: Detected {} objects", *counter, detections.len());
-                                
-                                // In a full implementation, we would attach metadata to the buffer here
-                                // For now, just log the detections
-                                for (i, detection) in detections.iter().enumerate() {
-                                    log::trace!("  Detection {}: {} at ({:.1}, {:.1}) {}x{} conf={:.2}",
-                                               i, detection.class_name, 
-                                               detection.x, detection.y,
-                                               detection.width, detection.height,
-                                               detection.confidence);
-                                }
-                            },
-                            Err(e) => {
-                                log::error!("Detection failed: {}", e);
-                            }
-                        }
-                    },
-                    Err(e) => {
-                        log::trace!("Failed to extract image from buffer: {}", e);
-                    }
-                }
-            }
-        }
-        gst::PadProbeReturn::Ok
-    });
-    
-    log::info!("CPU detector element created with real ONNX inference");
+    log::info!("CPU detector element created using cpuinfer plugin");
     Ok(bin.upcast())
 }
 

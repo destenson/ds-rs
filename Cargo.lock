@@ -630,7 +630,7 @@ dependencies = [
  "half",
  "image",
  "log",
- "ndarray 0.15.6",
+ "ndarray",
  "once_cell",
  "ort",
  "serde",
@@ -771,7 +771,6 @@ version = "0.1.0"
 dependencies = [
  "cairo-rs",
  "clap",
- "cpuinfer",
  "ctrlc",
  "env_logger",
  "gstreamer",
@@ -784,7 +783,6 @@ dependencies = [
  "lazy_static",
  "log",
  "nalgebra",
- "ndarray 0.16.1",
  "nix",
  "once_cell",
  "parking_lot",
@@ -2285,21 +2283,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "ndarray"
-version = "0.16.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "882ed72dce9365842bf196bdeedf5055305f11fc8c03dee7bb0194a6cad34841"
-dependencies = [
- "matrixmultiply",
- "num-complex",
- "num-integer",
- "num-traits",
- "portable-atomic",
- "portable-atomic-util",
- "rawpointer",
-]
-
-[[package]]
 name = "new_debug_unreachable"
 version = "1.0.6"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2533,7 +2516,7 @@ dependencies = [
  "half",
  "lazy_static",
  "libc",
- "ndarray 0.15.6",
+ "ndarray",
  "tar",
  "thiserror 1.0.69",
  "tracing",

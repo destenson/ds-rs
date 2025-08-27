@@ -23,26 +23,40 @@ const DEFAULT_NMS_THRESHOLD: f64 = 0.4;
 const DEFAULT_INPUT_WIDTH: u32 = 640;
 const DEFAULT_INPUT_HEIGHT: u32 = 640;
 const DEFAULT_PROCESS_EVERY_N_FRAMES: u32 = 1;
+const DEFAULT_BATCH_SIZE: u32 = 2;
+const DEFAULT_UNIQUE_ID: u32 = 0;
+const DEFAULT_PROCESS_MODE: u32 = 1;  // Primary mode
+const DEFAULT_OUTPUT_TENSOR_META: bool = false;
 
 #[derive(Debug, Clone)]
 struct Settings {
     model_path: String,
+    config_file_path: Option<String>,  // nvinfer compatibility
     confidence_threshold: f64,
     nms_threshold: f64,
     input_width: u32,
     input_height: u32,
     process_every_n_frames: u32,
+    batch_size: u32,  // nvinfer compatibility
+    unique_id: u32,  // nvinfer compatibility
+    process_mode: u32,  // nvinfer compatibility (1=primary, 2=secondary)
+    output_tensor_meta: bool,  // nvinfer compatibility
 }
 
 impl Default for Settings {
     fn default() -> Self {
         Settings {
             model_path: DEFAULT_MODEL_PATH.to_string(),
+            config_file_path: None,
             confidence_threshold: DEFAULT_CONFIDENCE_THRESHOLD,
             nms_threshold: DEFAULT_NMS_THRESHOLD,
             input_width: DEFAULT_INPUT_WIDTH,
             input_height: DEFAULT_INPUT_HEIGHT,
             process_every_n_frames: DEFAULT_PROCESS_EVERY_N_FRAMES,
+            batch_size: DEFAULT_BATCH_SIZE,
+            unique_id: DEFAULT_UNIQUE_ID,
+            process_mode: DEFAULT_PROCESS_MODE,
+            output_tensor_meta: DEFAULT_OUTPUT_TENSOR_META,
         }
     }
 }
@@ -217,6 +231,42 @@ impl ObjectImpl for CpuDetector {
                     .default_value(DEFAULT_PROCESS_EVERY_N_FRAMES)
                     .mutable_playing()
                     .build(),
+                // nvinfer-compatible properties
+                glib::ParamSpecString::builder("config-file-path")
+                    .nick("Config File Path")
+                    .blurb("Path to configuration file (nvinfer compatibility)")
+                    .mutable_ready()
+                    .build(),
+                glib::ParamSpecUInt::builder("batch-size")
+                    .nick("Batch Size")
+                    .blurb("Number of frames to batch for processing")
+                    .minimum(1)
+                    .maximum(32)
+                    .default_value(DEFAULT_BATCH_SIZE)
+                    .mutable_ready()
+                    .build(),
+                glib::ParamSpecUInt::builder("unique-id")
+                    .nick("Unique ID")
+                    .blurb("Unique identifier for this detector instance")
+                    .minimum(0)
+                    .maximum(u32::MAX)
+                    .default_value(DEFAULT_UNIQUE_ID)
+                    .mutable_ready()
+                    .build(),
+                glib::ParamSpecUInt::builder("process-mode")
+                    .nick("Process Mode")
+                    .blurb("Process mode: 1=Primary (full frame), 2=Secondary (crops)")
+                    .minimum(1)
+                    .maximum(2)
+                    .default_value(DEFAULT_PROCESS_MODE)
+                    .mutable_ready()
+                    .build(),
+                glib::ParamSpecBoolean::builder("output-tensor-meta")
+                    .nick("Output Tensor Meta")
+                    .blurb("Output raw tensor metadata")
+                    .default_value(DEFAULT_OUTPUT_TENSOR_META)
+                    .mutable_playing()
+                    .build(),
             ]
         });
         
@@ -260,6 +310,54 @@ impl ObjectImpl for CpuDetector {
             "process-every-n-frames" => {
                 settings.process_every_n_frames = value.get().expect("type checked upstream");
             },
+            "config-file-path" => {
+                let config_path: Option<String> = value.get().ok();
+                settings.config_file_path = config_path.clone();
+                if let Some(path) = config_path {
+                    gstreamer::info!(CAT, imp = self, "Loading config file: {}", path);
+                    
+                    // Parse config file and update settings
+                    match crate::config::parse_config_file(&path) {
+                        Ok(config) => {
+                            // Apply settings from config file
+                            if let Some(onnx_file) = config.onnx_file {
+                                settings.model_path = onnx_file;
+                                gstreamer::info!(CAT, imp = self, "Model path from config: {}", settings.model_path);
+                            }
+                            settings.batch_size = config.batch_size;
+                            settings.unique_id = config.unique_id;
+                            settings.process_mode = config.process_mode;
+                            settings.confidence_threshold = config.pre_cluster_threshold as f64;
+                            settings.nms_threshold = config.nms_iou_threshold as f64;
+                            
+                            // Reset detector to reload with new settings
+                            *self.detector.lock().unwrap() = None;
+                            
+                            gstreamer::info!(CAT, imp = self, "Config loaded successfully");
+                        }
+                        Err(e) => {
+                            gstreamer::error!(CAT, imp = self, "Failed to parse config file: {}", e);
+                        }
+                    }
+                }
+            },
+            "batch-size" => {
+                settings.batch_size = value.get().expect("type checked upstream");
+                gstreamer::info!(CAT, imp = self, "Batch size set to: {}", settings.batch_size);
+            },
+            "unique-id" => {
+                settings.unique_id = value.get().expect("type checked upstream");
+            },
+            "process-mode" => {
+                settings.process_mode = value.get().expect("type checked upstream");
+                gstreamer::info!(CAT, imp = self, "Process mode set to: {} ({})", 
+                    settings.process_mode,
+                    if settings.process_mode == 1 { "primary" } else { "secondary" }
+                );
+            },
+            "output-tensor-meta" => {
+                settings.output_tensor_meta = value.get().expect("type checked upstream");
+            },
             _ => {
                 gstreamer::warning!(CAT, imp = self, "Unknown property '{}' in set_property", pspec.name());
             }
@@ -276,6 +374,11 @@ impl ObjectImpl for CpuDetector {
             "input-width" => settings.input_width.to_value(),
             "input-height" => settings.input_height.to_value(),
             "process-every-n-frames" => settings.process_every_n_frames.to_value(),
+            "config-file-path" => settings.config_file_path.to_value(),
+            "batch-size" => settings.batch_size.to_value(),
+            "unique-id" => settings.unique_id.to_value(),
+            "process-mode" => settings.process_mode.to_value(),
+            "output-tensor-meta" => settings.output_tensor_meta.to_value(),
             _ => {
                 gstreamer::warning!(CAT, imp = self, "Unknown property '{}' in property getter", pspec.name());
                 // Return a default value to avoid crashes

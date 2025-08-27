@@ -1,0 +1,208 @@
+# Debtmap Configuration for ds-rs
+# Technical debt and code quality analysis configuration
+
+# Project metadata
+project:
+  name: ds-rs
+  type: rust
+  description: "Rust inference w/ DeepStream"
+
+# Analysis settings
+analysis:
+  # Paths to exclude from analysis
+  ignore_paths:
+    - target/
+    - vendor/
+    - "*.generated.rs"
+    - "*.pb.rs"
+    - tests/fixtures/
+    - examples/data/
+    - .git/
+    - .github/
+    - PRPs/
+    - docs/
+    
+  # Language-specific settings
+  languages:
+    rust:
+      enabled: true
+      extensions: [".rs"]
+      
+  # Complexity thresholds
+  complexity:
+    cyclomatic_threshold: 15      # Flag functions with cyclomatic complexity > 15
+    cognitive_threshold: 20        # Flag functions with cognitive complexity > 20
+    nesting_depth_threshold: 5     # Flag deeply nested code
+    
+  # Code duplication settings
+  duplication:
+    min_lines: 50                  # Minimum lines to consider as duplication
+    min_tokens: 100                # Minimum tokens for duplication detection
+    threshold_percentage: 5         # Flag if >5% of code is duplicated
+    
+  # Security analysis
+  security:
+    enhanced: true                  # Enable enhanced security checks
+    check_dependencies: true        # Check for vulnerable dependencies
+    
+# Custom rules for Rust-specific issues
+rules:
+  # Critical: Memory safety issues
+  - name: "Unsafe code usage"
+    pattern: "unsafe\\s*\\{"
+    severity: "critical"
+    category: "memory_safety"
+    message: "Unsafe code block detected. Ensure proper safety documentation and validation."
+    
+  - name: "Unwrap usage"
+    pattern: "\\.unwrap\\(\\)"
+    severity: "high"
+    category: "error_handling"
+    message: "Using unwrap() can cause panics. Use proper error handling with ? or expect() with meaningful message."
+    
+  - name: "Panic usage"
+    pattern: "panic!\\("
+    severity: "high"
+    category: "error_handling"
+    message: "Direct panic! usage. Consider returning Result instead."
+    
+  # High: Performance issues
+  - name: "Clone in loop"
+    pattern: "for.*\\.clone\\(\\)"
+    severity: "high"
+    category: "performance"
+    message: "Cloning inside loop can be expensive. Consider borrowing or Arc/Rc."
+    
+  - name: "Blocking in async"
+    pattern: "async.*block_on|async.*wait\\(\\)"
+    severity: "high"
+    category: "async"
+    message: "Blocking operations in async context. Use async alternatives."
+    
+  # Medium: Code quality issues
+  - name: "TODO/FIXME comments"
+    pattern: "TODO|FIXME|HACK|XXX|for now|in a real"
+    severity: "medium"
+    category: "maintenance"
+    message: "Unresolved TODO/FIXME comment found."
+    
+  - name: "Magic numbers"
+    pattern: "\\b(\\d{2,})\\b(?![a-zA-Z_])"
+    severity: "medium"
+    category: "readability"
+    message: "Magic number detected. Consider using named constants."
+    exclude_patterns:
+      - "0x[0-9a-fA-F]+"  # Hex numbers
+      - "\\d{4}"           # Years
+    
+  - name: "Long functions"
+    pattern: "fn\\s+\\w+.*\\{[^}]{500,}"
+    severity: "medium"
+    category: "complexity"
+    message: "Function is too long. Consider breaking it into smaller functions."
+    
+  # Low: Style issues
+  - name: "Missing documentation"
+    pattern: "^\\s*pub\\s+(fn|struct|enum|trait|mod)\\s+(?!.*///))"
+    severity: "low"
+    category: "documentation"
+    message: "Public item lacks documentation comment (///)."
+    
+  # DeepStream/GStreamer specific
+  - name: "GStreamer element leak"
+    pattern: "ElementFactory::make.*(?!\\.(build|ok|expect|unwrap_or))"
+    severity: "high"
+    category: "resource_leak"
+    message: "GStreamer element creation without error handling may leak resources."
+    
+  - name: "Pipeline state not checked"
+    pattern: "set_state.*(?!\\?|expect|unwrap)"
+    severity: "medium"
+    category: "gstreamer"
+    message: "Pipeline state change result not checked."
+
+# Quality gates (for CI/CD)
+quality_gates:
+  # Fail build if these thresholds are exceeded
+  max_cyclomatic_complexity: 20
+  max_file_length: 500
+  max_function_length: 100
+  max_duplication_percentage: 10
+  max_technical_debt_hours: 100
+  
+  # Issue count thresholds
+  max_critical_issues: 0
+  max_high_issues: 10
+  max_medium_issues: 50
+  
+  # Coverage thresholds (when coverage data is available)
+  min_coverage_percentage: 60
+  min_branch_coverage: 50
+
+# Reporting settings
+reporting:
+  # Group issues by these categories in reports
+  group_by: category
+  
+  # Minimum priority to include in reports
+  min_priority: low
+  
+  # Maximum issues to show per category
+  max_issues_per_category: 20
+  
+  # Sort order
+  sort_by: severity  # severity, file, category
+  
+  # Include metrics
+  include_metrics:
+    - complexity
+    - duplication
+    - coverage
+    - debt_score
+    - maintainability_index
+
+# Technical debt calculation
+debt:
+  # Time estimates for fixing issues (in minutes)
+  fix_time:
+    critical: 120
+    high: 60
+    medium: 30
+    low: 15
+    
+  # Interest rate (how much debt grows over time)
+  interest_rate: 0.05  # 5% per month
+  
+  # Debt categories and their weights
+  category_weights:
+    memory_safety: 3.0
+    error_handling: 2.5
+    performance: 2.0
+    security: 2.5
+    complexity: 1.5
+    maintenance: 1.0
+    documentation: 0.5
+
+# Integration settings
+integrations:
+  # GitHub integration
+  github:
+    enabled: true
+    comment_on_pr: true
+    status_checks: true
+    
+  # Issue tracking
+  issue_tracking:
+    create_issues: false  # Set to true to auto-create issues
+    label_prefix: "debt:"
+    
+# Output formats
+output:
+  formats:
+    - json
+    - markdown
+    - html
+  
+  # Include source code snippets in reports
+  include_source: true
+  context_lines: 3  # Lines of context around issues

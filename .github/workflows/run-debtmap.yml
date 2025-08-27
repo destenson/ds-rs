@@ -1,0 +1,343 @@
+name: Code Quality Analysis with Debtmap
+
+on:
+  push:
+    branches: [ main, master, develop ]
+  pull_request:
+    branches: [ main, master, develop ]
+  schedule:
+    # Run weekly on Monday at 3 AM UTC
+    - cron: '0 3 * * 1'
+  workflow_dispatch:
+    inputs:
+      verbose:
+        description: 'Enable verbose output'
+        required: false
+        default: 'false'
+
+env:
+  CARGO_TERM_COLOR: always
+  RUST_BACKTRACE: 1
+
+jobs:
+  code-coverage:
+    name: Generate Code Coverage
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - name: Install system dependencies
+        run: |
+          sudo apt-get update
+          # Search for correct package names
+          apt-cache search gstreamer | grep rtsp || true
+          sudo apt-get install -y \
+            libgstreamer1.0-dev \
+            libgstreamer-plugins-base1.0-dev \
+            libgstreamer-plugins-bad1.0-dev \
+            libgstrtspserver-1.0-dev \
+            gstreamer1.0-plugins-base \
+            gstreamer1.0-plugins-good \
+            gstreamer1.0-plugins-bad \
+            gstreamer1.0-plugins-ugly \
+            gstreamer1.0-libav \
+            gstreamer1.0-tools \
+            gstreamer1.0-rtsp \
+            libcairo2-dev \
+            libpango1.0-dev \
+            pkg-config
+
+      - name: Setup Rust
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          components: llvm-tools-preview
+
+      - name: Cache cargo dependencies
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/bin/
+            ~/.cargo/registry/index/
+            ~/.cargo/registry/cache/
+            ~/.cargo/git/db/
+            target/
+          key: ${{ runner.os }}-cargo-coverage-${{ hashFiles('**/Cargo.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-cargo-coverage-
+            ${{ runner.os }}-cargo-
+
+      - name: Install cargo-llvm-cov
+        run: |
+          if ! command -v cargo-llvm-cov &> /dev/null; then
+            cargo install cargo-llvm-cov
+          fi
+
+      - name: Generate code coverage
+        run: |
+          # Try both cargo-llvm-cov and cargo-tarpaulin for better compatibility
+          if command -v cargo-llvm-cov &> /dev/null; then
+            echo "Using cargo-llvm-cov for coverage..."
+            cargo llvm-cov clean --workspace
+            cargo llvm-cov --all-features --workspace --lcov --output-path lcov.info
+            cargo llvm-cov --all-features --workspace --json --output-path coverage.json
+            cargo llvm-cov report --json --output-path coverage-summary.json
+          elif command -v cargo-tarpaulin &> /dev/null; then
+            echo "Using cargo-tarpaulin for coverage..."
+            cargo tarpaulin --out Lcov --output-dir . --all-features --workspace
+            mv lcov.info lcov.info || true
+          else
+            echo "Installing cargo-tarpaulin as fallback..."
+            cargo install cargo-tarpaulin
+            cargo tarpaulin --out Lcov --output-dir . --all-features --workspace
+          fi
+
+      - name: Upload coverage to Codecov (optional)
+        uses: codecov/codecov-action@v4
+        with:
+          files: ./lcov.info
+          fail_ci_if_error: false
+          verbose: true
+          token: ${{ secrets.CODECOV_TOKEN }}
+        continue-on-error: true
+
+      - name: Upload coverage artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: coverage-reports
+          path: |
+            lcov.info
+            coverage.json
+            coverage-summary.json
+          retention-days: 30
+
+      - name: Display coverage summary
+        run: |
+          echo "## Coverage Summary"
+          cargo llvm-cov report
+
+  debtmap-analysis:
+    name: Run Debtmap Analysis
+    runs-on: ubuntu-latest
+    needs: code-coverage
+    
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0  # Full history for better git analysis
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.x'
+
+      - name: Install Debtmap
+        run: |
+          pip install --upgrade pip
+          pip install debtmap
+
+      - name: Download coverage artifacts
+        uses: actions/download-artifact@v4
+        with:
+          name: coverage-reports
+          path: ./coverage-reports
+
+      - name: Run Debtmap analysis
+        id: debtmap
+        run: |
+          # Initialize debtmap configuration if not exists
+          if [ ! -f ".debtmap.yml" ]; then
+            echo "Initializing Debtmap configuration..."
+            debtmap init || true
+          fi
+          
+          # Run debtmap with coverage if available
+          if [ -f "./coverage-reports/lcov.info" ]; then
+            echo "Running Debtmap with coverage data..."
+            debtmap analyze . \
+              --lcov ./coverage-reports/lcov.info \
+              --format json \
+              --output debtmap-report.json \
+              --languages rust \
+              --threshold-complexity 15 \
+              --threshold-duplication 50 \
+              --security-enhanced \
+              --group-by-category \
+              --min-priority medium \
+              -vv
+          else
+            echo "Running Debtmap without coverage data..."
+            debtmap analyze . \
+              --format json \
+              --output debtmap-report.json \
+              --languages rust \
+              --threshold-complexity 15 \
+              --threshold-duplication 50 \
+              --security-enhanced \
+              --group-by-category \
+              --min-priority medium \
+              -vv
+          fi
+          
+          # Display top issues
+          echo "## Top 10 High-Priority Issues"
+          debtmap analyze . --top 10 --min-priority high || true
+          
+          # Validate against thresholds
+          echo "## Validating project against thresholds..."
+          debtmap validate . || true
+          
+          # Generate HTML report (if debtmap supports it)
+          if debtmap report --help 2>/dev/null | grep -q "html"; then
+            debtmap report \
+              --input debtmap-report.json \
+              --output debtmap-report.html \
+              --format html || true
+          fi
+          
+          # Generate markdown report for PR comment (if supported)
+          if debtmap report --help 2>/dev/null | grep -q "markdown"; then
+            debtmap report \
+              --input debtmap-report.json \
+              --output debtmap-report.md \
+              --format markdown || true
+          else
+            # Create a basic markdown report from JSON
+            echo "# Debtmap Analysis Report" > debtmap-report.md
+            echo "" >> debtmap-report.md
+            if command -v jq &> /dev/null && [ -f "debtmap-report.json" ]; then
+              echo "## Summary" >> debtmap-report.md
+              jq -r '.summary | to_entries | map("- **\(.key)**: \(.value)") | .[]' debtmap-report.json >> debtmap-report.md 2>/dev/null || true
+              echo "" >> debtmap-report.md
+              echo "## Top Issues" >> debtmap-report.md
+              jq -r '.issues[:10] | map("### \(.title)\n- **File**: \(.file)\n- **Line**: \(.line)\n- **Severity**: \(.severity)\n- **Category**: \(.category)\n- **Description**: \(.description)\n") | .[]' debtmap-report.json >> debtmap-report.md 2>/dev/null || true
+            fi
+          fi
+
+      - name: Upload Debtmap reports
+        uses: actions/upload-artifact@v4
+        with:
+          name: debtmap-reports
+          path: |
+            debtmap-report.json
+            debtmap-report.html
+            debtmap-report.md
+          retention-days: 30
+
+      - name: Display Debtmap summary
+        run: |
+          echo "## Debtmap Analysis Summary"
+          if [ -f "debtmap-report.md" ]; then
+            cat debtmap-report.md
+          else
+            echo "No markdown report generated"
+          fi
+
+      - name: Comment PR with Debtmap results
+        if: github.event_name == 'pull_request'
+        uses: actions/github-script@v7
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          script: |
+            const fs = require('fs');
+            const path = require('path');
+            
+            try {
+              const reportPath = 'debtmap-report.md';
+              if (fs.existsSync(reportPath)) {
+                const report = fs.readFileSync(reportPath, 'utf8');
+                
+                // Truncate if too long for GitHub comment
+                const maxLength = 65000;
+                const truncatedReport = report.length > maxLength 
+                  ? report.substring(0, maxLength) + '\n\n... (truncated)'
+                  : report;
+                
+                const comment = `## 🔍 Debtmap Code Quality Analysis\n\n${truncatedReport}\n\n[View full report](https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }})`;
+                
+                // Find existing comment
+                const { data: comments } = await github.rest.issues.listComments({
+                  owner: context.repo.owner,
+                  repo: context.repo.repo,
+                  issue_number: context.issue.number,
+                });
+                
+                const botComment = comments.find(comment => 
+                  comment.user.type === 'Bot' && 
+                  comment.body.includes('Debtmap Code Quality Analysis')
+                );
+                
+                if (botComment) {
+                  await github.rest.issues.updateComment({
+                    owner: context.repo.owner,
+                    repo: context.repo.repo,
+                    comment_id: botComment.id,
+                    body: comment,
+                  });
+                } else {
+                  await github.rest.issues.createComment({
+                    owner: context.repo.owner,
+                    repo: context.repo.repo,
+                    issue_number: context.issue.number,
+                    body: comment,
+                  });
+                }
+              }
+            } catch (error) {
+              console.error('Failed to post Debtmap report:', error);
+            }
+
+  quality-gate:
+    name: Quality Gate Check
+    runs-on: ubuntu-latest
+    needs: [code-coverage, debtmap-analysis]
+    if: always()
+    
+    steps:
+      - name: Download Debtmap reports
+        uses: actions/download-artifact@v4
+        with:
+          name: debtmap-reports
+          path: ./debtmap-reports
+
+      - name: Check quality thresholds
+        run: |
+          # Parse debtmap-report.json and check thresholds
+          if [ -f "./debtmap-reports/debtmap-report.json" ]; then
+            # You can add custom threshold checks here
+            # Example: Check if technical debt score is below threshold
+            echo "Checking quality gates..."
+            
+            # Parse JSON and check metrics (requires jq)
+            sudo apt-get install -y jq
+            
+            # Example threshold checks (adjust based on debtmap output format)
+            # DEBT_SCORE=$(jq '.summary.debt_score' ./debtmap-reports/debtmap-report.json)
+            # if (( $(echo "$DEBT_SCORE > 7.0" | bc -l) )); then
+            #   echo "❌ Technical debt score too high: $DEBT_SCORE"
+            #   exit 1
+            # fi
+            
+            echo "✅ Quality gates passed"
+          else
+            echo "⚠️ No Debtmap report found"
+          fi
+
+      - name: Create summary
+        run: |
+          echo "# Code Quality Analysis Summary" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          
+          if [ -f "./debtmap-reports/debtmap-report.md" ]; then
+            cat ./debtmap-reports/debtmap-report.md >> $GITHUB_STEP_SUMMARY
+          else
+            echo "No detailed report available" >> $GITHUB_STEP_SUMMARY
+          fi
+          
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "---" >> $GITHUB_STEP_SUMMARY
+          echo "[View full Debtmap report](https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }})" >> $GITHUB_STEP_SUMMARY

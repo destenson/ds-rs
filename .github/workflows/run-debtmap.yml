@@ -70,30 +70,41 @@ jobs:
             ${{ runner.os }}-cargo-coverage-
             ${{ runner.os }}-cargo-
 
-      - name: Install cargo-llvm-cov
+      - name: Install coverage tools
         run: |
+          # Install cargo-llvm-cov (more accurate and faster)
           if ! command -v cargo-llvm-cov &> /dev/null; then
+            echo "Installing cargo-llvm-cov..."
             cargo install cargo-llvm-cov
+          else
+            echo "cargo-llvm-cov already installed"
           fi
 
       - name: Generate code coverage
         run: |
-          # Try both cargo-llvm-cov and cargo-tarpaulin for better compatibility
-          if command -v cargo-llvm-cov &> /dev/null; then
-            echo "Using cargo-llvm-cov for coverage..."
-            cargo llvm-cov clean --workspace
-            cargo llvm-cov --all-features --workspace --lcov --output-path lcov.info
-            cargo llvm-cov --all-features --workspace --json --output-path coverage.json
-            cargo llvm-cov report --json --output-path coverage-summary.json
-          elif command -v cargo-tarpaulin &> /dev/null; then
-            echo "Using cargo-tarpaulin for coverage..."
-            cargo tarpaulin --out Lcov --output-dir . --all-features --workspace
-            mv lcov.info lcov.info || true
-          else
-            echo "Installing cargo-tarpaulin as fallback..."
-            cargo install cargo-tarpaulin
-            cargo tarpaulin --out Lcov --output-dir . --all-features --workspace
-          fi
+          echo "Generating coverage with cargo-llvm-cov..."
+          # Clean any previous coverage data
+          cargo llvm-cov clean --workspace
+          
+          # Generate coverage in multiple formats
+          cargo llvm-cov \
+            --all-features \
+            --workspace \
+            --lcov \
+            --output-path lcov.info \
+            --ignore-filename-regex '(tests?|examples?|benches?|target)/' \
+            -- --test-threads=1
+          
+          # Also generate JSON format for additional processing
+          cargo llvm-cov \
+            --all-features \
+            --workspace \
+            --json \
+            --output-path coverage.json \
+            --ignore-filename-regex '(tests?|examples?|benches?|target)/'
+          
+          # Generate summary
+          cargo llvm-cov report --summary-only
 
       - name: Upload coverage to Codecov (optional)
         uses: codecov/codecov-action@v4

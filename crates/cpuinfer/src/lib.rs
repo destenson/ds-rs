@@ -4,6 +4,9 @@ use gstreamer::glib;
 mod cpudetector;
 pub mod detector;
 
+#[cfg(feature = "ort")]
+pub use ort;
+
 fn plugin_init(plugin: &gst::Plugin) -> Result<(), glib::BoolError> {
     cpudetector::register(plugin)?;
     Ok(())

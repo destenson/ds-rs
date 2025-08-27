@@ -1,3 +1,4 @@
+#![allow(unused)]
 use ds_rs::{init, timestamp};
 use ds_rs::pipeline::Pipeline;
 use ds_rs::source::FaultTolerantSourceController;

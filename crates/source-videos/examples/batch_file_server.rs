@@ -1,3 +1,5 @@
+#![allow(unused)]
+
 use source_videos::{
     init, RtspServerBuilder, VideoSourceConfig, VideoSourceType,
     config_types::{FileContainer, Resolution, Framerate, VideoFormat},

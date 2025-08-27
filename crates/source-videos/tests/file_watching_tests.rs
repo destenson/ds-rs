@@ -1,3 +1,4 @@
+#![allow(unused)]
 use source_videos::{
     DirectoryWatcher, WatcherManager, FileSystemEvent,
     LoopConfig, create_looping_source, FileVideoSource, FileWatcher,

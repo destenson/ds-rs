@@ -1,3 +1,5 @@
+#![allow(unused)]
+
 //! Multi-stream detection pipeline example
 //! 
 //! Demonstrates concurrent detection processing on multiple RTSP streams

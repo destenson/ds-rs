@@ -1,3 +1,5 @@
+#![allow(unused)]
+
 use source_videos::{
     DirectoryConfig, FileListConfig, FilterConfig, DirectoryScanner, BatchSourceLoader,
     VideoSourceManager, VideoSourceType, is_video_file, 

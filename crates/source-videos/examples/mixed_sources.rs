@@ -1,3 +1,5 @@
+#![allow(unused)]
+
 use source_videos::{
     init, RtspServerBuilder, DirectoryConfig, FilterConfig, DirectoryScanner,
     VideoSourceConfig, TestPattern, Result,

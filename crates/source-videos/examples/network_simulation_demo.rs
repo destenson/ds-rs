@@ -1,3 +1,5 @@
+#![allow(unused)]
+
 use source_videos::{RtspServerBuilder, init, Result};
 use source_videos::network::{NetworkProfile, NetworkScenario, NetworkConditions};
 use std::time::Duration;

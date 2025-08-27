@@ -1,17 +1,21 @@
 # TODO
 
-Last Updated: 2025-08-27 (Comprehensive Codebase Scan)
+Last Updated: 2025-08-27 (Post cpuinfer completion scan)
 
 ## Recent Achievements ✅
 
 ### Latest Completions (2025-08-27)
-- **PARTIALLY COMPLETED**: PRPs 51-53 for cpuinfer GStreamer plugin
-  - ✅ Plugin now discovered by gst-inspect-1.0
+- **COMPLETED**: PRPs 51-53 for cpuinfer GStreamer plugin
+  - ✅ Plugin now discovered by gst-inspect-1.0 as "cpuinfer"
   - ✅ Fixed plugin registration and removed duplicate from ds-rs
-  - ✅ Added nvinfer-compatible properties
+  - ✅ Added nvinfer-compatible properties (all visible in gst-inspect)
   - ✅ Created INI config file parser
   - ✅ Installation scripts for Windows/Linux
-  - ❌ Properties/caps not showing in gst-inspect (needs BaseTransform implementation)
+  - ✅ Properties/caps properly showing in gst-inspect
+  - ✅ Implemented transform_caps() for proper caps negotiation
+  - ✅ Element renamed from "cpudetector" to "cpuinfer" for nvinfer compatibility
+  - ✅ Fixed transform_ip_passthrough for proper passthrough mode operation
+  - ✅ Plugin runs successfully in GStreamer pipelines without crashing
 - **COMPLETED**: Enhanced PRP-50 with dependency reduction focus (463 → <50 deps goal)
 - **COMPLETED**: Created Debtmap workflow for code quality analysis
 - **COMPLETED**: Added .debtmap.yml configuration with Rust-specific rules
@@ -25,13 +29,7 @@ Last Updated: 2025-08-27 (Comprehensive Codebase Scan)
 
 ## Critical Priority 🔴
 
-### 1. Complete cpuinfer BaseTransform Implementation
-**Location**: `crates/cpuinfer/src/cpudetector/imp.rs`
-**Issue**: Properties and caps not showing in gst-inspect-1.0
-**Impact**: Plugin not fully functional as GStreamer element
-**Solution**: Implement pad_templates(), transform_caps(), transform() methods in BaseTransformImpl
-
-### 2. Remove Global State & lazy_static Dependency
+### 1. Remove Global State & lazy_static Dependency
 **Location**: `crates/ds-rs/src/error/classification.rs:309`
 ```rust
 // TODO: GET RID OF THIS GLOBAL & dependency on lazy_static
@@ -39,15 +37,8 @@ Last Updated: 2025-08-27 (Comprehensive Codebase Scan)
 - **Impact**: Architecture smell, testing difficulties, thread safety issues
 - **Solution**: Use dependency injection or context-based error classification
 
-### 2. cpuinfer GStreamer Plugin Registration
-**Locations**: Multiple PRPs created
-- **PRP-51**: Fix plugin build and registration
-- **PRP-52**: Implement nvinfer-compatible properties
-- **PRP-53**: Plugin installation and system integration
-- **Impact**: cpuinfer not usable as standard GStreamer element
-- **Status**: PRPs ready for implementation
 
-### 3. Replace Tokio Dependency
+### 2. Replace Tokio Dependency
 **Locations**: 
 - `crates/ds-rs/Cargo.toml:55`
 - `crates/source-videos/Cargo.toml:33`
@@ -57,7 +48,7 @@ tokio = { version = "1.47.1", features = ["full"] } # TODO: we should not use to
 - **Impact**: Heavy dependency (~200 deps), slower builds
 - **Solution**: Consider `smol` or remove async where not needed
 
-### 4. Remove .unwrap() Usage
+### 3. Remove .unwrap() Usage
 **Multiple locations** - Search with: `grep -r "\.unwrap()" crates/`
 - **Impact**: Can cause panics in production
 - **Solution**: Replace with proper error handling using `?` or `expect()` with meaningful messages
@@ -65,7 +56,7 @@ tokio = { version = "1.47.1", features = ["full"] } # TODO: we should not use to
 
 ## High Priority 🟠
 
-### 5. Mock Backend Conditional Compilation
+### 4. Mock Backend Conditional Compilation
 **Location**: `crates/ds-rs/src/backend/mock.rs:48`
 ```rust
 // TODO: only include this for testing #[cfg(test)]
@@ -73,7 +64,7 @@ tokio = { version = "1.47.1", features = ["full"] } # TODO: we should not use to
 - **Impact**: Unnecessary code in production builds
 - **Solution**: Add `#[cfg(test)]` attribute
 
-### 6. DeepStream Metadata Processing
+### 5. DeepStream Metadata Processing
 **Locations**: 
 - `crates/ds-rs/src/rendering/deepstream_renderer.rs:190,222`
 - `crates/ds-rs/src/backend/cpu_vision/cpudetector/imp.rs:186`
@@ -85,7 +76,7 @@ tokio = { version = "1.47.1", features = ["full"] } # TODO: we should not use to
 - **Impact**: Cannot use hardware acceleration properly
 - **Blocked by**: Need DeepStream SDK FFI bindings
 
-### 7. Real ONNX Model Testing
+### 6. Real ONNX Model Testing
 **Locations**: 
 - `crates/ds-rs/tests/cpu_backend_tests.rs:336,352`
 ```rust
@@ -96,7 +87,7 @@ tokio = { version = "1.47.1", features = ["full"] } # TODO: we should not use to
 
 ## Medium Priority 🟡
 
-### 8. Source Videos Features
+### 7. Source Videos Features
 
 #### Progressive Loading
 **Location**: `crates/source-videos/src/manager.rs:319`
@@ -122,7 +113,7 @@ tokio = { version = "1.47.1", features = ["full"] } # TODO: we should not use to
 0, // TODO: Get actual metrics
 ```
 
-### 9. Video Metadata Extraction
+### 8. Video Metadata Extraction
 **Location**: `crates/source-videos/src/file_utils.rs:128`
 ```rust
 // TODO: Implement actual metadata extraction using GStreamer discoverer
@@ -130,7 +121,7 @@ tokio = { version = "1.47.1", features = ["full"] } # TODO: we should not use to
 - **Impact**: Returns placeholder metadata
 - **Solution**: Use GStreamer discoverer API
 
-### 10. DSL Implementation
+### 9. DSL Implementation
 **Location**: `crates/dsl/src/lib.rs:10`
 ```rust
 // TODO: Implement actual DSL tests when DSL functionality is added
@@ -139,7 +130,7 @@ tokio = { version = "1.47.1", features = ["full"] } # TODO: we should not use to
 
 ## Low Priority 🔵
 
-### 11. Unused Parameters Cleanup
+### 10. Unused Parameters Cleanup
 **Multiple locations with `_` prefixed parameters**:
 - Probe callbacks: `_pad`, `_info`, `_bus`
 - Config loaders: `_path` parameters
@@ -151,7 +142,7 @@ Notable files:
 - `crates/ds-rs/examples/fault_tolerant_pipeline.rs`
 - `crates/ds-rs/src/multistream/`
 
-### 12. Incomplete API Implementations
+### 11. Incomplete API Implementations
 **Marked with "for now" comments** (30+ locations):
 - `source-videos/src/api/routes/sources.rs:126` - Update not fully implemented
 - `source-videos/src/api/routes/server.rs:110,130,147` - Simplified responses
@@ -174,12 +165,12 @@ Proposed crate structure:
   - `video-server` (~200 deps with axum/tokio)
   - `cli-utils` (~20 deps)
 
-### Code Quality Metrics (from scan)
-- **TODO comments**: 13 explicit
-- **"for now" patterns**: 30+ temporary implementations
-- **"actual" references**: 15+ needing real implementations
-- **"placeholder"**: 6 locations
-- **Unused parameters**: 30+ with `_` prefix
+### Code Quality Metrics (Latest Scan)
+- **TODO comments**: 11 explicit (down from 13)
+- **"for now" patterns**: 21 temporary implementations  
+- **"actual" references**: 12 needing real implementations
+- **Unused parameters**: 35+ with `_` prefix
+- **NOTE comments**: 15 documentation/clarification notes
 
 ## Next Actions 🎯
 

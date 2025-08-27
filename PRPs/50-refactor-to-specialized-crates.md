@@ -2,12 +2,13 @@
 
 ## Problem Statement
 
-The current ds-rs codebase is a monolithic crate containing all functionality from low-level GStreamer abstractions to high-level video processing features. This makes it difficult to:
+The current ds-rs codebase is a monolithic crate containing all functionality from low-level GStreamer abstractions to high-level video processing features. Additionally, the project has 463 dependencies (counted via `grep -c "^name = " Cargo.lock`) causing excessively long build times. This makes it difficult to:
 - Reuse specific components independently
 - Test individual features in isolation
 - Maintain clear separation of concerns
 - Allow external projects to use only the parts they need
 - Scale development across multiple teams/contributors
+- Build projects quickly when only a subset of functionality is needed
 
 ## Research & References
 
@@ -32,6 +33,19 @@ The existing codebase has natural boundaries visible in the module structure at 
 
 ## Implementation Blueprint
 
+### Naming Strategy
+- **`ds-*` prefix**: Used for DeepStream-specific functionality and core pipeline components
+- **Generic names**: Used for utilities that are NOT DeepStream-specific (e.g., `cli-utils`, `image-utils`, `video-server`)
+- **Clear distinction**: Only crates that actually interface with NVIDIA DeepStream should imply DeepStream functionality
+
+### Dependency Reduction Goals
+Each crate should have minimal dependencies for its specific purpose:
+- **ds-core**: 0 external dependencies (std only)
+- **ds-error**: 1-2 deps (thiserror only)
+- **ds-platform**: 0-2 deps (platform detection only)
+- **ds-gstreamer**: 5-10 deps (gstreamer crates only)
+- **Heavy deps isolated**: Image processing, ML, web servers in separate optional crates
+
 ### Phase 1: Core Foundation Crates
 
 #### 1.1 `ds-core` - Common Types & Traits
@@ -42,6 +56,7 @@ The existing codebase has natural boundaries visible in the module structure at 
 - Basic result types
 - Common trait definitions (to be extracted)
 - Shared utility functions
+**Target Dependencies**: 0 (std only)
 
 #### 1.2 `ds-error` - Error Handling
 **Purpose**: Centralized error types and error handling utilities
@@ -51,6 +66,7 @@ The existing codebase has natural boundaries visible in the module structure at 
 - `error/classification.rs` → Error classification logic
 - Result type alias
 - Error conversion implementations
+**Target Dependencies**: 1 (thiserror)
 
 #### 1.3 `ds-platform` - Platform Detection
 **Purpose**: Platform-specific detection and capabilities
@@ -58,6 +74,7 @@ The existing codebase has natural boundaries visible in the module structure at 
 **Contents to Move**:
 - `platform.rs` → Platform detection logic
 - `dll_validator.rs` → Windows DLL validation (conditional compilation)
+**Target Dependencies**: 0-2 (cfg-if, platform-specific)
 
 ### Phase 2: GStreamer Abstraction Layer
 
@@ -78,14 +95,15 @@ The existing codebase has natural boundaries visible in the module structure at 
 **Dependencies**: `ds-gstreamer`, `ds-backend`
 
 #### 2.3 `ds-backend` - Backend Abstraction System
-**Purpose**: DeepStream vs Standard vs Mock backend abstraction
+**Purpose**: Backend trait system for multiple implementations
 **Location**: `crates/ds-backend/`
 **Contents to Move**:
 - `backend/mod.rs` → Backend trait and manager
-- `backend/deepstream.rs` → DeepStream implementation
-- `backend/standard.rs` → Standard GStreamer implementation
+- `backend/deepstream.rs` → NVIDIA DeepStream implementation (actual DeepStream)
+- `backend/standard.rs` → Standard GStreamer implementation (NOT DeepStream)
 - `backend/mock.rs` → Mock implementation for testing
 **Dependencies**: `ds-platform`, `ds-error`
+**Note**: Only the deepstream.rs implementation is actually DeepStream-related
 
 ### Phase 3: Video Processing Components
 
@@ -159,7 +177,16 @@ The existing codebase has natural boundaries visible in the module structure at 
 - `app/config.rs` → Application configuration
 **Dependencies**: Most other crates (for their config types)
 
-#### 5.2 `ds-app` - Application Framework
+#### 5.2 `cli-utils` - Command Line Interface (Optional)
+**Purpose**: CLI tools and argument parsing
+**Location**: `crates/cli-utils/`
+**Contents to Move**:
+- CLI argument parsing from main.rs
+- Command handling logic
+**Target Dependencies**: clap, colored, ctrlc (~20 deps)
+**Note**: Not DeepStream-specific, just CLI utilities
+
+#### 5.3 `ds-app` - Application Framework
 **Purpose**: High-level application runner and coordination
 **Location**: `crates/ds-app/`
 **Contents to Move**:
@@ -167,13 +194,33 @@ The existing codebase has natural boundaries visible in the module structure at 
 - Main initialization logic
 **Dependencies**: All other crates
 
-#### 5.3 `ds-cpu-vision` - CPU Vision Processing
-**Purpose**: CPU-based vision processing integration
+#### 5.4 `cpu-inference` - CPU Vision Processing (Optional)
+**Purpose**: CPU-based ML inference (alternative to DeepStream GPU inference)
 **Location**: Keep in existing `crates/cpuinfer/` but rename
 **Contents to Move**:
 - `backend/cpu_vision/` → CPU vision elements
 - Keep existing detector implementation
 **Dependencies**: `ds-backend`, `ds-metadata`
+**Target Dependencies**: ort, ndarray, image (~150 deps when enabled)
+**Note**: Alternative to DeepStream's GPU inference
+
+#### 5.5 `image-utils` - Image Processing (Optional)
+**Purpose**: General image loading and manipulation utilities
+**Location**: `crates/image-utils/`
+**Contents to Move**:
+- Image processing utilities
+- Format-specific handlers
+**Target Dependencies**: image crate with selected features (~100 deps)
+**Note**: Not DeepStream-specific
+
+#### 5.6 `video-server` - Web/RTSP Server (Optional)
+**Purpose**: HTTP API and RTSP streaming server
+**Location**: Extract from `source-videos` or new crate
+**Contents to Move**:
+- Web server components from source-videos
+- RTSP server functionality
+**Target Dependencies**: axum, tower, hyper, tokio (~200 deps)
+**Note**: Generic video serving, not DeepStream-specific
 
 ## Dependency Graph
 
@@ -284,6 +331,8 @@ Update existing examples to use the new crate structure
 4. **Compilation**: Only changed crates need recompilation
 5. **Documentation**: Each crate has focused, specific documentation
 6. **Versioning**: Crates can be versioned independently
+7. **Dependency Reduction**: Users only compile dependencies for crates they use
+8. **Build Speed**: Minimal builds compile in seconds vs minutes
 
 ## Validation Gates
 
@@ -308,6 +357,20 @@ cargo deps --workspace
 
 # Verify examples still work
 cargo run --example ball_tracking_visualization --all-features
+
+# CRITICAL: Verify dependency reduction
+# Minimal GStreamer pipeline should have < 50 dependencies
+cargo tree -p ds-gstreamer | wc -l  # Target: < 50
+
+# Core crates should have minimal deps
+cargo tree -p ds-core --no-default-features | wc -l  # Target: < 5
+cargo tree -p ds-error --no-default-features | wc -l  # Target: < 10
+
+# Build time for minimal configuration
+time cargo build -p ds-gstreamer --release  # Target: < 30 seconds
+
+# Total unique dependencies for basic usage
+cargo tree -p ds-gstreamer -p ds-backend --no-dedupe | grep "^[a-z]" | sort -u | wc -l  # Target: < 100
 ```
 
 ## Success Criteria
@@ -318,6 +381,11 @@ cargo run --example ball_tracking_visualization --all-features
 - Documentation builds without warnings
 - Examples run successfully
 - Clean separation of concerns achieved
+- **Dependency reduction targets met**:
+  - Basic GStreamer usage: < 50 dependencies (from 463)
+  - Core crates: < 10 dependencies each
+  - Build time for minimal config: < 30 seconds
+  - Users can opt-in to heavy deps (image, ML, web) as needed
 
 ## Risk Assessment
 

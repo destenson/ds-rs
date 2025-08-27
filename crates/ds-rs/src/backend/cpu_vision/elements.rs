@@ -13,18 +13,18 @@ use cairo;
 use super::tracker::CentroidTracker;
 
 /// Create a CPU detector element that performs object detection
-/// This creates a bin containing the cpudetector element from the cpuinfer plugin
+/// This creates a bin containing the cpuinfer element from the cpuinfer plugin
 pub fn create_cpu_detector(name: Option<&str>, model_path: Option<&str>) -> Result<gst::Element> {
     let bin = gst::Bin::builder()
         .name(name.unwrap_or("cpu-detector"))
         .build();
     
-    // Create cpudetector element from the cpuinfer plugin
-    let detector = gst::ElementFactory::make("cpudetector")
+    // Create cpuinfer element from the cpuinfer plugin
+    let detector = gst::ElementFactory::make("cpuinfer")
         .name("detector")
         .build()
         .map_err(|_| DeepStreamError::ElementCreation {
-            element: "cpudetector".to_string(),
+            element: "cpuinfer".to_string(),
         })?;
     
     // Configure the detector with model path if provided

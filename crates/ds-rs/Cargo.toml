@@ -8,7 +8,7 @@ description.workspace = true
 default = ["std", "cpu_vision", "cairo-rs", "logging"]
 std = []
 cpu_vision = ["nalgebra"]
-half = ["dep:half"]
+half = ["dep:half", "cpuinfer/half"]
 logging = ["gstreamer/log"]
 serde = ["gstreamer/serde"]
 # gst_v1_16 = ["gstreamer/v1_16"]
@@ -22,12 +22,13 @@ serde = ["gstreamer/serde"]
 nalgebra = ["dep:nalgebra"]
 imgproc = ["dep:imgproc"]
 cairo-rs = ["dep:cairo-rs"]
+ort = ["cpuinfer/ort"]
 
 
 [dependencies]
 cairo-rs = { version = "0.21.1", optional = true }
 clap = { version = "4.5.46", features = ["derive"] }
-# cpuinfer is now a separate GStreamer plugin, not a library dependency
+cpuinfer = { path = "../cpuinfer", default-features = false }
 ctrlc = "3.4.7"
 gstreamer.workspace = true
 gstreamer-app.workspace = true

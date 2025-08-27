@@ -1,6 +1,6 @@
 # TODO
 
-Last Updated: 2025-08-27 (Post cpuinfer completion scan)
+Last Updated: 2025-12-27 (Comprehensive codebase scan)
 
 ## Recent Achievements ✅
 
@@ -174,12 +174,14 @@ Proposed crate structure:
   - `video-server` (~200 deps with axum/tokio)
   - `cli-utils` (~20 deps)
 
-### Code Quality Metrics (Latest Scan)
-- **TODO comments**: 11 explicit (down from 13)
-- **"for now" patterns**: 21 temporary implementations  
-- **"actual" references**: 12 needing real implementations
-- **Unused parameters**: 35+ with `_` prefix
-- **NOTE comments**: 15 documentation/clarification notes
+### Code Quality Metrics (2025-12-27 Scan)
+- **TODO comments**: 13 explicit TODO markers found
+- **"for now" patterns**: 30 temporary implementations (needs cleanup)
+- **"actual" references**: 9 needing real implementations
+- **"temporary" references**: 1 (error classification marked as temporary)
+- **Unused parameters**: 50+ with `_` prefix (cleanup opportunity)
+- **FIXME/HACK/XXX**: None found (good!)
+- **NOTE comments**: Not counted in this scan
 
 ## Next Actions 🎯
 

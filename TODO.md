@@ -1,30 +1,30 @@
-# TODO List
+# TODO
 
-Last Updated: 2025-08-25 (Comprehensive Codebase Scan)
+Last Updated: 2025-08-27 (Comprehensive Codebase Scan)
 
 ## Recent Achievements ✅
 
-### Latest Completions (2025-08-25)
+### Latest Completions (2025-08-27)
+- **COMPLETED**: Enhanced PRP-50 with dependency reduction focus (463 → <50 deps goal)
+- **COMPLETED**: Created Debtmap workflow for code quality analysis
+- **COMPLETED**: Added .debtmap.yml configuration with Rust-specific rules
+
+### Previous Completions
 - **COMPLETED**: PRP-44 Fix False Detection Bug - Coordinates fixed, confidence thresholds adjusted!
 - **COMPLETED**: Generated PRPs for cpuinfer GStreamer plugin (PRPs 51-53)
 - **COMPLETED**: PRP-50 Refactor to Specialized Crates plan created
-
-### Previous Completions (2025-08-25)
 - **COMPLETED**: PRP-43 Network Congestion Simulation Enhancement
 - **COMPLETED**: PRP-33 CPU OSD Cairo Draw Implementation
-- **COMPLETED**: PRP-09 Test Orchestration Scripts
-- **COMPLETED**: PRP-08 Code Quality & Production Readiness
-- **COMPLETED**: Code Refactoring and Duplication Elimination
 
-## Critical Priority TODOs 🔴
+## Critical Priority 🔴
 
-### 1. Remove Global State in Error Classification
+### 1. Remove Global State & lazy_static Dependency
 **Location**: `crates/ds-rs/src/error/classification.rs:309`
 ```rust
 // TODO: GET RID OF THIS GLOBAL & dependency on lazy_static
 ```
 - **Impact**: Architecture smell, testing difficulties, thread safety issues
-- **Priority**: CRITICAL - Global state is an anti-pattern
+- **Solution**: Use dependency injection or context-based error classification
 
 ### 2. cpuinfer GStreamer Plugin Registration
 **Locations**: Multiple PRPs created
@@ -34,150 +34,187 @@ Last Updated: 2025-08-25 (Comprehensive Codebase Scan)
 - **Impact**: cpuinfer not usable as standard GStreamer element
 - **Status**: PRPs ready for implementation
 
-### 3. DeepStream Metadata Processing Implementation
+### 3. Replace Tokio Dependency
 **Locations**: 
-- `crates/ds-rs/src/rendering/deepstream_renderer.rs:190` - TODO: Implement actual DeepStream metadata processing
-- `crates/ds-rs/src/rendering/deepstream_renderer.rs:222` - TODO: Create and attach actual NvDsObjectMeta
-- `crates/ds-rs/src/backend/cpu_vision/cpudetector/imp.rs:186-187` - TODO: Attach custom metadata to buffer
-- **Impact**: Critical for hardware acceleration and production deployment
-- **Blocked by**: Need DeepStream FFI bindings
+- `crates/ds-rs/Cargo.toml:55`
+- `crates/source-videos/Cargo.toml:33`
+```toml
+tokio = { version = "1.47.1", features = ["full"] } # TODO: we should not use tokio (async is ok though)
+```
+- **Impact**: Heavy dependency (~200 deps), slower builds
+- **Solution**: Consider `smol` or remove async where not needed
 
-## High Priority TODOs 🟠
+### 4. Remove .unwrap() Usage
+**Multiple locations** - Search with: `grep -r "\.unwrap()" crates/`
+- **Impact**: Can cause panics in production
+- **Solution**: Replace with proper error handling using `?` or `expect()` with meaningful messages
+- **Note**: Debtmap rule configured to catch these
 
-### 4. Mock Backend Conditional Compilation
+## High Priority 🟠
+
+### 5. Mock Backend Conditional Compilation
 **Location**: `crates/ds-rs/src/backend/mock.rs:48`
 ```rust
 // TODO: only include this for testing #[cfg(test)]
 ```
-- **Impact**: Smaller production binaries, clearer test boundaries
+- **Impact**: Unnecessary code in production builds
+- **Solution**: Add `#[cfg(test)]` attribute
 
-### 5. Source-Videos Progressive Loading
+### 6. DeepStream Metadata Processing
+**Locations**: 
+- `crates/ds-rs/src/rendering/deepstream_renderer.rs:190,222`
+- `crates/ds-rs/src/backend/cpu_vision/cpudetector/imp.rs:186`
+```rust
+// TODO: Implement actual DeepStream metadata processing
+// TODO: Create and attach actual NvDsObjectMeta
+// TODO: Attach custom metadata to buffer
+```
+- **Impact**: Cannot use hardware acceleration properly
+- **Blocked by**: Need DeepStream SDK FFI bindings
+
+### 7. Real ONNX Model Testing
+**Locations**: 
+- `crates/ds-rs/tests/cpu_backend_tests.rs:336,352`
+```rust
+// TODO: When a real ONNX model is available, test with an actual model
+```
+- **Impact**: Limited test coverage for inference
+- **Solution**: Add test models to repository
+
+## Medium Priority 🟡
+
+### 8. Source Videos Features
+
+#### Progressive Loading
 **Location**: `crates/source-videos/src/manager.rs:319`
 ```rust
 // TODO: Implement progressive loading
 ```
+
+#### Lazy Loading
 **Location**: `crates/source-videos/src/manager.rs:366`
 ```rust
 // TODO: Implement lazy loading
 ```
-- **Impact**: Better performance with large video collections
 
-### 6. Unix Socket Server for Runtime Control
+#### Unix Socket Control
 **Location**: `crates/source-videos/src/main.rs:1124`
 ```rust
 // TODO: Implement Unix socket server for runtime control
 ```
-- **Impact**: Better IPC for control operations
 
-### 7. Actual Metadata Extraction
+#### Actual Metrics
+**Location**: `crates/source-videos/src/main.rs:1331`
+```rust
+0, // TODO: Get actual metrics
+```
+
+### 9. Video Metadata Extraction
 **Location**: `crates/source-videos/src/file_utils.rs:128`
 ```rust
 // TODO: Implement actual metadata extraction using GStreamer discoverer
 ```
-- **Impact**: Cannot extract real video metadata
+- **Impact**: Returns placeholder metadata
+- **Solution**: Use GStreamer discoverer API
 
-## Medium Priority TODOs 🟡
-
-### 8. Real ONNX Model Testing
-**Locations**: 
-- `crates/ds-rs/tests/cpu_backend_tests.rs:336` - TODO: When a real ONNX model is available, test with an actual model
-- `crates/ds-rs/tests/cpu_backend_tests.rs:352` - TODO: When a real ONNX model is available, test with...
-- **Current state**: Tests verify detector fails without model (correct behavior)
-- **Impact**: Better test coverage, validation of real inference
-
-### 9. DSL Implementation
+### 10. DSL Implementation
 **Location**: `crates/dsl/src/lib.rs:10`
 ```rust
 // TODO: Implement actual DSL tests when DSL functionality is added
 ```
 - **Impact**: DSL crate is placeholder only
 
-### 10. Get Actual Metrics
-**Location**: `crates/source-videos/src/main.rs:1331`
-```rust
-0, // TODO: Get actual metrics
-```
-- **Impact**: Dashboard shows 0 for active streams metric
+## Low Priority 🔵
 
-## Low Priority TODOs 🔵
+### 11. Unused Parameters Cleanup
+**Multiple locations with `_` prefixed parameters**:
+- Probe callbacks: `_pad`, `_info`, `_bus`
+- Config loaders: `_path` parameters
+- Simulation functions: `_pipeline`
+- Processing functions in multistream
 
-### 11. Element Registration Cleanup
-**Location**: `crates/ds-rs/src/lib.rs:89`
-- Comment about temporary plugin for registering elements
-- Should be removed once cpuinfer is proper plugin (PRP-51)
+Notable files:
+- `crates/ds-rs/src/source/video_source.rs`
+- `crates/ds-rs/examples/fault_tolerant_pipeline.rs`
+- `crates/ds-rs/src/multistream/`
 
-### 12. Various "For now" Temporary Implementations
-**30+ locations with temporary code marked "for now":**
-- Model loading and configuration parsing
-- Metadata extraction and processing  
-- Stream message handling
-- Detection processing setup
-- Frame processing in pipeline pool
-- Various placeholder implementations
+### 12. Incomplete API Implementations
+**Marked with "for now" comments** (30+ locations):
+- `source-videos/src/api/routes/sources.rs:126` - Update not fully implemented
+- `source-videos/src/api/routes/server.rs:110,130,147` - Simplified responses
+- `source-videos/src/api/routes/config.rs:28` - Config update placeholder
+- Various authentication checks skipped
 
-## Technical Debt 🔧
+## Technical Debt & Architecture 🏗️
 
-### Architecture Refactoring
-- **PRP-50**: Refactor into 15+ specialized crates
-  - Foundation: ds-core, ds-error, ds-platform
-  - GStreamer: ds-gstreamer, ds-backend, ds-elements
-  - Processing: ds-source, ds-metadata, ds-inference, ds-tracking, ds-health
-  - Features: ds-rendering, ds-multistream
-  - Application: ds-config, ds-app
-- **Impact**: Better modularity, reusability, maintainability
+### Dependency Reduction (PRP-50/60)
+**Current State**: 463 dependencies
+**Goal**: <50 for basic usage
 
-### Code Quality Metrics 📊
-- **TODO comments**: 10 explicit TODOs
-- **"For now" patterns**: 30+ temporary implementations
-- **"actual" references**: 15+ places needing real implementations
-- **NOTE comments**: 8 informational notes
-- **Test coverage**: 121/121 tests passing ✅
+Proposed crate structure:
+- **Core** (0 deps): `ds-core`
+- **Error** (1 dep): `ds-error` 
+- **GStreamer** (5-10 deps): `ds-gstreamer`, `ds-backend`
+- **Optional Heavy**:
+  - `cpu-inference` (~150 deps with ONNX)
+  - `image-utils` (~100 deps)
+  - `video-server` (~200 deps with axum/tokio)
+  - `cli-utils` (~20 deps)
 
-## Next Sprint Focus 🎯
+### Code Quality Metrics (from scan)
+- **TODO comments**: 13 explicit
+- **"for now" patterns**: 30+ temporary implementations
+- **"actual" references**: 15+ needing real implementations
+- **"placeholder"**: 6 locations
+- **Unused parameters**: 30+ with `_` prefix
 
-### Week 1: Plugin Infrastructure
-1. **Implement PRP-51**: Fix cpuinfer plugin build and registration
-2. **Remove global state** in error classification
-3. **Add conditional compilation** for mock backend
+## Next Actions 🎯
 
-### Week 2: Plugin Compatibility  
-4. **Implement PRP-52**: Add nvinfer-compatible properties to cpuinfer
-5. **Implement metadata attachment** in CPU detector
-6. **Add configuration file parsing**
+### Week 1: Critical Fixes
+1. Remove global error classifier
+2. Start tokio replacement investigation
+3. Fix highest priority unwrap() calls
 
-### Week 3: Installation & Testing
-7. **Implement PRP-53**: Plugin installation scripts
-8. **Add real ONNX model** testing
-9. **Complete progressive loading** for source-videos
+### Week 2: Testing & Quality
+4. Add real ONNX models for testing
+5. Implement mock backend conditional compilation
+6. Run Debtmap analysis and fix high-severity issues
 
-## Production Readiness Assessment 🏭
+### Week 3: Feature Completion
+7. Implement video metadata extraction
+8. Add progressive/lazy loading
+9. Complete Unix socket control
 
-### ✅ Ready
-- Core pipeline management
-- Dynamic source management  
-- CPU-based detection (after PRP-44 fix)
-- Cross-platform backend abstraction
-- Ball tracking visualization working
+### Long-term: Architecture
+10. Execute PRP-50 crate modularization
+11. Complete DeepStream FFI bindings
+12. Implement all metadata propagation
 
-### 🚨 Blockers
-1. **Global state** in error handling
-2. **cpuinfer not a proper plugin** - can't use with gst-launch
-3. **Incomplete metadata flow** - detections not propagated via GStreamer metadata
-4. **No DeepStream metadata** implementation
+## CI/CD & Tooling
 
-### 📈 Recommendation
-Priority order:
-1. Complete cpuinfer plugin (PRPs 51-53) - enables standard GStreamer usage
-2. Remove global state - architectural cleanup
-3. Implement metadata propagation - complete the data flow
-4. Refactor to specialized crates (PRP-50) - long-term maintainability
+### New Tools Added
+- **Debtmap**: Code quality analysis workflow
+- **Coverage**: cargo-llvm-cov for accurate coverage
+- **Dependencies**: Fixed missing libgstrtspserver-1.0-dev
 
-## Development Guidelines 📝
+### Build Issues to Address
+- Long build times due to 463 dependencies
+- Need feature gates for optional functionality
+- Consider workspace optimization
 
-When working on any TODO:
-1. Remove the TODO comment when implementing
+## Guidelines 📝
+
+When addressing TODOs:
+1. Remove TODO comment when implementing
 2. Write tests for the implementation
 3. Update this file to reflect completion
-4. Check for related TODOs that might be affected
-5. Ensure no new global state is introduced
-6. Follow patterns from reference implementations in ../gst-plugins-rs
+4. Check for related TODOs
+5. Run `cargo clippy` and fix warnings
+6. Run Debtmap locally before committing
+7. Ensure no new global state introduced
+
+## Priority Definitions
+- **Critical**: Security risk, panics, or blocks major functionality
+- **High**: Significant technical debt or missing core features
+- **Medium**: Feature completeness and performance
+- **Low**: Code cleanup, nice-to-have features

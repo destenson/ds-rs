@@ -81,7 +81,7 @@ rules:
     
   # Medium: Code quality issues
   - name: "TODO/FIXME comments"
-    pattern: "TODO|FIXME|HACK|XXX|for now|in a real"
+    pattern: "TODO|FIXME|HACK|XXX|for now|in a real|temporar|real implementation|"
     severity: "medium"
     category: "maintenance"
     message: "Unresolved TODO/FIXME comment found."

@@ -73,10 +73,10 @@ impl FileSystemEvent {
 }
 
 pub trait FileEventHandler: Send + Sync {
-    async fn handle_created(&self, metadata: &FileEventMetadata) -> Result<(), String>;
-    async fn handle_modified(&self, metadata: &FileEventMetadata) -> Result<(), String>;
-    async fn handle_deleted(&self, metadata: &FileEventMetadata) -> Result<(), String>;
-    async fn handle_error(&self, path: &PathBuf, error: &str) -> Result<(), String>;
+    fn handle_created(&self, metadata: &FileEventMetadata) -> impl Future<Output=Result<(), String>> + Send;
+    fn handle_modified(&self, metadata: &FileEventMetadata) -> impl Future<Output=Result<(), String>> + Send;
+    fn handle_deleted(&self, metadata: &FileEventMetadata) -> impl Future<Output=Result<(), String>> + Send;
+    fn handle_error(&self, path: &PathBuf, error: &str) -> impl Future<Output=Result<(), String>> + Send;
 }
 
 pub struct EventRouter {

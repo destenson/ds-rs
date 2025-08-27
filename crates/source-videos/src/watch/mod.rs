@@ -11,9 +11,9 @@ use tokio::sync::mpsc;
 use uuid::Uuid;
 
 pub trait FileWatcher {
-    async fn start(&mut self) -> Result<()>;
-    async fn stop(&mut self) -> Result<()>;
-    async fn recv(&mut self) -> Option<FileSystemEvent>;
+    fn start(&mut self) -> impl Future<Output=Result<()>> + Send;
+    fn stop(&mut self) -> impl Future<Output=Result<()>> + Send;
+    fn recv(&mut self) -> impl Future<Output=Option<FileSystemEvent>> + Send;
     fn is_watching(&self) -> bool;
 }
 

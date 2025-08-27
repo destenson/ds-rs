@@ -1,4 +1,4 @@
-# PRP-01: Fix ONNX Runtime DLL Loading Issues on Windows
+# Fix ONNX Runtime DLL Loading Issues on Windows
 
 ## Problem Statement
 The application fails to start with error code 0xc000007b (STATUS_INVALID_IMAGE_FORMAT) when running examples that use the ONNX Runtime (ort) feature on Windows. This error indicates a DLL architecture mismatch or missing dependencies. The build script warns about missing DLLs but doesn't properly handle the ort crate's download and placement of these DLLs.

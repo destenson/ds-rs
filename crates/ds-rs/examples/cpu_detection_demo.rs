@@ -40,18 +40,14 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                     println!("\nTo fix this:");
                     println!("1. Run: python export_yolov5n_float32.py");
                     println!("2. Or install ultralytics and run: yolo export model=yolov5n.pt format=onnx half=False");
-                    println!("\nFalling back to mock detection to show the pipeline works:");
-                    test_mock_detection();
                 }
             }
         },
         None => {
-            println!("No ONNX model found, using mock detection");
+            println!("No ONNX model found in models/ directory.");
             println!("To use real ONNX inference:");
             println!("1. Run: python export_yolov5n_float32.py");
             println!("2. Or place a compatible yolov5n.onnx file in models/ directory");
-            println!("");
-            test_mock_detection();
         }
     }
     
@@ -115,30 +111,6 @@ fn test_real_detection(model_path: &str) -> Result<(), Box<dyn std::error::Error
     }
     
     Ok(())
-}
-
-fn test_mock_detection() {
-    println!("\nTesting Mock Detection");
-    println!("-------------------------");
-    
-    let detector = OnnxDetector::new_mock();
-    let test_image = create_test_pattern(640, 640);
-    
-    match detector.detect(&test_image) {
-        Ok(detections) => {
-            println!("Mock detector found {} detections:", detections.len());
-            
-            for (i, detection) in detections.iter().enumerate() {
-                println!("   Detection {}: {} (confidence: {:.2})", 
-                       i + 1, detection.class_name, detection.confidence);
-                println!("     Bounding box: ({:.1}, {:.1}) {}x{}", 
-                       detection.x, detection.y, detection.width, detection.height);
-            }
-        },
-        Err(e) => {
-            println!("Mock detection failed: {}", e);
-        }
-    }
 }
 
 /// Create a test pattern image

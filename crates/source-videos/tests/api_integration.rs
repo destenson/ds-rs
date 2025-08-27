@@ -8,6 +8,9 @@ use axum::http::StatusCode;
 use axum_test::TestServer;
 
 async fn setup_test_api() -> TestServer {
+    // Initialize GStreamer before creating managers
+    source_videos::ensure_initialized();
+    
     let source_manager = Arc::new(VideoSourceManager::new());
     let watcher_manager = Arc::new(RwLock::new(WatcherManager::new()));
     

@@ -1,4 +1,4 @@
-# PRP-37: Fix RTSP File Serving Architecture
+# Fix RTSP File Serving Architecture
 
 ## Problem Statement
 

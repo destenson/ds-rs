@@ -78,7 +78,7 @@ impl NetworkSimulator {
         }
         
         let mut rng = rand::thread_rng();
-        rng.random::<f32>() * 100.0 < config.conditions.packet_loss
+        rng.r#gen::<f32>() * 100.0 < config.conditions.packet_loss
     }
     
     /// Get delay to add for latency simulation
@@ -97,7 +97,7 @@ impl NetworkSimulator {
         
         if jitter > 0 {
             let mut rng = rand::thread_rng();
-            let variation = rng.random_range(0..=jitter);
+            let variation = rng.gen_range(0..=jitter);
             Duration::from_millis((base_latency + variation) as u64)
         } else {
             Duration::from_millis(base_latency as u64)

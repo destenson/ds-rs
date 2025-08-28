@@ -1,22 +1,25 @@
 #![allow(unused)]
+
+use std::path::PathBuf;
+use std::time::Duration;
+use std::sync::Arc;
+use std::io;
+use std::fs;
+use std::process;
+
+use chrono::{DateTime, Utc};
+use clap::{Parser, Subcommand, ValueEnum};
+use clap_complete::{generate, Shell};
+use gstreamer::glib::prelude::*;
+use regex::Regex;
+use tokio::sync::RwLock;
+use tokio::signal;
+
 use source_videos::{
     AppConfig, SourceVideos, TestPattern, VideoSourceConfig,
     generate_test_file, create_test_rtsp_server, Result, SourceVideoError,
     api::ControlApi, EnhancedRepl
 };
-use clap::{Parser, Subcommand, ValueEnum};
-use clap_complete::{generate, Shell};
-use std::path::PathBuf;
-use std::time::Duration;
-use std::sync::Arc;
-use tokio::sync::RwLock;
-use tokio::signal;
-use gstreamer::glib::prelude::*;
-use regex::Regex;
-use std::io;
-use chrono::{DateTime, Utc};
-use std::fs;
-use std::process;
 
 #[derive(Parser)]
 #[command(name = "source-videos")]

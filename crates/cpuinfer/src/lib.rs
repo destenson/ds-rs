@@ -17,12 +17,12 @@ fn plugin_init(plugin: &gst::Plugin) -> Result<(), glib::BoolError> {
                 let workspace_dir = std::env::var("CARGO_MANIFEST_DIR").unwrap();
                 std::env::set_var(
                     "GST_PLUGIN_PATH",
-                    format!("{}/target/debug:{}", workspace_dir, path),
+                    format!("{workspace_dir}/target/debug:{path}"),
                 );
             }
             Err(_) => {
                 let workspace_dir = std::env::var("CARGO_MANIFEST_DIR").unwrap();
-                std::env::set_var("GST_PLUGIN_PATH", format!("{}/target/debug", workspace_dir));
+                std::env::set_var("GST_PLUGIN_PATH", format!("{workspace_dir}/target/debug"));
             }
         };
     };
@@ -33,14 +33,14 @@ fn plugin_init(plugin: &gst::Plugin) -> Result<(), glib::BoolError> {
                 let workspace_dir = std::env::var("CARGO_MANIFEST_DIR").unwrap();
                 std::env::set_var(
                     "GST_PLUGIN_PATH",
-                    format!("{}/target/release:{}", workspace_dir, path),
+                    format!("{workspace_dir}/target/release:{path}"),
                 );
             }
             Err(_) => {
                 let workspace_dir = std::env::var("CARGO_MANIFEST_DIR").unwrap();
                 std::env::set_var(
                     "GST_PLUGIN_PATH",
-                    format!("{}/target/release", workspace_dir),
+                    format!("{workspace_dir}/target/release"),
                 );
             }
         };

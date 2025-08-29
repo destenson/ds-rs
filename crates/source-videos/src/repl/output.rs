@@ -1,6 +1,6 @@
-use colored::{Colorize, ColoredString};
-use comfy_table::Table;
 use super::ReplContext;
+use colored::{ColoredString, Colorize};
+use comfy_table::Table;
 
 #[derive(Debug, Clone)]
 pub enum OutputFormat {
@@ -25,16 +25,26 @@ impl ReplOutput {
         println!("{}", "═══════════════════════════".cyan());
         println!();
         println!("Welcome to the enhanced interactive mode!");
-        println!("Type '{}' to see all available commands.", "help".bright_white());
+        println!(
+            "Type '{}' to see all available commands.",
+            "help".bright_white()
+        );
         println!("Type '{}' for usage examples.", "examples".bright_white());
-        println!("Use {} or {} for auto-completion.", "TAB".bright_yellow(), "↑/↓".bright_yellow());
+        println!(
+            "Use {} or {} for auto-completion.",
+            "TAB".bright_yellow(),
+            "↑/↓".bright_yellow()
+        );
         println!();
-        
+
         if context.verbose {
             println!("Verbose mode: {}", "ON".bright_green());
-            println!("Session started at: {}", chrono::Local::now().format("%Y-%m-%d %H:%M:%S"));
+            println!(
+                "Session started at: {}",
+                chrono::Local::now().format("%Y-%m-%d %H:%M:%S")
+            );
         }
-        
+
         println!("Ready for commands!");
         println!();
     }
@@ -117,7 +127,9 @@ impl ReplOutput {
             OutputFormat::Json => {
                 // For JSON output, we would need to convert the table to JSON
                 // This is a simplified implementation
-                println!(r#"{{"type": "table", "data": "Table output not yet supported in JSON format"}}"#);
+                println!(
+                    r#"{{"type": "table", "data": "Table output not yet supported in JSON format"}}"#
+                );
             }
             OutputFormat::Csv => {
                 println!("table,Table output not yet supported in CSV format");
@@ -158,13 +170,26 @@ impl ReplOutput {
     pub fn print_progress(&self, message: &str, current: usize, total: usize) {
         match self.format {
             OutputFormat::Text => {
-                let percent = if total > 0 { (current * 100) / total } else { 0 };
+                let percent = if total > 0 {
+                    (current * 100) / total
+                } else {
+                    0
+                };
                 let progress_bar = self.create_progress_bar(percent);
                 println!("{} {} [{}/{}]", progress_bar, message, current, total);
             }
             OutputFormat::Json => {
-                println!(r#"{{"type": "progress", "message": "{}", "current": {}, "total": {}, "percent": {}}}"#, 
-                    message, current, total, if total > 0 { (current * 100) / total } else { 0 });
+                println!(
+                    r#"{{"type": "progress", "message": "{}", "current": {}, "total": {}, "percent": {}}}"#,
+                    message,
+                    current,
+                    total,
+                    if total > 0 {
+                        (current * 100) / total
+                    } else {
+                        0
+                    }
+                );
             }
             OutputFormat::Csv => {
                 println!("progress,{},{},{}", message, current, total);
@@ -176,11 +201,13 @@ impl ReplOutput {
         let width = 20;
         let filled = (percent * width) / 100;
         let empty = width - filled;
-        
-        let bar = format!("[{}{}]", 
+
+        let bar = format!(
+            "[{}{}]",
             "█".repeat(filled).bright_green(),
-            "░".repeat(empty).bright_black());
-        
+            "░".repeat(empty).bright_black()
+        );
+
         format!("{:3}% {}", percent, bar).normal()
     }
 
@@ -208,7 +235,11 @@ impl ReplOutput {
             }
             OutputFormat::Json => {
                 let items_json: Vec<String> = items.iter().map(|s| format!(r#""{}""#, s)).collect();
-                println!(r#"{{"type": "list", "title": "{}", "items": [{}]}}"#, title, items_json.join(","));
+                println!(
+                    r#"{{"type": "list", "title": "{}", "items": [{}]}}"#,
+                    title,
+                    items_json.join(",")
+                );
             }
             OutputFormat::Csv => {
                 for item in items {
@@ -226,10 +257,14 @@ impl ReplOutput {
                 }
             }
             OutputFormat::Json => {
-                let metrics_json: Vec<String> = metrics.iter()
+                let metrics_json: Vec<String> = metrics
+                    .iter()
                     .map(|(k, v)| format!(r#""{}": "{}""#, k, v))
                     .collect();
-                println!(r#"{{"type": "metrics", "data": {{{}}}}}"#, metrics_json.join(","));
+                println!(
+                    r#"{{"type": "metrics", "data": {{{}}}}}"#,
+                    metrics_json.join(",")
+                );
             }
             OutputFormat::Csv => {
                 for (name, value) in metrics {

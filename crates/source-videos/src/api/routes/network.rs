@@ -1,8 +1,8 @@
-use axum::{extract::State, Json};
-use std::sync::Arc;
-use crate::api::{ApiState, ApiError, ApiResult, models::*};
-use crate::network::{NetworkProfile, NetworkConditions};
+use crate::api::{ApiError, ApiResult, ApiState, models::*};
+use crate::network::{NetworkConditions, NetworkProfile};
+use axum::{Json, extract::State};
 use std::str::FromStr;
+use std::sync::Arc;
 
 pub async fn list_profiles(
     State(_state): State<Arc<ApiState>>,
@@ -57,7 +57,7 @@ pub async fn list_profiles(
             jitter_ms: 50,
         },
     ];
-    
+
     Ok(Json(profiles))
 }
 
@@ -67,9 +67,9 @@ pub async fn apply_profile(
 ) -> ApiResult<Json<SuccessResponse>> {
     let profile = NetworkProfile::from_str(&req.profile)
         .map_err(|e| ApiError::bad_request(format!("Invalid profile: {}", e)))?;
-    
+
     state.apply_network_profile(profile).await?;
-    
+
     Ok(Json(SuccessResponse {
         success: true,
         message: Some(format!("Applied network profile: {}", req.profile)),
@@ -90,11 +90,15 @@ pub async fn set_conditions(
         allow_reordering: true,
         min_delay_ms: 0,
         max_delay_ms: req.latency_ms.unwrap_or(0) + req.jitter_ms.unwrap_or(0),
-        delay_probability: if req.latency_ms.unwrap_or(0) > 0 { 100.0 } else { 0.0 },
+        delay_probability: if req.latency_ms.unwrap_or(0) > 0 {
+            100.0
+        } else {
+            0.0
+        },
     };
-    
+
     state.apply_custom_network_conditions(conditions).await?;
-    
+
     Ok(Json(SuccessResponse {
         success: true,
         message: Some("Applied custom network conditions".to_string()),
@@ -105,7 +109,7 @@ pub async fn get_status(
     State(state): State<Arc<ApiState>>,
 ) -> ApiResult<Json<NetworkStatusResponse>> {
     let conditions = state.get_network_status().await;
-    
+
     if let Some(conditions) = conditions {
         Ok(Json(NetworkStatusResponse {
             active: true,
@@ -135,11 +139,9 @@ pub async fn get_status(
     }
 }
 
-pub async fn reset_network(
-    State(state): State<Arc<ApiState>>,
-) -> ApiResult<Json<SuccessResponse>> {
+pub async fn reset_network(State(state): State<Arc<ApiState>>) -> ApiResult<Json<SuccessResponse>> {
     state.reset_network().await?;
-    
+
     Ok(Json(SuccessResponse {
         success: true,
         message: Some("Network conditions reset to perfect".to_string()),

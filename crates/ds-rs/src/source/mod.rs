@@ -1,34 +1,36 @@
 #![allow(unused)]
-pub mod video_source;
-pub mod manager;
-pub mod removal;
-pub mod events;
-pub mod synchronization;
-pub mod controller;
-pub mod recovery;
-pub mod health;
 pub mod circuit_breaker;
-pub mod isolation;
+pub mod controller;
+pub mod events;
 pub mod fault_tolerant_controller;
+pub mod health;
+pub mod isolation;
+pub mod manager;
+pub mod recovery;
+pub mod removal;
+pub mod synchronization;
+pub mod video_source;
 
 use crate::error::{DeepStreamError, Result};
+use crate::pipeline::Pipeline;
 use gstreamer as gst;
 use std::collections::HashMap;
-use std::sync::{Arc, RwLock};
 use std::sync::atomic::AtomicUsize;
-use crate::pipeline::Pipeline;
+use std::sync::{Arc, RwLock};
 
-pub use video_source::VideoSource;
-pub use manager::SourceAddition;
-pub use removal::SourceRemoval;
-pub use events::{SourceEvent, SourceEventHandler};
-pub use synchronization::SourceSynchronizer;
+pub use circuit_breaker::{
+    CircuitBreaker, CircuitBreakerConfig, CircuitBreakerManager, CircuitState,
+};
 pub use controller::SourceController;
-pub use recovery::{RecoveryConfig, RecoveryManager, RecoveryState, RecoveryStats};
-pub use health::{HealthConfig, HealthMonitor, HealthStatus, SourceHealthMonitor};
-pub use circuit_breaker::{CircuitBreaker, CircuitBreakerConfig, CircuitBreakerManager, CircuitState};
-pub use isolation::{ErrorBoundary, IsolatedSource, IsolationManager, IsolationPolicy};
+pub use events::{SourceEvent, SourceEventHandler};
 pub use fault_tolerant_controller::FaultTolerantSourceController;
+pub use health::{HealthConfig, HealthMonitor, HealthStatus, SourceHealthMonitor};
+pub use isolation::{ErrorBoundary, IsolatedSource, IsolationManager, IsolationPolicy};
+pub use manager::SourceAddition;
+pub use recovery::{RecoveryConfig, RecoveryManager, RecoveryState, RecoveryStats};
+pub use removal::SourceRemoval;
+pub use synchronization::SourceSynchronizer;
+pub use video_source::VideoSource;
 
 pub const MAX_NUM_SOURCES: usize = 30;
 
@@ -73,7 +75,7 @@ impl SourceManager {
     pub fn new(max_sources: usize) -> Self {
         let mut source_enabled = Vec::with_capacity(max_sources);
         source_enabled.resize(max_sources, false);
-        
+
         Self {
             sources: Arc::new(RwLock::new(HashMap::new())),
             next_id: AtomicUsize::new(0),
@@ -83,28 +85,30 @@ impl SourceManager {
             streammux: None,
         }
     }
-    
+
     pub fn with_defaults() -> Self {
         Self::new(MAX_NUM_SOURCES)
     }
-    
+
     pub fn set_pipeline(&mut self, pipeline: Arc<Pipeline>) {
         self.pipeline = Some(pipeline);
     }
-    
+
     pub fn set_streammux(&mut self, streammux: gst::Element) {
         self.streammux = Some(streammux);
     }
-    
+
     pub fn get_max_sources(&self) -> usize {
         self.max_sources
     }
-    
+
     pub fn generate_source_id(&self) -> Result<SourceId> {
         // Lock for write to make this atomic - prevent concurrent threads from getting same ID
-        let mut enabled = self.source_enabled.write()
+        let mut enabled = self
+            .source_enabled
+            .write()
             .map_err(|_| DeepStreamError::Unknown("Failed to lock source_enabled".to_string()))?;
-        
+
         for i in 0..self.max_sources {
             if !enabled[i] {
                 // Mark as enabled immediately to prevent race conditions
@@ -112,119 +116,136 @@ impl SourceManager {
                 return Ok(SourceId(i));
             }
         }
-        
-        Err(DeepStreamError::Pipeline(
-            format!("Maximum number of sources ({}) reached", self.max_sources)
-        ))
+
+        Err(DeepStreamError::Pipeline(format!(
+            "Maximum number of sources ({}) reached",
+            self.max_sources
+        )))
     }
-    
+
     pub fn mark_source_enabled(&self, id: SourceId, enabled: bool) -> Result<()> {
-        let mut source_enabled = self.source_enabled.write()
+        let mut source_enabled = self
+            .source_enabled
+            .write()
             .map_err(|_| DeepStreamError::Unknown("Failed to lock source_enabled".to_string()))?;
-        
+
         if id.0 >= self.max_sources {
-            return Err(DeepStreamError::InvalidInput(
-                format!("Source ID {} exceeds maximum {}", id.0, self.max_sources)
-            ));
+            return Err(DeepStreamError::InvalidInput(format!(
+                "Source ID {} exceeds maximum {}",
+                id.0, self.max_sources
+            )));
         }
-        
+
         source_enabled[id.0] = enabled;
         Ok(())
     }
-    
+
     pub fn add_source(&self, id: SourceId, info: SourceInfo) -> Result<()> {
-        let mut sources = self.sources.write()
+        let mut sources = self
+            .sources
+            .write()
             .map_err(|_| DeepStreamError::Unknown("Failed to lock sources".to_string()))?;
-        
+
         if sources.contains_key(&id) {
-            return Err(DeepStreamError::InvalidInput(
-                format!("Source {} already exists", id)
-            ));
+            return Err(DeepStreamError::InvalidInput(format!(
+                "Source {} already exists",
+                id
+            )));
         }
-        
+
         sources.insert(id, info);
         // No need to mark as enabled here - already done in generate_source_id()
         Ok(())
     }
-    
+
     pub fn remove_source(&self, id: SourceId) -> Result<SourceInfo> {
-        let mut sources = self.sources.write()
+        let mut sources = self
+            .sources
+            .write()
             .map_err(|_| DeepStreamError::Unknown("Failed to lock sources".to_string()))?;
-        
-        let info = sources.remove(&id)
-            .ok_or_else(|| DeepStreamError::InvalidInput(
-                format!("Source {} not found", id)
-            ))?;
-        
+
+        let info = sources
+            .remove(&id)
+            .ok_or_else(|| DeepStreamError::InvalidInput(format!("Source {} not found", id)))?;
+
         // Mark as disabled to free the slot
         self.mark_source_enabled(id, false)?;
         Ok(info)
     }
-    
+
     pub fn get_source(&self, id: SourceId) -> Result<VideoSource> {
-        let sources = self.sources.read()
+        let sources = self
+            .sources
+            .read()
             .map_err(|_| DeepStreamError::Unknown("Failed to lock sources".to_string()))?;
-        
-        sources.get(&id)
+
+        sources
+            .get(&id)
             .map(|info| info.source.clone())
-            .ok_or_else(|| DeepStreamError::InvalidInput(
-                format!("Source {} not found", id)
-            ))
+            .ok_or_else(|| DeepStreamError::InvalidInput(format!("Source {} not found", id)))
     }
-    
+
     pub fn get_source_info(&self, id: SourceId) -> Result<SourceInfo> {
-        let sources = self.sources.read()
+        let sources = self
+            .sources
+            .read()
             .map_err(|_| DeepStreamError::Unknown("Failed to lock sources".to_string()))?;
-        
-        sources.get(&id)
+
+        sources
+            .get(&id)
             .cloned()
-            .ok_or_else(|| DeepStreamError::InvalidInput(
-                format!("Source {} not found", id)
-            ))
+            .ok_or_else(|| DeepStreamError::InvalidInput(format!("Source {} not found", id)))
     }
-    
+
     pub fn update_source_state(&self, id: SourceId, state: SourceState) -> Result<()> {
-        let mut sources = self.sources.write()
+        let mut sources = self
+            .sources
+            .write()
             .map_err(|_| DeepStreamError::Unknown("Failed to lock sources".to_string()))?;
-        
-        let info = sources.get_mut(&id)
-            .ok_or_else(|| DeepStreamError::InvalidInput(
-                format!("Source {} not found", id)
-            ))?;
-        
+
+        let info = sources
+            .get_mut(&id)
+            .ok_or_else(|| DeepStreamError::InvalidInput(format!("Source {} not found", id)))?;
+
         info.state = state;
         Ok(())
     }
-    
+
     pub fn list_sources(&self) -> Result<Vec<SourceId>> {
-        let sources = self.sources.read()
+        let sources = self
+            .sources
+            .read()
             .map_err(|_| DeepStreamError::Unknown("Failed to lock sources".to_string()))?;
-        
+
         Ok(sources.keys().cloned().collect())
     }
-    
+
     pub fn num_sources(&self) -> Result<usize> {
-        let sources = self.sources.read()
+        let sources = self
+            .sources
+            .read()
             .map_err(|_| DeepStreamError::Unknown("Failed to lock sources".to_string()))?;
-        
+
         Ok(sources.len())
     }
-    
+
     pub fn is_source_enabled(&self, id: SourceId) -> Result<bool> {
-        let enabled = self.source_enabled.read()
+        let enabled = self
+            .source_enabled
+            .read()
             .map_err(|_| DeepStreamError::Unknown("Failed to lock source_enabled".to_string()))?;
-        
+
         if id.0 >= self.max_sources {
             return Ok(false);
         }
-        
+
         Ok(enabled[id.0])
     }
-    
+
     pub fn get_pipeline(&self) -> Option<Arc<Pipeline>> {
         self.pipeline.clone()
     }
-    
+
     pub fn get_streammux(&self) -> Option<&gst::Element> {
         self.streammux.as_ref()
     }
@@ -245,29 +266,29 @@ impl Clone for SourceInfo {
 #[cfg(test)]
 mod tests {
     use super::*;
-    
+
     #[test]
     fn test_source_manager_creation() {
         let manager = SourceManager::with_defaults();
         assert_eq!(manager.max_sources, MAX_NUM_SOURCES);
         assert_eq!(manager.num_sources().unwrap(), 0);
     }
-    
+
     #[test]
     fn test_source_id_generation() {
         let manager = SourceManager::new(3);
-        
+
         let id1 = manager.generate_source_id().unwrap();
         manager.mark_source_enabled(id1, true).unwrap();
-        
+
         let id2 = manager.generate_source_id().unwrap();
         manager.mark_source_enabled(id2, true).unwrap();
-        
+
         let id3 = manager.generate_source_id().unwrap();
         manager.mark_source_enabled(id3, true).unwrap();
-        
+
         assert!(manager.generate_source_id().is_err());
-        
+
         manager.mark_source_enabled(id2, false).unwrap();
         let id4 = manager.generate_source_id().unwrap();
         assert_eq!(id4.0, id2.0);

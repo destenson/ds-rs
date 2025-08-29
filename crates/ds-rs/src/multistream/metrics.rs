@@ -3,11 +3,11 @@
 //! Metrics collection and monitoring for multi-stream processing
 
 use crate::source::SourceId;
-use std::sync::{Arc, RwLock, Mutex};
 use std::collections::{HashMap, VecDeque};
-use std::time::{Duration, Instant};
 use std::fs::File;
 use std::io::Write;
+use std::sync::{Arc, Mutex, RwLock};
+use std::time::{Duration, Instant};
 
 /// Metrics for a single stream
 #[derive(Debug, Clone)]
@@ -44,18 +44,18 @@ impl StreamMetrics {
             recovery_count: 0,
         }
     }
-    
+
     fn update_fps(&mut self) {
         let elapsed = self.last_update.elapsed().as_secs_f32();
         if elapsed > 0.0 {
             self.current_fps = 1.0 / elapsed;
         }
-        
+
         let total_elapsed = self.start_time.elapsed().as_secs_f32();
         if total_elapsed > 0.0 {
             self.average_fps = self.frames_processed as f32 / total_elapsed;
         }
-        
+
         self.last_update = Instant::now();
     }
 }
@@ -81,52 +81,52 @@ impl TimeSeries {
             max_points,
         }
     }
-    
+
     fn add_point(&mut self, value: f32) {
         let point = MetricDataPoint {
             timestamp: Instant::now(),
             value,
         };
-        
+
         self.data.push_back(point);
-        
+
         if self.data.len() > self.max_points {
             self.data.pop_front();
         }
     }
-    
+
     fn get_average(&self, window: Duration) -> Option<f32> {
         let cutoff = Instant::now() - window;
-        let recent: Vec<f32> = self.data.iter()
+        let recent: Vec<f32> = self
+            .data
+            .iter()
             .filter(|p| p.timestamp > cutoff)
             .map(|p| p.value)
             .collect();
-        
+
         if recent.is_empty() {
             None
         } else {
             Some(recent.iter().sum::<f32>() / recent.len() as f32)
         }
     }
-    
+
     fn get_max(&self, window: Duration) -> Option<f32> {
         let cutoff = Instant::now() - window;
-        self.data.iter()
+        self.data
+            .iter()
             .filter(|p| p.timestamp > cutoff)
             .map(|p| p.value)
-            .fold(None, |max, val| {
-                Some(max.map_or(val, |m: f32| m.max(val)))
-            })
+            .fold(None, |max, val| Some(max.map_or(val, |m: f32| m.max(val))))
     }
-    
+
     fn get_min(&self, window: Duration) -> Option<f32> {
         let cutoff = Instant::now() - window;
-        self.data.iter()
+        self.data
+            .iter()
             .filter(|p| p.timestamp > cutoff)
             .map(|p| p.value)
-            .fold(None, |min, val| {
-                Some(min.map_or(val, |m: f32| m.min(val)))
-            })
+            .fold(None, |min, val| Some(min.map_or(val, |m: f32| m.min(val))))
     }
 }
 
@@ -147,25 +147,25 @@ impl MetricsCollector {
             collection_interval: Duration::from_secs(1),
         }
     }
-    
+
     /// Enable metrics export to file
     pub fn enable_export(&mut self, path: &str) -> std::io::Result<()> {
         let file = File::create(path)?;
         self.export_file = Some(Arc::new(Mutex::new(file)));
         Ok(())
     }
-    
+
     /// Start collecting metrics for a stream
     pub fn start_stream_metrics(&self, source_id: SourceId) {
         let mut metrics = self.stream_metrics.write().unwrap();
         metrics.insert(source_id, StreamMetrics::new(source_id));
     }
-    
+
     /// Stop collecting metrics for a stream
     pub fn stop_stream_metrics(&self, source_id: SourceId) {
         self.stream_metrics.write().unwrap().remove(&source_id);
     }
-    
+
     /// Update stream with new frame
     pub fn update_stream(&self, source_id: SourceId) {
         let mut metrics = self.stream_metrics.write().unwrap();
@@ -174,7 +174,7 @@ impl MetricsCollector {
             m.update_fps();
         }
     }
-    
+
     /// Record detection results
     pub fn record_detection(&self, source_id: SourceId, count: usize, latency_ms: f32) {
         let mut metrics = self.stream_metrics.write().unwrap();
@@ -182,15 +182,16 @@ impl MetricsCollector {
             m.detections_count += count as u64;
             m.detection_latency_ms = latency_ms;
         }
-        
+
         // Add to time series
         let mut series = self.time_series.lock().unwrap();
         let key = format!("detection_count_{}", source_id);
-        series.entry(key)
+        series
+            .entry(key)
             .or_insert_with(|| TimeSeries::new(1000))
             .add_point(count as f32);
     }
-    
+
     /// Record dropped frame
     pub fn record_dropped_frame(&self, source_id: SourceId) {
         let mut metrics = self.stream_metrics.write().unwrap();
@@ -198,7 +199,7 @@ impl MetricsCollector {
             m.frames_dropped += 1;
         }
     }
-    
+
     /// Record stream error
     pub fn record_error(&self, source_id: SourceId) {
         let mut metrics = self.stream_metrics.write().unwrap();
@@ -206,7 +207,7 @@ impl MetricsCollector {
             m.error_count += 1;
         }
     }
-    
+
     /// Record stream recovery
     pub fn record_recovery(&self, source_id: SourceId) {
         let mut metrics = self.stream_metrics.write().unwrap();
@@ -214,38 +215,47 @@ impl MetricsCollector {
             m.recovery_count += 1;
         }
     }
-    
+
     /// Get metrics for a specific stream
     pub fn get_stream_metrics(&self, source_id: SourceId) -> Option<StreamMetrics> {
         self.stream_metrics.read().unwrap().get(&source_id).cloned()
     }
-    
+
     /// Get all stream metrics
     pub fn get_all_metrics(&self) -> Vec<StreamMetrics> {
-        self.stream_metrics.read().unwrap().values().cloned().collect()
+        self.stream_metrics
+            .read()
+            .unwrap()
+            .values()
+            .cloned()
+            .collect()
     }
-    
+
     /// Get aggregated statistics
     pub fn get_aggregate_stats(&self) -> AggregateStats {
         let metrics = self.stream_metrics.read().unwrap();
-        
+
         let total_frames: u64 = metrics.values().map(|m| m.frames_processed).sum();
         let total_dropped: u64 = metrics.values().map(|m| m.frames_dropped).sum();
         let total_detections: u64 = metrics.values().map(|m| m.detections_count).sum();
         let total_errors: u32 = metrics.values().map(|m| m.error_count).sum();
-        
+
         let avg_fps = if !metrics.is_empty() {
             metrics.values().map(|m| m.average_fps).sum::<f32>() / metrics.len() as f32
         } else {
             0.0
         };
-        
+
         let avg_latency = if !metrics.is_empty() {
-            metrics.values().map(|m| m.detection_latency_ms).sum::<f32>() / metrics.len() as f32
+            metrics
+                .values()
+                .map(|m| m.detection_latency_ms)
+                .sum::<f32>()
+                / metrics.len() as f32
         } else {
             0.0
         };
-        
+
         AggregateStats {
             active_streams: metrics.len(),
             total_frames_processed: total_frames,
@@ -261,13 +271,13 @@ impl MetricsCollector {
             },
         }
     }
-    
+
     /// Export current metrics to file
     pub fn export_metrics(&self) -> std::io::Result<()> {
         if let Some(file) = &self.export_file {
             let stats = self.get_aggregate_stats();
             let mut file = file.lock().unwrap();
-            
+
             writeln!(file, "Timestamp: {:?}", Instant::now())?;
             writeln!(file, "Active Streams: {}", stats.active_streams)?;
             writeln!(file, "Total Frames: {}", stats.total_frames_processed)?;
@@ -275,24 +285,24 @@ impl MetricsCollector {
             writeln!(file, "Average Latency: {:.2}ms", stats.average_latency_ms)?;
             writeln!(file, "Drop Rate: {:.2}%", stats.drop_rate * 100.0)?;
             writeln!(file, "---")?;
-            
+
             file.flush()?;
         }
         Ok(())
     }
-    
+
     /// Generate performance report
     pub fn generate_report(&self, window: Duration) -> PerformanceReport {
         let stats = self.get_aggregate_stats();
         let series = self.time_series.lock().unwrap();
-        
+
         // Calculate percentiles and trends from time series
         let fps_series = series.get("fps_aggregate");
         let latency_series = series.get("latency_aggregate");
-        
+
         // Clone stats for recommendations
         let stats_clone = stats.clone();
-        
+
         PerformanceReport {
             timestamp: Instant::now(),
             window,
@@ -302,27 +312,34 @@ impl MetricsCollector {
             recommendations: self.generate_recommendations(&stats_clone),
         }
     }
-    
+
     /// Generate optimization recommendations
     fn generate_recommendations(&self, stats: &AggregateStats) -> Vec<String> {
         let mut recommendations = Vec::new();
-        
+
         if stats.drop_rate > 0.1 {
-            recommendations.push("High frame drop rate detected. Consider reducing stream quality or count.".to_string());
+            recommendations.push(
+                "High frame drop rate detected. Consider reducing stream quality or count."
+                    .to_string(),
+            );
         }
-        
+
         if stats.average_fps < 15.0 && stats.active_streams > 0 {
             recommendations.push("Low average FPS. System may be overloaded.".to_string());
         }
-        
+
         if stats.average_latency_ms > 100.0 {
-            recommendations.push("High detection latency. Consider optimizing detector configuration.".to_string());
+            recommendations.push(
+                "High detection latency. Consider optimizing detector configuration.".to_string(),
+            );
         }
-        
+
         if stats.total_errors > 10 {
-            recommendations.push("Multiple errors detected. Check stream connectivity and resources.".to_string());
+            recommendations.push(
+                "Multiple errors detected. Check stream connectivity and resources.".to_string(),
+            );
         }
-        
+
         recommendations
     }
 }

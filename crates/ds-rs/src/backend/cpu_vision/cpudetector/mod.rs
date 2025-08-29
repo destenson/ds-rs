@@ -1,7 +1,7 @@
-use gstreamer::glib;
 use gstreamer as gst;
-use gstreamer_base as gst_base;
+use gstreamer::glib;
 use gstreamer::prelude::*;
+use gstreamer_base as gst_base;
 
 mod imp;
 

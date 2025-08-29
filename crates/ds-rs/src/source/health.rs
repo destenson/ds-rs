@@ -1,10 +1,10 @@
+use super::SourceId;
+use crate::error::Result;
+use gst::prelude::*;
+use gstreamer as gst;
+use std::collections::VecDeque;
 use std::sync::{Arc, Mutex};
 use std::time::{Duration, Instant};
-use std::collections::VecDeque;
-use gstreamer as gst;
-use gst::prelude::*;
-use crate::error::Result;
-use super::SourceId;
 
 /// Health status of a source
 #[derive(Debug, Clone, PartialEq)]
@@ -89,19 +89,19 @@ impl Default for HealthConfig {
 pub trait HealthMonitor: Send + Sync {
     /// Perform a health check
     fn check_health(&self) -> HealthStatus;
-    
+
     /// Get current health metrics
     fn get_metrics(&self) -> HealthMetrics;
-    
+
     /// Update metrics with new frame data
     fn update_frame_metrics(&self, timestamp: Instant);
-    
+
     /// Report a buffer underrun
     fn report_underrun(&self);
-    
+
     /// Report network latency
     fn report_latency(&self, latency_ms: f64);
-    
+
     /// Reset health metrics
     fn reset_metrics(&self);
 }
@@ -122,7 +122,7 @@ impl FrameRateCalculator {
 
     fn add_frame(&mut self, timestamp: Instant) {
         self.timestamps.push_back(timestamp);
-        
+
         // Remove old timestamps outside the window
         let cutoff = timestamp - self.window_size;
         while let Some(front) = self.timestamps.front() {
@@ -175,24 +175,24 @@ impl SourceHealthMonitor {
     pub fn install_probe(&self, pad: &gst::Pad) -> Result<()> {
         let metrics = self.metrics.clone();
         let calculator = self.frame_calculator.clone();
-        
+
         pad.add_probe(gst::PadProbeType::BUFFER, move |_, _| {
             let now = Instant::now();
-            
+
             // Update frame metrics
             let mut calc = calculator.lock().unwrap();
             calc.add_frame(now);
             let frame_rate = calc.get_rate();
             drop(calc);
-            
+
             let mut m = metrics.lock().unwrap();
             m.total_frames += 1;
             m.last_frame_time = Some(now);
             m.frame_rate = frame_rate;
-            
+
             gst::PadProbeReturn::Ok
         });
-        
+
         Ok(())
     }
 }
@@ -202,11 +202,11 @@ impl HealthMonitor for SourceHealthMonitor {
         let metrics = self.metrics.lock().unwrap();
         let mut failures = self.consecutive_failures.lock().unwrap();
         let mut last_check = self.last_check.lock().unwrap();
-        
+
         let now = Instant::now();
         let time_since_check = now - *last_check;
         *last_check = now;
-        
+
         // Check frame rate
         if metrics.avg_frame_rate < self.config.min_frame_rate && metrics.total_frames > 10 {
             *failures += 1;
@@ -220,7 +220,7 @@ impl HealthMonitor for SourceHealthMonitor {
                 };
             }
         }
-        
+
         // Check buffer underruns
         if metrics.buffer_underruns > self.config.max_buffer_underruns {
             *failures += 1;
@@ -228,7 +228,7 @@ impl HealthMonitor for SourceHealthMonitor {
                 reason: format!("Too many buffer underruns: {}", metrics.buffer_underruns),
             };
         }
-        
+
         // Check network latency
         if let Some(latency) = metrics.network_latency_ms {
             if latency > self.config.max_network_latency_ms {
@@ -238,7 +238,7 @@ impl HealthMonitor for SourceHealthMonitor {
                 };
             }
         }
-        
+
         // Check if we're receiving frames
         if let Some(last_frame) = metrics.last_frame_time {
             let time_since_frame = now - last_frame;
@@ -249,7 +249,7 @@ impl HealthMonitor for SourceHealthMonitor {
                 };
             }
         }
-        
+
         // Reset consecutive failures on healthy check
         *failures = 0;
         HealthStatus::Healthy
@@ -258,7 +258,7 @@ impl HealthMonitor for SourceHealthMonitor {
     fn get_metrics(&self) -> HealthMetrics {
         let metrics = self.metrics.lock().unwrap();
         let calculator = self.frame_calculator.lock().unwrap();
-        
+
         HealthMetrics {
             frame_rate: metrics.frame_rate,
             avg_frame_rate: calculator.get_rate(),
@@ -274,7 +274,7 @@ impl HealthMonitor for SourceHealthMonitor {
     fn update_frame_metrics(&self, timestamp: Instant) {
         let mut calculator = self.frame_calculator.lock().unwrap();
         calculator.add_frame(timestamp);
-        
+
         let mut metrics = self.metrics.lock().unwrap();
         metrics.total_frames += 1;
         metrics.last_frame_time = Some(timestamp);
@@ -294,10 +294,10 @@ impl HealthMonitor for SourceHealthMonitor {
     fn reset_metrics(&self) {
         let mut metrics = self.metrics.lock().unwrap();
         *metrics = HealthMetrics::default();
-        
+
         let mut calculator = self.frame_calculator.lock().unwrap();
         calculator.timestamps.clear();
-        
+
         let mut failures = self.consecutive_failures.lock().unwrap();
         *failures = 0;
     }
@@ -322,7 +322,7 @@ impl HealthAggregator {
 
     pub fn get_overall_health(&self) -> HealthStatus {
         let monitors = self.monitors.lock().unwrap();
-        
+
         if monitors.is_empty() {
             return HealthStatus::Unknown;
         }
@@ -366,14 +366,14 @@ mod tests {
     #[test]
     fn test_frame_rate_calculation() {
         let mut calc = FrameRateCalculator::new(Duration::from_secs(1));
-        
+
         // Add frames at 30 fps
         let start = Instant::now();
         for i in 0..30 {
             let timestamp = start + Duration::from_millis(i * 33); // ~30fps
             calc.add_frame(timestamp);
         }
-        
+
         let rate = calc.get_rate();
         assert!(rate > 28.0 && rate < 32.0, "Expected ~30 fps, got {}", rate);
     }
@@ -385,19 +385,19 @@ mod tests {
             failure_threshold: 2,
             ..Default::default()
         };
-        
+
         let monitor = SourceHealthMonitor::new(SourceId(0), config);
-        
+
         // Initially unknown/healthy
         let status = monitor.check_health();
         assert!(matches!(status, HealthStatus::Healthy));
-        
+
         // Simulate low frame rate
         let mut metrics = monitor.metrics.lock().unwrap();
         metrics.avg_frame_rate = 10.0;
         metrics.total_frames = 100;
         drop(metrics);
-        
+
         // First check should be degraded
         let status = monitor.check_health();
         assert!(matches!(status, HealthStatus::Degraded { .. }));
@@ -409,14 +409,14 @@ mod tests {
             max_buffer_underruns: 3,
             ..Default::default()
         };
-        
+
         let monitor = SourceHealthMonitor::new(SourceId(0), config);
-        
+
         // Report underruns
         for _ in 0..4 {
             monitor.report_underrun();
         }
-        
+
         let status = monitor.check_health();
         assert!(matches!(status, HealthStatus::Unhealthy { .. }));
     }
@@ -424,15 +424,15 @@ mod tests {
     #[test]
     fn test_metrics_reset() {
         let monitor = SourceHealthMonitor::new(SourceId(0), HealthConfig::default());
-        
+
         // Add some metrics
         monitor.update_frame_metrics(Instant::now());
         monitor.report_underrun();
         monitor.report_latency(100.0);
-        
+
         // Reset
         monitor.reset_metrics();
-        
+
         let metrics = monitor.get_metrics();
         assert_eq!(metrics.total_frames, 0);
         assert_eq!(metrics.buffer_underruns, 0);

@@ -1,7 +1,7 @@
 use axum::{
+    Json,
     http::StatusCode,
     response::{IntoResponse, Response},
-    Json,
 };
 use serde_json::json;
 use std::fmt;
@@ -24,31 +24,31 @@ impl ApiError {
     pub fn bad_request(msg: impl Into<String>) -> Self {
         Self::BadRequest(msg.into())
     }
-    
+
     pub fn unauthorized(msg: impl Into<String>) -> Self {
         Self::Unauthorized(msg.into())
     }
-    
+
     pub fn forbidden(msg: impl Into<String>) -> Self {
         Self::Forbidden(msg.into())
     }
-    
+
     pub fn not_found(msg: impl Into<String>) -> Self {
         Self::NotFound(msg.into())
     }
-    
+
     pub fn conflict(msg: impl Into<String>) -> Self {
         Self::Conflict(msg.into())
     }
-    
+
     pub fn internal(msg: impl Into<String>) -> Self {
         Self::InternalError(msg.into())
     }
-    
+
     pub fn service_unavailable(msg: impl Into<String>) -> Self {
         Self::ServiceUnavailable(msg.into())
     }
-    
+
     pub fn validation(msg: impl Into<String>) -> Self {
         Self::ValidationError(msg.into())
     }
@@ -80,10 +80,14 @@ impl IntoResponse for ApiError {
             Self::NotFound(msg) => (StatusCode::NOT_FOUND, "not_found", msg),
             Self::Conflict(msg) => (StatusCode::CONFLICT, "conflict", msg),
             Self::InternalError(msg) => (StatusCode::INTERNAL_SERVER_ERROR, "internal_error", msg),
-            Self::ServiceUnavailable(msg) => (StatusCode::SERVICE_UNAVAILABLE, "service_unavailable", msg),
-            Self::ValidationError(msg) => (StatusCode::UNPROCESSABLE_ENTITY, "validation_error", msg),
+            Self::ServiceUnavailable(msg) => {
+                (StatusCode::SERVICE_UNAVAILABLE, "service_unavailable", msg)
+            }
+            Self::ValidationError(msg) => {
+                (StatusCode::UNPROCESSABLE_ENTITY, "validation_error", msg)
+            }
         };
-        
+
         let body = Json(json!({
             "error": {
                 "type": error_type,
@@ -91,7 +95,7 @@ impl IntoResponse for ApiError {
                 "status": status.as_u16(),
             }
         }));
-        
+
         (status, body).into_response()
     }
 }
@@ -99,7 +103,7 @@ impl IntoResponse for ApiError {
 impl From<crate::SourceVideoError> for ApiError {
     fn from(err: crate::SourceVideoError) -> Self {
         use crate::SourceVideoError;
-        
+
         match err {
             SourceVideoError::Configuration(_) => Self::BadRequest(err.to_string()),
             SourceVideoError::SourceNotFound(_) => Self::NotFound(err.to_string()),

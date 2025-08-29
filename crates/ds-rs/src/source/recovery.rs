@@ -1,6 +1,6 @@
-use std::time::Duration;
+use rand::{Rng, thread_rng};
 use std::sync::{Arc, Mutex};
-use rand::{thread_rng, Rng};
+use std::time::Duration;
 
 /// Configuration for recovery behavior
 #[derive(Debug, Clone)]
@@ -52,14 +52,9 @@ pub enum RecoveryState {
         next_retry: std::time::Instant,
     },
     /// Recovery failed after all attempts
-    Failed {
-        attempts: usize,
-        last_error: String,
-    },
+    Failed { attempts: usize, last_error: String },
     /// Successfully recovered
-    Recovered {
-        attempts: usize,
-    },
+    Recovered { attempts: usize },
 }
 
 /// Tracks recovery statistics
@@ -95,23 +90,23 @@ impl RecoveryManager {
         // Calculate exponential backoff
         let base_backoff = self.config.initial_backoff.as_secs_f64()
             * self.config.backoff_multiplier.powi(attempt as i32);
-        
+
         // Cap at maximum backoff
         let capped_backoff = base_backoff.min(self.config.max_backoff.as_secs_f64());
-        
+
         // Apply jitter
         let mut rng = thread_rng();
         let jitter_range = capped_backoff * self.config.jitter_factor;
         let jitter = rng.gen_range(-jitter_range..=jitter_range);
         let final_backoff = (capped_backoff + jitter).max(0.0);
-        
+
         Duration::from_secs_f64(final_backoff)
     }
 
     /// Start a recovery attempt
     pub fn start_recovery(&self) -> Option<Duration> {
         let mut state = self.state.lock().unwrap();
-        
+
         match &*state {
             RecoveryState::Failed { attempts, .. } if *attempts >= self.config.max_retries => {
                 // Already exceeded max retries
@@ -127,7 +122,7 @@ impl RecoveryManager {
                     RecoveryState::Failed { attempts, .. } => *attempts,
                     _ => 0,
                 };
-                
+
                 if attempt >= self.config.max_retries {
                     *state = RecoveryState::Failed {
                         attempts: attempt,
@@ -137,16 +132,16 @@ impl RecoveryManager {
                 } else {
                     let backoff = self.calculate_backoff(attempt);
                     let next_retry = std::time::Instant::now() + backoff;
-                    
+
                     *state = RecoveryState::Retrying {
                         attempt,
                         next_retry,
                     };
-                    
+
                     // Update stats
                     let mut stats = self.stats.lock().unwrap();
                     stats.total_attempts += 1;
-                    
+
                     Some(backoff)
                 }
             }
@@ -160,9 +155,9 @@ impl RecoveryManager {
             RecoveryState::Retrying { attempt, .. } => *attempt + 1,
             _ => 1,
         };
-        
+
         *state = RecoveryState::Recovered { attempts };
-        
+
         // Update stats
         let mut stats = self.stats.lock().unwrap();
         stats.successful_recoveries += 1;
@@ -181,12 +176,12 @@ impl RecoveryManager {
             RecoveryState::Failed { attempts, .. } => *attempts,
             _ => 1,
         };
-        
+
         *state = RecoveryState::Failed {
             attempts,
             last_error: error,
         };
-        
+
         // Update stats
         let mut stats = self.stats.lock().unwrap();
         stats.failed_recoveries += 1;
@@ -223,9 +218,10 @@ impl RecoveryManager {
         let state = self.state.lock().unwrap();
         match &*state {
             RecoveryState::Failed { attempts, .. } => *attempts < self.config.max_retries,
-            RecoveryState::Retrying { attempt, next_retry } => {
-                *attempt < self.config.max_retries && std::time::Instant::now() >= *next_retry
-            }
+            RecoveryState::Retrying {
+                attempt,
+                next_retry,
+            } => *attempt < self.config.max_retries && std::time::Instant::now() >= *next_retry,
             _ => true,
         }
     }
@@ -244,9 +240,9 @@ mod tests {
             jitter_factor: 0.0, // No jitter for predictable testing
             ..Default::default()
         };
-        
+
         let manager = RecoveryManager::new(config);
-        
+
         // Test exponential growth
         assert_eq!(manager.calculate_backoff(0), Duration::from_secs(1));
         assert_eq!(manager.calculate_backoff(1), Duration::from_secs(2));
@@ -263,17 +259,17 @@ mod tests {
             jitter_factor: 0.3,
             ..Default::default()
         };
-        
+
         let manager = RecoveryManager::new(config);
-        
+
         // Test that jitter produces different values
         let backoff1 = manager.calculate_backoff(0);
         let backoff2 = manager.calculate_backoff(0);
-        
+
         // With jitter, values should be within expected range
         let min_expected = Duration::from_secs_f64(7.0); // 10 - 30%
         let max_expected = Duration::from_secs_f64(13.0); // 10 + 30%
-        
+
         assert!(backoff1 >= min_expected && backoff1 <= max_expected);
         assert!(backoff2 >= min_expected && backoff2 <= max_expected);
     }
@@ -281,19 +277,25 @@ mod tests {
     #[test]
     fn test_recovery_state_transitions() {
         let manager = RecoveryManager::new(RecoveryConfig::default());
-        
+
         // Initial state should be Idle
         assert_eq!(manager.get_state(), RecoveryState::Idle);
-        
+
         // Start recovery
         let backoff = manager.start_recovery();
         assert!(backoff.is_some());
-        assert!(matches!(manager.get_state(), RecoveryState::Retrying { .. }));
-        
+        assert!(matches!(
+            manager.get_state(),
+            RecoveryState::Retrying { .. }
+        ));
+
         // Mark as recovered
         manager.mark_recovered();
-        assert!(matches!(manager.get_state(), RecoveryState::Recovered { .. }));
-        
+        assert!(matches!(
+            manager.get_state(),
+            RecoveryState::Recovered { .. }
+        ));
+
         // Reset and mark as failed
         manager.reset();
         manager.mark_failed("Test error".to_string());
@@ -306,17 +308,17 @@ mod tests {
             max_retries: 2,
             ..Default::default()
         };
-        
+
         let manager = RecoveryManager::new(config);
-        
+
         // First retry
         assert!(manager.start_recovery().is_some());
         manager.mark_failed("Error 1".to_string());
-        
+
         // Second retry (last allowed)
         assert!(manager.start_recovery().is_some());
         manager.mark_failed("Error 2".to_string());
-        
+
         // Third retry should fail (exceeded max)
         assert!(manager.start_recovery().is_none());
         assert!(!manager.should_retry());
@@ -325,15 +327,15 @@ mod tests {
     #[test]
     fn test_recovery_statistics() {
         let manager = RecoveryManager::new(RecoveryConfig::default());
-        
+
         // Successful recovery
         manager.start_recovery();
         manager.mark_recovered();
-        
+
         // Failed recovery
         manager.start_recovery();
         manager.mark_failed("Test failure".to_string());
-        
+
         let stats = manager.get_stats();
         assert_eq!(stats.total_attempts, 2);
         assert_eq!(stats.successful_recoveries, 1);

@@ -14,12 +14,12 @@ pub struct StandardBackend {
 impl StandardBackend {
     fn create_capabilities() -> BackendCapabilities {
         BackendCapabilities {
-            supports_inference: true,   // CPU-based inference via ONNX
-            supports_tracking: true,    // Centroid tracking
-            supports_osd: true,         // Can do basic overlays
-            supports_batching: false,   // Limited batching via compositor
+            supports_inference: true,        // CPU-based inference via ONNX
+            supports_tracking: true,         // Centroid tracking
+            supports_osd: true,              // Can do basic overlays
+            supports_batching: false,        // Limited batching via compositor
             supports_hardware_decode: false, // Software decode only
-            max_batch_size: 4,          // Limited by compositor
+            max_batch_size: 4,               // Limited by compositor
             available_elements: vec![
                 "compositor".to_string(),
                 "queue".to_string(),
@@ -34,17 +34,19 @@ impl StandardBackend {
             ],
         }
     }
-    
+
     fn create_element(element_type: &str, name: Option<&str>) -> Result<gst::Element> {
         let mut builder = gst::ElementFactory::make(element_type);
-        
+
         if let Some(n) = name {
             builder = builder.name(n);
         }
-        
-        builder.build().map_err(|_| DeepStreamError::ElementCreation {
-            element: element_type.to_string(),
-        })
+
+        builder
+            .build()
+            .map_err(|_| DeepStreamError::ElementCreation {
+                element: element_type.to_string(),
+            })
     }
 }
 
@@ -52,77 +54,78 @@ impl Backend for StandardBackend {
     fn backend_type(&self) -> BackendType {
         BackendType::Standard
     }
-    
+
     fn capabilities(&self) -> &BackendCapabilities {
         &self.capabilities
     }
-    
+
     fn is_available() -> bool {
-        super::detector::check_element_availability("compositor") &&
-        super::detector::check_element_availability("videoconvert")
+        super::detector::check_element_availability("compositor")
+            && super::detector::check_element_availability("videoconvert")
     }
-    
+
     fn new(platform: &PlatformInfo) -> Result<Box<dyn Backend>> {
         if !Self::is_available() {
             return Err(DeepStreamError::BackendNotAvailable {
                 backend: "Standard".to_string(),
             });
         }
-        
+
         Ok(Box::new(Self {
             capabilities: Self::create_capabilities(),
             platform: platform.clone(),
         }))
     }
-    
+
     fn create_stream_mux(&self, name: Option<&str>) -> Result<gst::Element> {
         // Use compositor as a batching replacement for nvstreammux
         let compositor = Self::create_element("compositor", name)?;
-        
+
         // Set up compositor for immediate playback
         compositor.set_property_from_str("background", "black");
         compositor.set_property_from_str("start-time-selection", "zero");
         compositor.set_property("ignore-inactive-pads", true);
-        
+
         log::info!("Standard backend: Using compositor for tiling");
-        
+
         Ok(compositor)
     }
-    
+
     fn create_inference(&self, name: Option<&str>, config_path: &str) -> Result<gst::Element> {
         // Create the CPU detector element
         let detector = super::cpu_vision::cpudetector::CpuDetector::new(name);
-        
+
         // Try to find an ONNX model - prefer float32 models
         let model_candidates = [
             config_path,
             "models/yolov5n.onnx",
             "crates/ds-rs/models/yolov5n.onnx",
-            "yolov5n.onnx",  // In current directory (after Python export)
+            "yolov5n.onnx", // In current directory (after Python export)
         ];
-        
-        let model_path = model_candidates.iter()
+
+        let model_path = model_candidates
+            .iter()
             .find(|path| std::path::Path::new(path).exists())
             .copied();
-            
+
         match model_path {
             Some(path) => {
                 log::info!("Standard backend: Setting ONNX model path: {}", path);
                 detector.set_property("model-path", path);
                 log::info!("Standard backend: Created CPU detector with ONNX model");
-            },
+            }
             None => {
                 log::info!("Standard backend: No ONNX model found, using mock detector");
                 log::info!("  To use real ONNX inference:");
-                log::info!("  1. Run: python export_yolov5n_float32.py");  
+                log::info!("  1. Run: python export_yolov5n_float32.py");
                 log::info!("  2. Or place yolov5n.onnx in models/ directory");
                 // Element will use mock detector automatically when model file doesn't exist
             }
         }
-        
+
         Ok(detector.upcast())
     }
-    
+
     fn create_tracker(&self, name: Option<&str>) -> Result<gst::Element> {
         // Try to create CPU tracker
         match super::cpu_vision::elements::create_cpu_tracker(name) {
@@ -131,26 +134,29 @@ impl Backend for StandardBackend {
                 Ok(tracker)
             }
             Err(e) => {
-                log::warn!("Failed to create CPU tracker: {}, falling back to identity", e);
-                
+                log::warn!(
+                    "Failed to create CPU tracker: {}, falling back to identity",
+                    e
+                );
+
                 // Fallback to identity if CPU tracker fails
                 let identity = Self::create_element("identity", name)?;
                 Ok(identity)
             }
         }
     }
-    
+
     fn create_tiler(&self, name: Option<&str>) -> Result<gst::Element> {
         // For Standard backend, tiler is just an identity element
         // The actual tiling is done by the compositor used as streammux
         let identity = Self::create_element("identity", name)?;
         identity.set_property("sync", false);
-        
+
         log::info!("Standard backend: Using identity for tiler (tiling handled by compositor mux)");
-        
+
         Ok(identity)
     }
-    
+
     fn create_osd(&self, name: Option<&str>) -> Result<gst::Element> {
         // Try to create CPU OSD for bounding box rendering
         match super::cpu_vision::elements::create_cpu_osd(name, None) {
@@ -159,39 +165,40 @@ impl Backend for StandardBackend {
                 Ok(osd)
             }
             Err(e) => {
-                log::warn!("Failed to create CPU OSD: {}, falling back to text overlay", e);
-                
+                log::warn!(
+                    "Failed to create CPU OSD: {}, falling back to text overlay",
+                    e
+                );
+
                 // Fallback to simple text overlay
-                let bin = gst::Bin::builder()
-                    .name(name.unwrap_or("osd-bin"))
-                    .build();
-                
+                let bin = gst::Bin::builder().name(name.unwrap_or("osd-bin")).build();
+
                 let convert = Self::create_element("videoconvert", Some("osd-convert"))?;
                 let overlay = Self::create_element("textoverlay", Some("osd-overlay"))?;
-                
+
                 overlay.set_property("text", "Standard Backend - CPU Vision");
                 overlay.set_property_from_str("valignment", "top");
                 overlay.set_property_from_str("halignment", "left");
                 overlay.set_property("font-desc", "Sans, 12");
-                
+
                 bin.add_many([&convert, &overlay])?;
                 convert.link(&overlay)?;
-                
+
                 let sink_pad = convert.static_pad("sink").unwrap();
                 let src_pad = overlay.static_pad("src").unwrap();
-                
+
                 bin.add_pad(&gst::GhostPad::with_target(&sink_pad)?)?;
                 bin.add_pad(&gst::GhostPad::with_target(&src_pad)?)?;
-                
+
                 Ok(bin.upcast())
             }
         }
     }
-    
+
     fn create_video_convert(&self, name: Option<&str>) -> Result<gst::Element> {
         Self::create_element("videoconvert", name)
     }
-    
+
     fn create_video_sink(&self, name: Option<&str>) -> Result<gst::Element> {
         // Try different sinks in order of preference
         let sink = gst::ElementFactory::make("autovideosink")
@@ -215,12 +222,12 @@ impl Backend for StandardBackend {
             .map_err(|_| DeepStreamError::ElementCreation {
                 element: "video sink".to_string(),
             })?;
-        
+
         sink.set_property("sync", false);
-        
+
         Ok(sink)
     }
-    
+
     fn create_decoder(&self, name: Option<&str>) -> Result<gst::Element> {
         // Use software decoder
         let decoder = gst::ElementFactory::make("decodebin")
@@ -234,18 +241,22 @@ impl Backend for StandardBackend {
             .map_err(|_| DeepStreamError::ElementCreation {
                 element: "decoder".to_string(),
             })?;
-        
+
         Ok(decoder)
     }
-    
-    fn configure_element(&self, element: &gst::Element, config: &HashMap<String, String>) -> Result<()> {
+
+    fn configure_element(
+        &self,
+        element: &gst::Element,
+        config: &HashMap<String, String>,
+    ) -> Result<()> {
         for (key, value) in config {
             // Skip config-file-path as it's already handled during element creation
             // The CPU detector bin doesn't have this property
             if key == "config-file-path" {
                 continue;
             }
-            
+
             // Parse and set properties based on type
             if let Ok(int_val) = value.parse::<i32>() {
                 element.set_property_from_str(key, &int_val.to_string());
@@ -259,7 +270,7 @@ impl Backend for StandardBackend {
         }
         Ok(())
     }
-    
+
     fn get_element_mapping(&self, deepstream_element: &str) -> Option<&str> {
         match deepstream_element {
             "nvstreammux" => Some("compositor"),

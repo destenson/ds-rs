@@ -1,17 +1,17 @@
-use rustyline::{Helper, Editor};
-use rustyline::error::ReadlineError;
+use crate::{Result, SourceVideoError, SourceVideos};
+use colored::Colorize;
+use comfy_table::{Cell, Color, Table, presets};
 use rustyline::completion::{Completer, FilenameCompleter, Pair};
+use rustyline::error::ReadlineError;
+use rustyline::highlight::{CmdKind, Highlighter, MatchingBracketHighlighter};
 use rustyline::hint::{Hinter, HistoryHinter};
-use rustyline::highlight::{Highlighter, MatchingBracketHighlighter, CmdKind};
-use rustyline::validate::{Validator, MatchingBracketValidator};
-use crate::{Result, SourceVideos, SourceVideoError};
+use rustyline::validate::{MatchingBracketValidator, Validator};
+use rustyline::{Editor, Helper};
 use std::borrow::Cow;
 use std::collections::HashMap;
 use std::sync::Arc;
 use std::time::{Duration, Instant};
 use tokio::sync::RwLock;
-use comfy_table::{Table, presets, Cell, Color};
-use colored::Colorize;
 
 pub mod commands;
 pub mod completion;
@@ -132,18 +132,18 @@ pub struct EnhancedRepl {
 
 impl EnhancedRepl {
     pub fn new(source_videos: SourceVideos) -> Result<Self> {
-        let mut editor = Editor::new().map_err(|e| SourceVideoError::config(format!("Failed to create editor: {}", e)))?;
+        let mut editor = Editor::new()
+            .map_err(|e| SourceVideoError::config(format!("Failed to create editor: {}", e)))?;
         editor.set_helper(Some(ReplHelper::new()));
-        
+
         // Load history file if it exists
-        let history_file = dirs::config_dir()
-            .map(|mut path| {
-                path.push("source-videos");
-                std::fs::create_dir_all(&path).ok();
-                path.push("repl_history");
-                path
-            });
-        
+        let history_file = dirs::config_dir().map(|mut path| {
+            path.push("source-videos");
+            std::fs::create_dir_all(&path).ok();
+            path.push("repl_history");
+            path
+        });
+
         if let Some(ref history_path) = history_file {
             let _ = editor.load_history(history_path);
         }
@@ -151,7 +151,7 @@ impl EnhancedRepl {
         let context = ReplContext::new(source_videos);
         let output = ReplOutput::new();
         let mut commands: HashMap<String, Box<dyn ReplCommand>> = HashMap::new();
-        
+
         // Register all commands
         commands::register_commands(&mut commands);
 
@@ -165,7 +165,7 @@ impl EnhancedRepl {
 
     pub async fn run(&mut self) -> Result<()> {
         self.output.print_welcome(&self.context);
-        
+
         loop {
             let prompt = self.get_prompt();
             let readline = self.editor.readline(&prompt);
@@ -195,16 +195,19 @@ impl EnhancedRepl {
                     break;
                 }
                 Err(err) => {
-                    self.output.print_error(&format!("Error reading line: {}", err));
+                    self.output
+                        .print_error(&format!("Error reading line: {}", err));
                     break;
                 }
             }
         }
 
         // Save history
-        if let Some(history_path) = dirs::config_dir()
-            .map(|mut path| { path.push("source-videos"); path.push("repl_history"); path }) 
-        {
+        if let Some(history_path) = dirs::config_dir().map(|mut path| {
+            path.push("source-videos");
+            path.push("repl_history");
+            path
+        }) {
             let _ = self.editor.save_history(&history_path);
         }
 
@@ -249,8 +252,10 @@ impl EnhancedRepl {
             }
             "verbose" => {
                 self.context.verbose = !self.context.verbose;
-                self.output.print_success(&format!("Verbose mode: {}", 
-                    if self.context.verbose { "ON" } else { "OFF" }));
+                self.output.print_success(&format!(
+                    "Verbose mode: {}",
+                    if self.context.verbose { "ON" } else { "OFF" }
+                ));
                 return Ok(CommandResult::Continue);
             }
             _ => {}
@@ -260,7 +265,10 @@ impl EnhancedRepl {
         if let Some(command) = self.commands.get(command_name) {
             command.execute(args, &mut self.context, &self.output).await
         } else {
-            self.output.print_error(&format!("Unknown command: '{}'. Type 'help' for available commands.", command_name));
+            self.output.print_error(&format!(
+                "Unknown command: '{}'. Type 'help' for available commands.",
+                command_name
+            ));
             self.suggest_similar_command(command_name);
             Ok(CommandResult::Continue)
         }
@@ -268,14 +276,12 @@ impl EnhancedRepl {
 
     fn show_history(&self) {
         let mut table = Table::new();
-        table.load_preset(presets::UTF8_FULL)
+        table
+            .load_preset(presets::UTF8_FULL)
             .set_header(vec!["#", "Command"]);
 
         for (i, cmd) in self.context.command_history.iter().enumerate() {
-            table.add_row(vec![
-                Cell::new(i + 1),
-                Cell::new(cmd),
-            ]);
+            table.add_row(vec![Cell::new(i + 1), Cell::new(cmd)]);
         }
 
         self.output.print_table(table);
@@ -283,7 +289,7 @@ impl EnhancedRepl {
 
     fn suggest_similar_command(&self, input: &str) {
         let mut suggestions = Vec::new();
-        
+
         for cmd_name in self.commands.keys() {
             if cmd_name.starts_with(input) {
                 suggestions.push(cmd_name.clone());
@@ -300,7 +306,8 @@ impl EnhancedRepl {
         }
 
         if !suggestions.is_empty() {
-            self.output.print_info(&format!("Did you mean: {}", suggestions.join(", ")));
+            self.output
+                .print_info(&format!("Did you mean: {}", suggestions.join(", ")));
         }
     }
 
@@ -310,20 +317,32 @@ impl EnhancedRepl {
         let a_len = a_chars.len();
         let b_len = b_chars.len();
 
-        if a_len == 0 { return b_len; }
-        if b_len == 0 { return a_len; }
+        if a_len == 0 {
+            return b_len;
+        }
+        if b_len == 0 {
+            return a_len;
+        }
 
         let mut matrix = vec![vec![0; b_len + 1]; a_len + 1];
 
-        for i in 0..=a_len { matrix[i][0] = i; }
-        for j in 0..=b_len { matrix[0][j] = j; }
+        for i in 0..=a_len {
+            matrix[i][0] = i;
+        }
+        for j in 0..=b_len {
+            matrix[0][j] = j;
+        }
 
         for i in 1..=a_len {
             for j in 1..=b_len {
-                let cost = if a_chars[i-1] == b_chars[j-1] { 0 } else { 1 };
-                matrix[i][j] = (matrix[i-1][j] + 1)
-                    .min(matrix[i][j-1] + 1)
-                    .min(matrix[i-1][j-1] + cost);
+                let cost = if a_chars[i - 1] == b_chars[j - 1] {
+                    0
+                } else {
+                    1
+                };
+                matrix[i][j] = (matrix[i - 1][j] + 1)
+                    .min(matrix[i][j - 1] + 1)
+                    .min(matrix[i - 1][j - 1] + cost);
             }
         }
 

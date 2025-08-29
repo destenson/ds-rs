@@ -1,64 +1,79 @@
-
-pub mod error;
-pub mod platform;
-pub mod backend;
-pub mod elements;
-pub mod config;
-pub mod pipeline;
-pub mod source;
 pub mod app;
-pub mod metadata;
+pub mod backend;
+pub mod config;
+pub mod elements;
+pub mod error;
 pub mod inference;
-pub mod tracking;
 pub mod messages;
-pub mod rendering;
+pub mod metadata;
 pub mod multistream;
+pub mod pipeline;
+pub mod platform;
+pub mod rendering;
+pub mod source;
+pub mod tracking;
 
 #[cfg(target_os = "windows")]
 pub mod dll_validator;
 
-pub use error::{DeepStreamError, Result, ErrorClassifier, ErrorClassification, is_retryable};
-pub use platform::{Platform, PlatformInfo};
-pub use backend::{Backend, BackendType, BackendCapabilities, BackendManager};
-pub use elements::{DeepStreamElement, DeepStreamElementType, ElementBuilder};
-pub use elements::factory::ElementFactory;
+pub use backend::{Backend, BackendCapabilities, BackendManager, BackendType};
 pub use config::ApplicationConfig;
-pub use pipeline::{Pipeline, PipelineBuilder, PipelineState, StateManager, BusWatcher, MessageHandler};
-pub use source::{
-    SourceId, SourceState, SourceInfo, SourceManager, VideoSource,
-    SourceAddition, SourceRemoval, SourceEvent, SourceEventHandler,
-    SourceSynchronizer, SourceController, FaultTolerantSourceController,
-    // Recovery and fault tolerance exports
-    RecoveryConfig, RecoveryManager, RecoveryState, RecoveryStats,
-    HealthConfig, HealthMonitor, HealthStatus, SourceHealthMonitor,
-    CircuitBreaker, CircuitBreakerConfig, CircuitBreakerManager, CircuitState,
-    ErrorBoundary, IsolatedSource, IsolationManager, IsolationPolicy
-};
-pub use metadata::{
-    MetadataExtractor, MetadataError, MetadataStats,
-    BatchMeta, FrameMeta, ObjectMeta, BoundingBox, ClassificationMeta
-};
+pub use elements::factory::ElementFactory;
+pub use elements::{DeepStreamElement, DeepStreamElementType, ElementBuilder};
+pub use error::{DeepStreamError, ErrorClassification, ErrorClassifier, Result, is_retryable};
 pub use inference::{
-    InferenceProcessor, DetectionResult, ClassificationResult, LabelMap,
-    InferenceConfig, ModelConfig
+    ClassificationResult, DetectionResult, InferenceConfig, InferenceProcessor, LabelMap,
+    ModelConfig,
 };
-pub use tracking::{
-    ObjectTracker, TrackStatus, TrackerState, Trajectory, TrackingStats
-};
-pub use messages::{
-    DSMessageHandler, DSMessageType, StreamEosTracker
-};
-pub use rendering::{
-    BoundingBoxRenderer, RenderingConfig, RendererFactory, MetadataBridge,
-    PerformanceMetrics
+pub use messages::{DSMessageHandler, DSMessageType, StreamEosTracker};
+pub use metadata::{
+    BatchMeta, BoundingBox, ClassificationMeta, FrameMeta, MetadataError, MetadataExtractor,
+    MetadataStats, ObjectMeta,
 };
 pub use multistream::{
-    MultiStreamManager, PipelinePool, DetectionPipeline,
-    StreamCoordinator, StreamPriority,
-    ResourceManager, ResourceLimits,
-    MultiStreamConfig, MultiStreamConfigBuilder, StreamMetrics, MetricsCollector,
-    MultiStreamStats, MultiStreamEvent
+    DetectionPipeline, MetricsCollector, MultiStreamConfig, MultiStreamConfigBuilder,
+    MultiStreamEvent, MultiStreamManager, MultiStreamStats, PipelinePool, ResourceLimits,
+    ResourceManager, StreamCoordinator, StreamMetrics, StreamPriority,
 };
+pub use pipeline::{
+    BusWatcher, MessageHandler, Pipeline, PipelineBuilder, PipelineState, StateManager,
+};
+pub use platform::{Platform, PlatformInfo};
+pub use rendering::{
+    BoundingBoxRenderer, MetadataBridge, PerformanceMetrics, RendererFactory, RenderingConfig,
+};
+pub use source::{
+    CircuitBreaker,
+    CircuitBreakerConfig,
+    CircuitBreakerManager,
+    CircuitState,
+    ErrorBoundary,
+    FaultTolerantSourceController,
+    HealthConfig,
+    HealthMonitor,
+    HealthStatus,
+    IsolatedSource,
+    IsolationManager,
+    IsolationPolicy,
+    // Recovery and fault tolerance exports
+    RecoveryConfig,
+    RecoveryManager,
+    RecoveryState,
+    RecoveryStats,
+    SourceAddition,
+    SourceController,
+    SourceEvent,
+    SourceEventHandler,
+    SourceHealthMonitor,
+    SourceId,
+    SourceInfo,
+    SourceManager,
+    SourceRemoval,
+    SourceState,
+    SourceSynchronizer,
+    VideoSource,
+};
+pub use tracking::{ObjectTracker, TrackStatus, TrackerState, TrackingStats, Trajectory};
 
 /// Get current timestamp in seconds since Unix epoch
 /// Used for consistent timestamp formatting in log messages
@@ -72,11 +87,11 @@ pub fn timestamp() -> f64 {
 
 pub fn init() -> Result<()> {
     gstreamer::init().map_err(|e| DeepStreamError::GStreamer(e.into()))?;
-    
+
     // Initialize logging if not already done
     let _ = log::set_logger(&SimpleLogger);
     log::set_max_level(log::LevelFilter::Info);
-    
+
     Ok(())
 }
 
@@ -104,14 +119,14 @@ mod tests {
     fn test_init() {
         assert!(init().is_ok());
     }
-    
+
     #[test]
     fn test_platform_detection() {
         let _ = init();
         let platform = PlatformInfo::detect();
         assert!(platform.is_ok());
     }
-    
+
     #[test]
     fn test_backend_manager_creation() {
         let _ = init();

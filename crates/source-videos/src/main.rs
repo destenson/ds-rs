@@ -1,24 +1,23 @@
 #![allow(unused)]
 
-use std::path::PathBuf;
-use std::time::Duration;
-use std::sync::Arc;
-use std::io;
 use std::fs;
+use std::io;
+use std::path::PathBuf;
 use std::process;
+use std::sync::Arc;
+use std::time::Duration;
 
 use chrono::{DateTime, Utc};
 use clap::{Parser, Subcommand, ValueEnum};
-use clap_complete::{generate, Shell};
+use clap_complete::{Shell, generate};
 use gstreamer::glib::prelude::*;
 use regex::Regex;
-use tokio::sync::RwLock;
 use tokio::signal;
+use tokio::sync::RwLock;
 
 use source_videos::{
-    AppConfig, SourceVideos, TestPattern, VideoSourceConfig,
-    generate_test_file, create_test_rtsp_server, Result, SourceVideoError,
-    api::ControlApi, EnhancedRepl
+    AppConfig, EnhancedRepl, Result, SourceVideoError, SourceVideos, TestPattern,
+    VideoSourceConfig, api::ControlApi, create_test_rtsp_server, generate_test_file,
 };
 
 #[derive(Parser)]
@@ -56,10 +55,10 @@ EXAMPLES:
 struct Cli {
     #[command(subcommand)]
     command: Commands,
-    
+
     #[arg(short, long, global = true, action = clap::ArgAction::Count)]
     verbose: u8,
-    
+
     #[arg(short, long, global = true)]
     config: Option<PathBuf>,
 }
@@ -90,105 +89,153 @@ enum Commands {
     Serve {
         #[arg(short, long, default_value_t = 8554)]
         port: u16,
-        
+
         #[arg(long, help = "Enable REST API server")]
         api: bool,
-        
+
         #[arg(long, default_value_t = 3000, help = "API server port")]
         api_port: u16,
-        
+
         #[arg(long, default_value = "0.0.0.0", help = "API server bind address")]
         api_address: String,
-        
+
         #[arg(short, long, default_value = "0.0.0.0")]
         address: String,
-        
+
         #[arg(long)]
         duration: Option<u64>,
-        
+
         #[arg(long, value_delimiter = ',')]
         patterns: Vec<String>,
-        
-        #[arg(short = 'd', long = "directory", help = "Directory containing video files to serve")]
+
+        #[arg(
+            short = 'd',
+            long = "directory",
+            help = "Directory containing video files to serve"
+        )]
         directory: Option<PathBuf>,
-        
+
         #[arg(short = 'r', long = "recursive", help = "Recursively scan directories")]
         recursive: bool,
-        
-        #[arg(short = 'f', long = "files", value_delimiter = ',', help = "Explicit list of video files to serve")]
+
+        #[arg(
+            short = 'f',
+            long = "files",
+            value_delimiter = ',',
+            help = "Explicit list of video files to serve"
+        )]
         files: Vec<PathBuf>,
-        
-        #[arg(long = "include", value_delimiter = ',', help = "Include file patterns (e.g., *.mp4,test_*)")]
+
+        #[arg(
+            long = "include",
+            value_delimiter = ',',
+            help = "Include file patterns (e.g., *.mp4,test_*)"
+        )]
         include: Vec<String>,
-        
-        #[arg(long = "exclude", value_delimiter = ',', help = "Exclude file patterns (e.g., *.tmp,backup_*)")]
+
+        #[arg(
+            long = "exclude",
+            value_delimiter = ',',
+            help = "Exclude file patterns (e.g., *.tmp,backup_*)"
+        )]
         exclude: Vec<String>,
-        
+
         #[arg(long = "mount-prefix", help = "Prefix for RTSP mount points")]
         mount_prefix: Option<String>,
-        
+
         #[arg(long = "lazy", help = "Enable lazy loading of sources")]
         lazy_loading: bool,
-        
-        #[arg(short = 'w', long = "watch", help = "Enable file system watching for dynamic source updates")]
+
+        #[arg(
+            short = 'w',
+            long = "watch",
+            help = "Enable file system watching for dynamic source updates"
+        )]
         watch: bool,
-        
-        #[arg(short = 'l', long = "auto-repeat", help = "Enable auto-repeat/looping for video playback")]
+
+        #[arg(
+            short = 'l',
+            long = "auto-repeat",
+            help = "Enable auto-repeat/looping for video playback"
+        )]
         auto_repeat: bool,
-        
-        #[arg(long = "reload-on-change", help = "Reload video files when they are modified")]
+
+        #[arg(
+            long = "reload-on-change",
+            help = "Reload video files when they are modified"
+        )]
         reload_on_change: bool,
-        
-        #[arg(long = "watch-interval", default_value_t = 500, help = "File watching debounce interval in milliseconds")]
+
+        #[arg(
+            long = "watch-interval",
+            default_value_t = 500,
+            help = "File watching debounce interval in milliseconds"
+        )]
         watch_interval_ms: u64,
-        
-        #[arg(long = "max-loops", help = "Maximum number of loops for auto-repeat (default: infinite)")]
+
+        #[arg(
+            long = "max-loops",
+            help = "Maximum number of loops for auto-repeat (default: infinite)"
+        )]
         max_loops: Option<u32>,
-        
+
         #[arg(long = "seamless-loop", help = "Enable seamless looping without gaps")]
         seamless_loop: bool,
-        
+
         // Network simulation options
-        #[arg(long = "network-profile", help = "Apply network profile (perfect, 3g, 4g, 5g, wifi, public, satellite, broadband, poor)")]
+        #[arg(
+            long = "network-profile",
+            help = "Apply network profile (perfect, 3g, 4g, 5g, wifi, public, satellite, broadband, poor)"
+        )]
         network_profile: Option<String>,
-        
-        #[arg(long = "network-scenario", help = "Apply dynamic network scenario (degrading, flaky, congestion, intermittent-satellite, noisy-radio, drone-urban, drone-mountain)")]
+
+        #[arg(
+            long = "network-scenario",
+            help = "Apply dynamic network scenario (degrading, flaky, congestion, intermittent-satellite, noisy-radio, drone-urban, drone-mountain)"
+        )]
         network_scenario: Option<String>,
-        
+
         #[arg(long = "packet-loss", help = "Packet loss percentage (0-100)")]
         packet_loss: Option<f32>,
-        
+
         #[arg(long = "latency", help = "Additional latency in milliseconds")]
         latency_ms: Option<u32>,
-        
+
         #[arg(long = "bandwidth", help = "Bandwidth limit in kbps (0 = unlimited)")]
         bandwidth_kbps: Option<u32>,
-        
+
         #[arg(long = "jitter", help = "Jitter in milliseconds")]
         jitter_ms: Option<u32>,
-        
-        #[arg(long = "network-drop", help = "Simulate periodic connection drops (format: period_seconds,duration_seconds)")]
+
+        #[arg(
+            long = "network-drop",
+            help = "Simulate periodic connection drops (format: period_seconds,duration_seconds)"
+        )]
         network_drop: Option<String>,
-        
-        #[arg(long = "per-source-network", help = "Per-source network conditions (format: source_name:profile)", value_delimiter = ',')]
+
+        #[arg(
+            long = "per-source-network",
+            help = "Per-source network conditions (format: source_name:profile)",
+            value_delimiter = ','
+        )]
         per_source_network: Vec<String>,
     },
     Generate {
         #[arg(short, long, default_value = "smpte")]
         pattern: String,
-        
+
         #[arg(short, long, default_value_t = 10)]
         duration: u64,
-        
+
         #[arg(short, long)]
         output: PathBuf,
-        
+
         #[arg(long, default_value_t = 1920)]
         width: u32,
-        
+
         #[arg(long, default_value_t = 1080)]
         height: u32,
-        
+
         #[arg(long, default_value_t = 30)]
         fps: i32,
     },
@@ -198,163 +245,182 @@ enum Commands {
         #[arg(short, long, default_value_t = 8554)]
         port: u16,
     },
-    
+
     /// Serve files or directories as separate RTSP streams
     ServeFiles {
         #[arg(short, long, default_value_t = 8554)]
         port: u16,
-        
-        #[arg(short = 'd', long = "directory", help = "Directory containing video files")]
+
+        #[arg(
+            short = 'd',
+            long = "directory",
+            help = "Directory containing video files"
+        )]
         directory: Option<PathBuf>,
-        
-        #[arg(short = 'f', long = "files", value_delimiter = ',', help = "Explicit list of video files")]
+
+        #[arg(
+            short = 'f',
+            long = "files",
+            value_delimiter = ',',
+            help = "Explicit list of video files"
+        )]
         files: Vec<PathBuf>,
-        
+
         #[arg(short = 'r', long = "recursive")]
         recursive: bool,
-        
+
         #[arg(long = "include", value_delimiter = ',')]
         include: Vec<String>,
-        
+
         #[arg(long = "exclude", value_delimiter = ',')]
         exclude: Vec<String>,
-        
+
         #[arg(long = "format", help = "Filter by video format (mp4, mkv, avi, webm)")]
         format: Option<String>,
-        
+
         #[arg(long = "min-duration", help = "Minimum duration in seconds")]
         min_duration: Option<u64>,
-        
+
         #[arg(long = "max-duration", help = "Maximum duration in seconds")]
         max_duration: Option<u64>,
-        
-        #[arg(long = "modified-since", help = "Filter files modified since date (YYYY-MM-DD)")]
+
+        #[arg(
+            long = "modified-since",
+            help = "Filter files modified since date (YYYY-MM-DD)"
+        )]
         modified_since: Option<String>,
-        
+
         #[arg(short = 'w', long = "watch")]
         watch: bool,
-        
+
         #[arg(long = "daemon", short = 'D')]
         daemon: bool,
-        
+
         #[arg(long = "pid-file")]
         pid_file: Option<PathBuf>,
-        
+
         #[arg(long = "max-streams")]
         max_streams: Option<u32>,
-        
+
         #[arg(long = "control-socket", help = "Unix socket path for runtime control")]
         control_socket: Option<PathBuf>,
-        
-        #[arg(long = "signal-handlers", help = "Enable signal handlers for graceful shutdown")]
+
+        #[arg(
+            long = "signal-handlers",
+            help = "Enable signal handlers for graceful shutdown"
+        )]
         signal_handlers: bool,
-        
+
         #[arg(short = 'v', long = "verbose", action = clap::ArgAction::Count)]
         verbose: u8,
-        
+
         #[arg(short = 'q', long = "quiet")]
         quiet: bool,
-        
+
         #[arg(long = "status-interval", help = "Status update interval in seconds")]
         status_interval: Option<u64>,
-        
+
         #[arg(long = "metrics")]
         metrics: bool,
-        
+
         #[arg(long = "output-format", value_enum, default_value = "text")]
         output_format: OutputFormat,
-        
+
         #[arg(long = "dry-run")]
         dry_run: bool,
     },
-    
+
     /// Serve directory as playlist with sequential playback
     Playlist {
         #[arg(short, long, default_value_t = 8554)]
         port: u16,
-        
+
         #[arg(short = 'd', long = "directory", help = "Directory for playlist")]
         directory: PathBuf,
-        
+
         #[arg(short = 'r', long = "recursive")]
         recursive: bool,
-        
+
         #[arg(long = "playlist-mode", value_enum, default_value = "sequential")]
         playlist_mode: PlaylistMode,
-        
+
         #[arg(long = "playlist-repeat", value_enum, default_value = "none")]
         playlist_repeat: PlaylistRepeat,
-        
+
         #[arg(long = "playlist-file", help = "Load playlist from m3u/pls file")]
         playlist_file: Option<PathBuf>,
-        
+
         #[arg(long = "transition-duration", help = "Transition gap in seconds")]
         transition_duration: Option<f32>,
-        
+
         #[arg(long = "crossfade")]
         crossfade: bool,
-        
+
         #[arg(long = "include", value_delimiter = ',')]
         include: Vec<String>,
-        
+
         #[arg(long = "exclude", value_delimiter = ',')]
         exclude: Vec<String>,
-        
+
         #[arg(short = 'v', long = "verbose", action = clap::ArgAction::Count)]
         verbose: u8,
-        
+
         #[arg(long = "daemon", short = 'D')]
         daemon: bool,
     },
-    
+
     /// Monitor directory with real-time statistics
     Monitor {
         #[arg(short = 'd', long = "directory", help = "Directory to monitor")]
         directory: PathBuf,
-        
+
         #[arg(short = 'r', long = "recursive")]
         recursive: bool,
-        
-        #[arg(long = "watch-interval", default_value_t = 1000, help = "Watch interval in ms")]
+
+        #[arg(
+            long = "watch-interval",
+            default_value_t = 1000,
+            help = "Watch interval in ms"
+        )]
         watch_interval: u64,
-        
+
         #[arg(long = "list-streams")]
         list_streams: bool,
-        
+
         #[arg(long = "metrics")]
         metrics: bool,
-        
+
         #[arg(long = "output-format", value_enum, default_value = "text")]
         output_format: OutputFormat,
     },
-    
+
     /// Test network simulation with various profiles
     Simulate {
         #[arg(short, long, default_value_t = 8554)]
         port: u16,
-        
+
         #[arg(long = "network-profile", help = "Network profile to test")]
         network_profile: String,
-        
+
         #[arg(short = 'd', long = "directory")]
         directory: Option<PathBuf>,
-        
+
         #[arg(long = "patterns", value_delimiter = ',')]
         patterns: Vec<String>,
-        
+
         #[arg(long = "duration", help = "Test duration in seconds")]
         duration: Option<u64>,
-        
+
         #[arg(long = "metrics")]
         metrics: bool,
     },
-    
+
     /// Generate shell completions
     Completions {
         #[arg(value_enum)]
         shell: Shell,
     },
-    
+
     /// Show comprehensive help with examples and configuration
     HelpAll,
 }
@@ -362,31 +428,31 @@ enum Commands {
 #[tokio::main]
 async fn main() -> Result<()> {
     let cli = Cli::parse();
-    
+
     let level = match cli.verbose {
         0 => "warn",
-        1 => "info", 
+        1 => "info",
         2 => "debug",
         _ => "trace",
     };
     env_logger::Builder::from_env(env_logger::Env::default().default_filter_or(level)).init();
-    
+
     source_videos::init()?;
-    
+
     let config = if let Some(config_path) = &cli.config {
         AppConfig::from_file(config_path)?
     } else {
         AppConfig::default()
     };
-    
+
     match cli.command {
-        Commands::Serve { 
+        Commands::Serve {
             port,
             api,
             api_port,
             api_address,
-            address, 
-            duration, 
+            address,
+            duration,
             patterns,
             directory,
             recursive,
@@ -415,8 +481,8 @@ async fn main() -> Result<()> {
                 api,
                 api_port,
                 api_address,
-                address, 
-                duration, 
+                address,
+                duration,
                 patterns,
                 directory,
                 recursive,
@@ -439,68 +505,138 @@ async fn main() -> Result<()> {
                 jitter_ms,
                 network_drop,
                 per_source_network,
-            ).await
+            )
+            .await
         }
-        Commands::Generate { pattern, duration, output, width, height, fps } => {
-            generate_command(pattern, duration, output, width, height, fps).await
-        }
-        Commands::List => {
-            list_command().await
-        }
-        Commands::Interactive => {
-            enhanced_interactive_command().await
-        }
-        Commands::Test { port } => {
-            test_command(port).await
-        }
+        Commands::Generate {
+            pattern,
+            duration,
+            output,
+            width,
+            height,
+            fps,
+        } => generate_command(pattern, duration, output, width, height, fps).await,
+        Commands::List => list_command().await,
+        Commands::Interactive => enhanced_interactive_command().await,
+        Commands::Test { port } => test_command(port).await,
         Commands::ServeFiles {
-            port, directory, files, recursive, include, exclude,
-            format, min_duration, max_duration, modified_since,
-            watch, daemon, pid_file, max_streams, verbose,
-            quiet, status_interval, metrics, output_format, dry_run,
-            control_socket, signal_handlers
+            port,
+            directory,
+            files,
+            recursive,
+            include,
+            exclude,
+            format,
+            min_duration,
+            max_duration,
+            modified_since,
+            watch,
+            daemon,
+            pid_file,
+            max_streams,
+            verbose,
+            quiet,
+            status_interval,
+            metrics,
+            output_format,
+            dry_run,
+            control_socket,
+            signal_handlers,
         } => {
             serve_files_command(
-                port, directory, files, recursive, include, exclude,
-                format, min_duration, max_duration, modified_since,
-                watch, daemon, pid_file, max_streams, verbose,
-                quiet, status_interval, metrics, output_format, dry_run,
-                control_socket, signal_handlers
-            ).await
+                port,
+                directory,
+                files,
+                recursive,
+                include,
+                exclude,
+                format,
+                min_duration,
+                max_duration,
+                modified_since,
+                watch,
+                daemon,
+                pid_file,
+                max_streams,
+                verbose,
+                quiet,
+                status_interval,
+                metrics,
+                output_format,
+                dry_run,
+                control_socket,
+                signal_handlers,
+            )
+            .await
         }
         Commands::Playlist {
-            port, directory, recursive, playlist_mode, playlist_repeat,
-            playlist_file, transition_duration, crossfade, include,
-            exclude, verbose, daemon
+            port,
+            directory,
+            recursive,
+            playlist_mode,
+            playlist_repeat,
+            playlist_file,
+            transition_duration,
+            crossfade,
+            include,
+            exclude,
+            verbose,
+            daemon,
         } => {
             playlist_command(
-                port, directory, recursive, playlist_mode, playlist_repeat,
-                playlist_file, transition_duration, crossfade, include,
-                exclude, verbose, daemon
-            ).await
+                port,
+                directory,
+                recursive,
+                playlist_mode,
+                playlist_repeat,
+                playlist_file,
+                transition_duration,
+                crossfade,
+                include,
+                exclude,
+                verbose,
+                daemon,
+            )
+            .await
         }
         Commands::Monitor {
-            directory, recursive, watch_interval, list_streams,
-            metrics, output_format
+            directory,
+            recursive,
+            watch_interval,
+            list_streams,
+            metrics,
+            output_format,
         } => {
             monitor_command(
-                directory, recursive, watch_interval, list_streams,
-                metrics, output_format
-            ).await
+                directory,
+                recursive,
+                watch_interval,
+                list_streams,
+                metrics,
+                output_format,
+            )
+            .await
         }
         Commands::Simulate {
-            port, network_profile, directory, patterns, duration, metrics
+            port,
+            network_profile,
+            directory,
+            patterns,
+            duration,
+            metrics,
         } => {
             simulate_command(
-                port, network_profile, directory, patterns, duration, metrics
-            ).await
+                port,
+                network_profile,
+                directory,
+                patterns,
+                duration,
+                metrics,
+            )
+            .await
         }
-        Commands::Completions { shell } => {
-            completions_command(shell).await
-        }
-        Commands::HelpAll => {
-            help_all_command().await
-        }
+        Commands::Completions { shell } => completions_command(shell).await,
+        Commands::HelpAll => help_all_command().await,
     }
 }
 
@@ -509,8 +645,8 @@ async fn serve_command(
     api: bool,
     api_port: u16,
     api_address: String,
-    address: String, 
-    duration: Option<u64>, 
+    address: String,
+    duration: Option<u64>,
     patterns: Vec<String>,
     directory: Option<PathBuf>,
     recursive: bool,
@@ -534,24 +670,38 @@ async fn serve_command(
     network_drop: Option<String>,
     per_source_network: Vec<String>,
 ) -> Result<()> {
-    use source_videos::{DirectoryConfig, FileListConfig, FilterConfig, DirectoryScanner, RtspServerBuilder, WatcherManager, LoopConfig, create_looping_source, VideoSourceManager};
-    use source_videos::network::{NetworkProfile, NetworkConditions, GStreamerNetworkSimulator, NetworkController, NetworkScenario, ScenarioPlayer};
-    use std::time::Duration;
+    use source_videos::network::{
+        GStreamerNetworkSimulator, NetworkConditions, NetworkController, NetworkProfile,
+        NetworkScenario, ScenarioPlayer,
+    };
+    use source_videos::{
+        DirectoryConfig, DirectoryScanner, FileListConfig, FilterConfig, LoopConfig,
+        RtspServerBuilder, VideoSourceManager, WatcherManager, create_looping_source,
+    };
     use std::str::FromStr;
-    
+    use std::time::Duration;
+
     println!("Starting RTSP server on rtsp://localhost:{}", port);
     println!("Starting RTSP server on {}:{}", address, port);
-    
+
     // Parse network simulation settings
     let global_network_profile = if let Some(profile_str) = network_profile {
         match NetworkProfile::from_str(&profile_str) {
             Ok(profile) => {
-                println!("Applying network profile: {} - {}", profile_str, profile.description());
+                println!(
+                    "Applying network profile: {} - {}",
+                    profile_str,
+                    profile.description()
+                );
                 Some(profile)
             }
             Err(e) => {
                 eprintln!("Invalid network profile '{}': {}", profile_str, e);
-                return Err(source_videos::SourceVideoError::config(format!("Invalid network profile: {}", e)).into());
+                return Err(source_videos::SourceVideoError::config(format!(
+                    "Invalid network profile: {}",
+                    e
+                ))
+                .into());
             }
         }
     } else if packet_loss.is_some() || latency_ms.is_some() || bandwidth_kbps.is_some() {
@@ -564,17 +714,28 @@ async fn serve_command(
             connection_dropped: false,
             duplicate_probability: 0.0,
             allow_reordering: true,
-            min_delay_ms: latency_ms.unwrap_or(0).saturating_sub(jitter_ms.unwrap_or(0) / 2),
+            min_delay_ms: latency_ms
+                .unwrap_or(0)
+                .saturating_sub(jitter_ms.unwrap_or(0) / 2),
             max_delay_ms: latency_ms.unwrap_or(0) + jitter_ms.unwrap_or(0),
-            delay_probability: if latency_ms.unwrap_or(0) > 0 { 100.0 } else { 0.0 },
+            delay_probability: if latency_ms.unwrap_or(0) > 0 {
+                100.0
+            } else {
+                0.0
+            },
         };
-        println!("Applying custom network conditions: packet_loss={}%, latency={}ms, bandwidth={}kbps, jitter={}ms",
-                 conditions.packet_loss, conditions.latency_ms, conditions.bandwidth_kbps, conditions.jitter_ms);
+        println!(
+            "Applying custom network conditions: packet_loss={}%, latency={}ms, bandwidth={}kbps, jitter={}ms",
+            conditions.packet_loss,
+            conditions.latency_ms,
+            conditions.bandwidth_kbps,
+            conditions.jitter_ms
+        );
         Some(NetworkProfile::Custom)
     } else {
         None
     };
-    
+
     // Parse per-source network conditions
     let mut per_source_profiles = std::collections::HashMap::new();
     for spec in per_source_network {
@@ -583,42 +744,57 @@ async fn serve_command(
             match NetworkProfile::from_str(parts[1]) {
                 Ok(profile) => {
                     per_source_profiles.insert(parts[0].to_string(), profile);
-                    println!("Source '{}' will use network profile: {}", parts[0], parts[1]);
+                    println!(
+                        "Source '{}' will use network profile: {}",
+                        parts[0], parts[1]
+                    );
                 }
                 Err(e) => {
                     eprintln!("Invalid network profile for source '{}': {}", parts[0], e);
                 }
             }
         } else {
-            eprintln!("Invalid per-source-network format: '{}' (expected 'source:profile')", spec);
+            eprintln!(
+                "Invalid per-source-network format: '{}' (expected 'source:profile')",
+                spec
+            );
         }
     }
-    
+
     // Parse network drop simulation
     let network_drop_config = if let Some(drop_spec) = network_drop {
         let parts: Vec<&str> = drop_spec.split(',').collect();
         if parts.len() == 2 {
             match (parts[0].parse::<u64>(), parts[1].parse::<u64>()) {
                 (Ok(period), Ok(duration)) => {
-                    println!("Network drops configured: every {}s for {}s", period, duration);
+                    println!(
+                        "Network drops configured: every {}s for {}s",
+                        period, duration
+                    );
                     Some((Duration::from_secs(period), Duration::from_secs(duration)))
                 }
                 _ => {
-                    eprintln!("Invalid network-drop format: '{}' (expected 'period_seconds,duration_seconds')", drop_spec);
+                    eprintln!(
+                        "Invalid network-drop format: '{}' (expected 'period_seconds,duration_seconds')",
+                        drop_spec
+                    );
                     None
                 }
             }
         } else {
-            eprintln!("Invalid network-drop format: '{}' (expected 'period_seconds,duration_seconds')", drop_spec);
+            eprintln!(
+                "Invalid network-drop format: '{}' (expected 'period_seconds,duration_seconds')",
+                drop_spec
+            );
             None
         }
     } else {
         None
     };
-    
+
     // Build server with initial patterns
     let mut server_builder = RtspServerBuilder::new().port(port);
-    
+
     // Apply global network profile if set
     if let Some(profile) = global_network_profile {
         server_builder = server_builder.network_profile(profile);
@@ -628,26 +804,30 @@ async fn serve_command(
             packet_loss.unwrap_or(0.0),
             latency_ms.unwrap_or(0),
             bandwidth_kbps.unwrap_or(0),
-            jitter_ms.unwrap_or(0)
+            jitter_ms.unwrap_or(0),
         );
     }
-    
+
     // Add test patterns if specified
     if !patterns.is_empty() {
         for (i, pattern) in patterns.iter().enumerate() {
             let name = format!("pattern-{}", i + 1);
-            
+
             // Check for per-source network profile
             if let Some(profile) = per_source_profiles.get(&name) {
-                server_builder = server_builder.add_test_pattern_with_network(&name, pattern, *profile);
+                server_builder =
+                    server_builder.add_test_pattern_with_network(&name, pattern, *profile);
             } else {
                 server_builder = server_builder.add_test_pattern(&name, pattern);
             }
-            
-            println!("Will add pattern '{}' at rtsp://{}:{}/{}", pattern, address, port, name);
+
+            println!(
+                "Will add pattern '{}' at rtsp://{}:{}/{}",
+                pattern, address, port, name
+            );
         }
     }
-    
+
     // Scan directory for video files if specified
     if let Some(ref dir_path) = directory {
         let filters = if !include.is_empty() || !exclude.is_empty() {
@@ -659,7 +839,7 @@ async fn serve_command(
         } else {
             None
         };
-        
+
         let dir_config = DirectoryConfig {
             path: dir_path.display().to_string(),
             recursive,
@@ -667,36 +847,41 @@ async fn serve_command(
             lazy_loading,
             mount_prefix: mount_prefix.clone(),
         };
-        
-        println!("Scanning directory: {} (recursive: {})", dir_path.display(), recursive);
+
+        println!(
+            "Scanning directory: {} (recursive: {})",
+            dir_path.display(),
+            recursive
+        );
         let mut scanner = DirectoryScanner::new(dir_config);
         let source_configs = scanner.scan()?;
-        
+
         println!("Found {} video files in directory", source_configs.len());
-        
+
         for config in source_configs {
             server_builder = server_builder.add_source(config);
         }
     }
-    
+
     // Add explicit file list if specified
     if !files.is_empty() {
         use source_videos::file_utils::detect_container_format;
-        
+
         println!("Adding {} files from list", files.len());
-        
+
         for (index, file_path) in files.iter().enumerate() {
             let container = detect_container_format(file_path)
                 .unwrap_or(source_videos::config_types::FileContainer::Mp4);
-            
+
             let name = format!(
                 "file_{}_{}",
                 index,
-                file_path.file_stem()
+                file_path
+                    .file_stem()
                     .and_then(|s| s.to_str())
                     .unwrap_or("video")
             );
-            
+
             let config = VideoSourceConfig {
                 name: name.clone(),
                 source_type: source_videos::VideoSourceType::File {
@@ -716,51 +901,59 @@ async fn serve_command(
                 num_buffers: None,
                 is_live: false,
             };
-            
+
             server_builder = server_builder.add_source(config);
             println!("Added file: {}", file_path.display());
         }
     }
-    
+
     // Build and start the server
     let mut server = server_builder.build()?;
-    
+
     // Create shared state for API if enabled
     let rtsp_server_arc = Arc::new(RwLock::new(server));
     let source_manager_arc = Arc::new(VideoSourceManager::new());
-    
+
     // Set up file watching if enabled
     let watcher_manager_arc = if watch && directory.is_some() {
         println!("Setting up file system watching...");
         let mut manager = WatcherManager::new();
-        
+
         if let Some(ref dir_path) = directory {
             let watcher_id = manager.add_directory_watcher(dir_path, recursive).await?;
-            println!("Started watching directory: {} (ID: {})", dir_path.display(), watcher_id);
+            println!(
+                "Started watching directory: {} (ID: {})",
+                dir_path.display(),
+                watcher_id
+            );
         }
-        
+
         Arc::new(RwLock::new(manager))
     } else {
         Arc::new(RwLock::new(WatcherManager::new()))
     };
-    
+
     // Start API server if enabled
     let api_handle = if api {
-        let api_bind_address: std::net::SocketAddr = format!("{}:{}", api_address, api_port).parse()
+        let api_bind_address: std::net::SocketAddr = format!("{}:{}", api_address, api_port)
+            .parse()
             .map_err(|e| SourceVideoError::config(format!("Invalid API address: {}", e)))?;
-        
+
         let api_server = ControlApi::new(
             Some(rtsp_server_arc.clone()),
             source_manager_arc.clone(),
             watcher_manager_arc.clone(),
         )?;
-        
+
         println!("Starting API server on http://{}:{}", api_address, api_port);
-        println!("API documentation available at http://{}:{}/api/docs", api_address, api_port);
-        
+        println!(
+            "API documentation available at http://{}:{}/api/docs",
+            api_address, api_port
+        );
+
         let mut api_server = api_server;
         api_server.set_bind_address(api_bind_address);
-        
+
         Some(tokio::spawn(async move {
             if let Err(e) = api_server.bind_and_serve().await {
                 eprintln!("API server error: {}", e);
@@ -769,31 +962,37 @@ async fn serve_command(
     } else {
         None
     };
-    
+
     let mut watcher_manager = if watch && directory.is_some() {
         Some(watcher_manager_arc.clone())
     } else {
         None
     };
-    
+
     // Print auto-repeat configuration
     if auto_repeat {
-        println!("Auto-repeat enabled: max_loops={:?}, seamless={}", max_loops, seamless_loop);
+        println!(
+            "Auto-repeat enabled: max_loops={:?}, seamless={}",
+            max_loops, seamless_loop
+        );
     }
-    
+
     if reload_on_change {
-        println!("Hot-reload enabled with {}ms debounce interval", watch_interval_ms);
+        println!(
+            "Hot-reload enabled with {}ms debounce interval",
+            watch_interval_ms
+        );
     }
-    
+
     {
         let mut server = rtsp_server_arc.write().await;
         server.start()?;
-        
+
         for mount in server.list_sources() {
             println!("Stream available at: {}", server.get_url(&mount));
         }
     }
-    
+
     // Set up network scenario player if configured
     let mut scenario_player = if let Some(scenario_name) = network_scenario {
         let scenario = match scenario_name.to_lowercase().as_str() {
@@ -805,20 +1004,26 @@ async fn serve_command(
             "drone-urban" | "drone" | "urban" => NetworkScenario::drone_urban_flight(),
             "drone-mountain" | "mountain" => NetworkScenario::drone_mountain_flight(),
             _ => {
-                eprintln!("Unknown network scenario '{}', using degrading", scenario_name);
+                eprintln!(
+                    "Unknown network scenario '{}', using degrading",
+                    scenario_name
+                );
                 NetworkScenario::degrading()
             }
         };
-        
-        println!("Starting network scenario: {} - {}", scenario.name, scenario.description);
+
+        println!(
+            "Starting network scenario: {} - {}",
+            scenario.name, scenario.description
+        );
         println!("Scenario duration: {:?}", scenario.duration);
-        
+
         let network_sim = Box::new(GStreamerNetworkSimulator::new()) as Box<dyn NetworkController>;
         Some(ScenarioPlayer::new(scenario, network_sim))
     } else {
         None
     };
-    
+
     // Set up periodic network drops if configured
     let mut network_simulator = if let Some((period, duration)) = network_drop_config {
         let sim = GStreamerNetworkSimulator::new();
@@ -826,34 +1031,41 @@ async fn serve_command(
     } else {
         None
     };
-    
+
     // Get the default main context for manual iteration
     let main_context = gstreamer::glib::MainContext::default();
-    
+
     if let Some(duration) = duration {
         println!("Server will run for {} seconds", duration);
         let end_time = std::time::Instant::now() + Duration::from_secs(duration);
-        
+
         while std::time::Instant::now() < end_time {
             // Iterate the GLib main context
             main_context.iteration(false);
-            
+
             // Update network scenario if active
             if let Some(ref player) = scenario_player {
                 player.update();
                 if player.is_complete() {
-                    println!("Network scenario completed ({}% progress)", player.progress());
+                    println!(
+                        "Network scenario completed ({}% progress)",
+                        player.progress()
+                    );
                 }
             }
-            
+
             // Handle periodic network drops
-            if let Some((ref mut sim, period, drop_duration, ref mut last_drop)) = network_simulator {
+            if let Some((ref mut sim, period, drop_duration, ref mut last_drop)) = network_simulator
+            {
                 let now = std::time::Instant::now();
                 if now.duration_since(*last_drop) >= period {
-                    println!("Simulating network drop for {}s...", drop_duration.as_secs());
+                    println!(
+                        "Simulating network drop for {}s...",
+                        drop_duration.as_secs()
+                    );
                     sim.drop_connection();
                     *last_drop = now;
-                    
+
                     // Schedule restoration
                     let sim_clone = sim.simulator().clone();
                     let duration_clone = drop_duration;
@@ -864,13 +1076,13 @@ async fn serve_command(
                     });
                 }
             }
-            
+
             // Small sleep to prevent busy waiting
             tokio::time::sleep(Duration::from_millis(10)).await;
         }
     } else {
         println!("Press Ctrl+C to stop the server");
-        
+
         tokio::select! {
             _ = signal::ctrl_c() => {
                 println!("Received Ctrl+C, stopping...");
@@ -878,13 +1090,13 @@ async fn serve_command(
             _ = async {
                 loop {
                     main_context.iteration(false);
-                    
+
                     // Check for file system events if watching is enabled
                     if let Some(ref manager_arc) = watcher_manager {
                         let mut manager = manager_arc.write().await;
                         if let Some(event) = manager.recv().await {
                             println!("File system event: {:?} - {}", event.event_type(), event.path().display());
-                            
+
                             // Handle the event through the RTSP server directly
                             let mut server = rtsp_server_arc.write().await;
                             if let Err(e) = server.handle_file_event(&event) {
@@ -892,7 +1104,7 @@ async fn serve_command(
                             }
                         }
                     }
-                    
+
                     // Update network scenario if active
                     if let Some(ref player) = scenario_player {
                         player.update();
@@ -900,7 +1112,7 @@ async fn serve_command(
                             println!("Network scenario completed ({}% progress)", player.progress());
                         }
                     }
-                    
+
                     // Handle periodic network drops
                     if let Some((ref mut sim, period, drop_duration, ref mut last_drop)) = network_simulator {
                         let now = std::time::Instant::now();
@@ -908,7 +1120,7 @@ async fn serve_command(
                             println!("Simulating network drop for {}s...", drop_duration.as_secs());
                             sim.drop_connection();
                             *last_drop = now;
-                            
+
                             // Schedule restoration
                             let sim_clone = sim.simulator().clone();
                             let duration_clone = drop_duration;
@@ -919,13 +1131,13 @@ async fn serve_command(
                             });
                         }
                     }
-                    
+
                     tokio::time::sleep(Duration::from_millis(10)).await;
                 }
             } => {}
         }
     }
-    
+
     println!("Server stopped");
     Ok(())
 }
@@ -943,53 +1155,60 @@ async fn generate_command(
     println!("Duration: {} seconds", duration);
     println!("Resolution: {}x{}", width, height);
     println!("Framerate: {} fps", fps);
-    
+
     let start = std::time::Instant::now();
-    
+
     generate_test_file(&pattern, duration, &output)?;
-    
+
     let elapsed = start.elapsed();
-    println!("Generated successfully in {:.2} seconds", elapsed.as_secs_f64());
-    
+    println!(
+        "Generated successfully in {:.2} seconds",
+        elapsed.as_secs_f64()
+    );
+
     Ok(())
 }
 
 async fn list_command() -> Result<()> {
     println!("Available test patterns:");
-    
+
     for pattern in TestPattern::all() {
-        println!("  {:<20} - {}", format!("{:?}", pattern), pattern.description());
+        println!(
+            "  {:<20} - {}",
+            format!("{:?}", pattern),
+            pattern.description()
+        );
     }
-    
+
     println!("\nAnimated patterns:");
     for pattern in TestPattern::animated_patterns() {
         println!("  {:?}", pattern);
     }
-    
+
     Ok(())
 }
 
 async fn interactive_command() -> Result<()> {
     println!("Source Videos Interactive Mode");
     println!("==============================");
-    
+
     let mut sv = SourceVideos::new()?;
     let mut line = String::new();
-    
+
     loop {
         print!("> ");
         std::io::Write::flush(&mut std::io::stdout()).unwrap();
-        
+
         line.clear();
         if std::io::stdin().read_line(&mut line).is_err() {
             break;
         }
-        
+
         let parts: Vec<&str> = line.trim().split_whitespace().collect();
         if parts.is_empty() {
             continue;
         }
-        
+
         match parts[0] {
             "add" => {
                 if parts.len() >= 3 {
@@ -1058,37 +1277,37 @@ async fn interactive_command() -> Result<()> {
             _ => println!("Unknown command. Type 'help' for available commands."),
         }
     }
-    
+
     Ok(())
 }
 
 async fn test_command(port: u16) -> Result<()> {
     println!("Running comprehensive test suite...");
-    
+
     let mut sv = SourceVideos::new()?;
-    
+
     println!("1. Adding test patterns...");
     sv.add_test_pattern("smpte", "smpte")?;
     sv.add_test_pattern("ball", "ball")?;
     sv.add_test_pattern("snow", "snow")?;
-    
+
     println!("2. Starting RTSP server...");
     sv.start_rtsp_server(port)?;
-    
+
     println!("3. Listing sources...");
     let sources = sv.list_sources();
     for info in &sources {
         println!("   {} - {}", info.name, info.uri);
     }
-    
+
     println!("4. RTSP URLs:");
     for url in sv.get_rtsp_urls() {
         println!("   {}", url);
     }
-    
+
     println!("\nTest completed! Test streams for 10 seconds...");
     tokio::time::sleep(Duration::from_secs(10)).await;
-    
+
     println!("All tests passed!");
     Ok(())
 }
@@ -1120,50 +1339,70 @@ async fn serve_files_command(
     if daemon {
         daemonize(pid_file)?;
     }
-    
+
     // Set up control socket for runtime commands
     if let Some(socket_path) = control_socket {
-        println!("Control socket would be created at: {}", socket_path.display());
+        println!(
+            "Control socket would be created at: {}",
+            socket_path.display()
+        );
         // TODO: Implement Unix socket server for runtime control
     }
-    
+
     // Set up signal handlers
     if signal_handlers {
         println!("Signal handlers enabled for graceful shutdown");
         // Signal handling is already implemented below with tokio::signal::ctrl_c()
     }
-    
+
     // Logging already set up in main
-    
+
     if dry_run {
         return dry_run_preview(directory, files, recursive, include, exclude).await;
     }
-    
+
     // Enhanced serve command with advanced filtering
     let mut filtered_files = Vec::new();
-    
+
     if let Some(dir) = directory {
         filtered_files.extend(scan_directory_with_filters(
-            &dir, recursive, &include, &exclude, format.as_deref(),
-            min_duration, max_duration, modified_since.as_deref()
+            &dir,
+            recursive,
+            &include,
+            &exclude,
+            format.as_deref(),
+            min_duration,
+            max_duration,
+            modified_since.as_deref(),
         )?);
     }
-    
+
     filtered_files.extend(filter_files(
-        files, &include, &exclude, format.as_deref(),
-        min_duration, max_duration, modified_since.as_deref()
+        files,
+        &include,
+        &exclude,
+        format.as_deref(),
+        min_duration,
+        max_duration,
+        modified_since.as_deref(),
     )?);
-    
+
     if let Some(max) = max_streams {
         if filtered_files.len() > max as usize {
             filtered_files.truncate(max as usize);
             println!("Limiting to {} streams", max);
         }
     }
-    
+
     start_enhanced_server(
-        port, filtered_files, watch, status_interval, metrics, output_format
-    ).await
+        port,
+        filtered_files,
+        watch,
+        status_interval,
+        metrics,
+        output_format,
+    )
+    .await
 }
 
 async fn playlist_command(
@@ -1183,17 +1422,17 @@ async fn playlist_command(
     if daemon {
         daemonize(None)?;
     }
-    
+
     // Logging already set up in main
-    
+
     let files = if let Some(pls_file) = playlist_file {
         load_playlist_file(&pls_file)?
     } else {
         scan_directory_with_filters(
-            &directory, recursive, &include, &exclude, None, None, None, None
+            &directory, recursive, &include, &exclude, None, None, None, None,
         )?
     };
-    
+
     let ordered_files = match playlist_mode {
         PlaylistMode::Sequential => files,
         PlaylistMode::Random => {
@@ -1211,10 +1450,15 @@ async fn playlist_command(
             shuffled
         }
     };
-    
+
     start_playlist_server(
-        port, ordered_files, playlist_repeat, transition_duration, crossfade
-    ).await
+        port,
+        ordered_files,
+        playlist_repeat,
+        transition_duration,
+        crossfade,
+    )
+    .await
 }
 
 async fn monitor_command(
@@ -1226,28 +1470,32 @@ async fn monitor_command(
     output_format: OutputFormat,
 ) -> Result<()> {
     use source_videos::WatcherManager;
-    
+
     let mut manager = WatcherManager::new();
     let watcher_id = manager.add_directory_watcher(&directory, recursive).await?;
-    
-    println!("Monitoring directory: {} (recursive: {})", directory.display(), recursive);
+
+    println!(
+        "Monitoring directory: {} (recursive: {})",
+        directory.display(),
+        recursive
+    );
     println!("Watcher ID: {}", watcher_id);
-    
+
     if list_streams {
-        let files = scan_directory_with_filters(
-            &directory, recursive, &[], &[], None, None, None, None
-        )?;
+        let files =
+            scan_directory_with_filters(&directory, recursive, &[], &[], None, None, None, None)?;
         println!("Found {} video files:", files.len());
         for file in &files {
             println!("  {}", file.display());
         }
     }
-    
+
     loop {
         if let Some(event) = manager.recv().await {
             match output_format {
                 OutputFormat::Text => {
-                    println!("[{}] {:?}: {}", 
+                    println!(
+                        "[{}] {:?}: {}",
                         chrono::Utc::now().format("%Y-%m-%d %H:%M:%S"),
                         event.event_type(),
                         event.path().display()
@@ -1262,19 +1510,20 @@ async fn monitor_command(
                     println!("{}", json_event);
                 }
                 OutputFormat::Csv => {
-                    println!("{},{:?},{}", 
+                    println!(
+                        "{},{:?},{}",
                         chrono::Utc::now().to_rfc3339(),
                         event.event_type(),
                         event.path().display()
                     );
                 }
             }
-            
+
             if metrics {
                 print_file_metrics(&event.path()).await?;
             }
         }
-        
+
         tokio::time::sleep(Duration::from_millis(watch_interval)).await;
     }
 }
@@ -1289,19 +1538,22 @@ async fn simulate_command(
 ) -> Result<()> {
     use source_videos::network::{NetworkProfile, NetworkSimulator};
     use std::str::FromStr;
-    
-    println!("Starting network simulation with profile: {}", network_profile);
-    
+
+    println!(
+        "Starting network simulation with profile: {}",
+        network_profile
+    );
+
     let profile = NetworkProfile::from_str(&network_profile)
         .map_err(|e| SourceVideoError::config(format!("Invalid network profile: {}", e)))?;
-    
+
     println!("Profile description: {}", profile.description());
-    
+
     // Start test sources
     let mut server_builder = source_videos::RtspServerBuilder::new()
         .port(port)
         .network_profile(profile);
-    
+
     if let Some(dir) = directory {
         let files = scan_directory_with_filters(&dir, true, &[], &[], None, None, None, None)?;
         for (i, file) in files.iter().take(3).enumerate() {
@@ -1309,38 +1561,39 @@ async fn simulate_command(
             server_builder = server_builder.add_source(config);
         }
     }
-    
+
     for (i, pattern) in patterns.iter().enumerate() {
         server_builder = server_builder.add_test_pattern(&format!("sim-pattern-{}", i), pattern);
     }
-    
+
     let mut server = server_builder.build()?;
     server.start()?;
-    
+
     println!("Simulation server started on port {}", port);
     for mount in server.list_sources() {
         println!("  {}", server.get_url(&mount));
     }
-    
+
     let test_duration = duration.unwrap_or(60);
     println!("Running simulation for {} seconds...", test_duration);
-    
+
     if metrics {
         tokio::spawn(async move {
             let mut interval = tokio::time::interval(Duration::from_secs(5));
             loop {
                 interval.tick().await;
-                println!("[METRICS] Active streams: {}, Network conditions: {}", 
+                println!(
+                    "[METRICS] Active streams: {}, Network conditions: {}",
                     0, // TODO: Get actual metrics
                     network_profile
                 );
             }
         });
     }
-    
+
     tokio::time::sleep(Duration::from_secs(test_duration)).await;
     println!("Simulation completed");
-    
+
     Ok(())
 }
 
@@ -1352,7 +1605,8 @@ async fn completions_command(shell: Shell) -> Result<()> {
 }
 
 async fn help_all_command() -> Result<()> {
-    println!(r#"
+    println!(
+        r#"
 source-videos - Comprehensive Help and Examples
 ===============================================
 
@@ -1519,7 +1773,8 @@ For more detailed help on specific commands, use:
 
 For API documentation, start with --api and visit:
   http://localhost:3000/api/docs
-"#);
+"#
+    );
     Ok(())
 }
 
@@ -1531,7 +1786,7 @@ fn daemonize(pid_file: Option<PathBuf>) -> Result<()> {
         fs::write(pid_path, pid.to_string())
             .map_err(|e| SourceVideoError::config(format!("Failed to write PID file: {}", e)))?;
     }
-    
+
     // Note: Full daemonization would require fork() which is Unix-specific
     // For now, just detach from console on Windows
     #[cfg(windows)]
@@ -1539,7 +1794,7 @@ fn daemonize(pid_file: Option<PathBuf>) -> Result<()> {
         use std::os::windows::process::CommandExt;
         // Windows-specific detachment would go here
     }
-    
+
     Ok(())
 }
 
@@ -1565,24 +1820,24 @@ async fn dry_run_preview(
     exclude: Vec<String>,
 ) -> Result<()> {
     println!("DRY RUN - Would serve the following sources:");
-    
+
     if let Some(dir) = directory {
         let found_files = scan_directory_with_filters(
-            &dir, recursive, &include, &exclude, None, None, None, None
+            &dir, recursive, &include, &exclude, None, None, None, None,
         )?;
         println!("Directory {}: {} files", dir.display(), found_files.len());
         for file in &found_files {
             println!("  - {}", file.display());
         }
     }
-    
+
     if !files.is_empty() {
         println!("Explicit files: {}", files.len());
         for file in &files {
             println!("  - {}", file.display());
         }
     }
-    
+
     Ok(())
 }
 
@@ -1596,8 +1851,8 @@ fn scan_directory_with_filters(
     max_duration: Option<u64>,
     modified_since: Option<&str>,
 ) -> Result<Vec<PathBuf>> {
-    use source_videos::{DirectoryScanner, DirectoryConfig, FilterConfig};
-    
+    use source_videos::{DirectoryConfig, DirectoryScanner, FilterConfig};
+
     let filters = if !include.is_empty() || !exclude.is_empty() {
         Some(FilterConfig {
             include: include.to_vec(),
@@ -1607,7 +1862,7 @@ fn scan_directory_with_filters(
     } else {
         None
     };
-    
+
     let config = DirectoryConfig {
         path: directory.display().to_string(),
         recursive,
@@ -1615,11 +1870,12 @@ fn scan_directory_with_filters(
         lazy_loading: false,
         mount_prefix: None,
     };
-    
+
     let mut scanner = DirectoryScanner::new(config);
     let source_configs = scanner.scan()?;
-    
-    let files: Vec<PathBuf> = source_configs.into_iter()
+
+    let files: Vec<PathBuf> = source_configs
+        .into_iter()
         .filter_map(|config| {
             if let source_videos::VideoSourceType::File { path, .. } = config.source_type {
                 Some(PathBuf::from(path))
@@ -1628,9 +1884,13 @@ fn scan_directory_with_filters(
             }
         })
         .collect();
-    
+
     Ok(apply_advanced_filters(
-        files, format_filter, min_duration, max_duration, modified_since
+        files,
+        format_filter,
+        min_duration,
+        max_duration,
+        modified_since,
     )?)
 }
 
@@ -1644,13 +1904,14 @@ fn filter_files(
     modified_since: Option<&str>,
 ) -> Result<Vec<PathBuf>> {
     let mut filtered = files;
-    
+
     // Apply include/exclude patterns
     if !include.is_empty() || !exclude.is_empty() {
-        filtered = filtered.into_iter()
+        filtered = filtered
+            .into_iter()
             .filter(|file| {
                 let name = file.file_name().unwrap_or_default().to_string_lossy();
-                
+
                 // Check include patterns
                 let included = if include.is_empty() {
                     true
@@ -1661,20 +1922,26 @@ fn filter_files(
                             .unwrap_or(false)
                     })
                 };
-                
+
                 // Check exclude patterns
                 let excluded = exclude.iter().any(|pattern| {
                     glob::Pattern::new(pattern)
                         .map(|p| p.matches(&name))
                         .unwrap_or(false)
                 });
-                
+
                 included && !excluded
             })
             .collect();
     }
-    
-    apply_advanced_filters(filtered, format_filter, min_duration, max_duration, modified_since)
+
+    apply_advanced_filters(
+        filtered,
+        format_filter,
+        min_duration,
+        max_duration,
+        modified_since,
+    )
 }
 
 fn apply_advanced_filters(
@@ -1685,10 +1952,11 @@ fn apply_advanced_filters(
     modified_since: Option<&str>,
 ) -> Result<Vec<PathBuf>> {
     let mut filtered = files;
-    
+
     // Format filter
     if let Some(format) = format_filter {
-        filtered = filtered.into_iter()
+        filtered = filtered
+            .into_iter()
             .filter(|file| {
                 file.extension()
                     .and_then(|ext| ext.to_str())
@@ -1697,14 +1965,15 @@ fn apply_advanced_filters(
             })
             .collect();
     }
-    
+
     // Date filter
     if let Some(date_str) = modified_since {
         let since_date = chrono::NaiveDate::parse_from_str(date_str, "%Y-%m-%d")
             .map_err(|e| SourceVideoError::config(format!("Invalid date format: {}", e)))?;
         let since_datetime = since_date.and_hms_opt(0, 0, 0).unwrap().and_utc();
-        
-        filtered = filtered.into_iter()
+
+        filtered = filtered
+            .into_iter()
             .filter(|file| {
                 if let Ok(metadata) = file.metadata() {
                     if let Ok(modified) = metadata.modified() {
@@ -1716,17 +1985,17 @@ fn apply_advanced_filters(
             })
             .collect();
     }
-    
+
     // Duration filters would require reading video metadata
     // For now, we'll skip duration filtering as it would require GStreamer probing
-    
+
     Ok(filtered)
 }
 
 fn load_playlist_file(file: &PathBuf) -> Result<Vec<PathBuf>> {
     let content = fs::read_to_string(file)
         .map_err(|e| SourceVideoError::config(format!("Failed to read playlist: {}", e)))?;
-    
+
     let files: Vec<PathBuf> = content
         .lines()
         .filter_map(|line| {
@@ -1738,24 +2007,29 @@ fn load_playlist_file(file: &PathBuf) -> Result<Vec<PathBuf>> {
             }
         })
         .collect();
-    
+
     Ok(files)
 }
 
 fn create_file_source_config(name: &str, file: &PathBuf) -> Result<VideoSourceConfig> {
     use source_videos::{config_types::*, file_utils::detect_container_format};
-    
-    let container = detect_container_format(file)
-        .unwrap_or(FileContainer::Mp4);
-    
+
+    let container = detect_container_format(file).unwrap_or(FileContainer::Mp4);
+
     Ok(VideoSourceConfig {
         name: name.to_string(),
         source_type: source_videos::VideoSourceType::File {
             path: file.display().to_string(),
             container,
         },
-        resolution: Resolution { width: 1920, height: 1080 },
-        framerate: Framerate { numerator: 30, denominator: 1 },
+        resolution: Resolution {
+            width: 1920,
+            height: 1080,
+        },
+        framerate: Framerate {
+            numerator: 30,
+            denominator: 1,
+        },
         format: VideoFormat::I420,
         duration: None,
         num_buffers: None,
@@ -1772,17 +2046,17 @@ async fn start_enhanced_server(
     output_format: OutputFormat,
 ) -> Result<()> {
     println!("Starting enhanced server with {} sources", files.len());
-    
+
     let mut server_builder = source_videos::RtspServerBuilder::new().port(port);
-    
+
     for (i, file) in files.iter().enumerate() {
         let config = create_file_source_config(&format!("file-{}", i), file)?;
         server_builder = server_builder.add_source(config);
     }
-    
+
     let mut server = server_builder.build()?;
     server.start()?;
-    
+
     if let Some(interval) = status_interval {
         tokio::spawn(async move {
             let mut interval_timer = tokio::time::interval(Duration::from_secs(interval));
@@ -1792,13 +2066,13 @@ async fn start_enhanced_server(
             }
         });
     }
-    
+
     tokio::select! {
         _ = signal::ctrl_c() => {
             println!("Received Ctrl+C, stopping...");
         }
     }
-    
+
     Ok(())
 }
 
@@ -1811,35 +2085,35 @@ async fn start_playlist_server(
 ) -> Result<()> {
     println!("Starting playlist server with {} files", files.len());
     println!("Repeat mode: {:?}", repeat);
-    
+
     if let Some(duration) = transition_duration {
         println!("Transition duration: {}s", duration);
     }
-    
+
     if crossfade {
         println!("Crossfade enabled");
     }
-    
+
     // For now, create a single stream that cycles through the playlist
     let mut server_builder = source_videos::RtspServerBuilder::new().port(port);
-    
+
     // Create a combined playlist source (simplified for now)
     if !files.is_empty() {
         let config = create_file_source_config("playlist-stream", &files[0])?;
         server_builder = server_builder.add_source(config);
     }
-    
+
     let mut server = server_builder.build()?;
     server.start()?;
-    
+
     println!("Playlist server started on port {}", port);
-    
+
     tokio::select! {
         _ = signal::ctrl_c() => {
             println!("Received Ctrl+C, stopping...");
         }
     }
-    
+
     Ok(())
 }
 

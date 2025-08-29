@@ -1,9 +1,9 @@
+use super::{SourceId, SourceState};
 use crate::error::Result;
 use gstreamer as gst;
 use gstreamer::prelude::*;
-use std::sync::mpsc::{channel, Receiver, Sender};
+use std::sync::mpsc::{Receiver, Sender, channel};
 use std::sync::{Arc, Mutex};
-use super::{SourceId, SourceState};
 
 #[derive(Debug, Clone)]
 pub enum SourceEvent {
@@ -49,33 +49,32 @@ pub struct SourceEventHandler {
 impl SourceEventHandler {
     pub fn new() -> Self {
         let (sender, receiver) = channel();
-        
+
         Self {
             sender,
             receiver: Arc::new(Mutex::new(receiver)),
             callbacks: Arc::new(Mutex::new(Vec::new())),
         }
     }
-    
+
     pub fn sender(&self) -> Sender<SourceEvent> {
         self.sender.clone()
     }
-    
+
     pub fn emit(&self, event: SourceEvent) -> Result<()> {
         println!("Emitting event: {:?}", event);
-        
+
         if let Ok(callbacks) = self.callbacks.lock() {
             for callback in callbacks.iter() {
                 callback(&event);
             }
         }
-        
-        self.sender.send(event)
-            .map_err(|e| crate::error::DeepStreamError::Unknown(
-                format!("Failed to send event: {}", e)
-            ))
+
+        self.sender.send(event).map_err(|e| {
+            crate::error::DeepStreamError::Unknown(format!("Failed to send event: {}", e))
+        })
     }
-    
+
     pub fn register_callback<F>(&self, callback: F)
     where
         F: Fn(&SourceEvent) + Send + 'static,
@@ -84,7 +83,7 @@ impl SourceEventHandler {
             callbacks.push(Box::new(callback));
         }
     }
-    
+
     pub fn poll_event(&self) -> Option<SourceEvent> {
         if let Ok(receiver) = self.receiver.lock() {
             receiver.try_recv().ok()
@@ -92,17 +91,15 @@ impl SourceEventHandler {
             None
         }
     }
-    
+
     pub fn wait_for_event(&self) -> Result<SourceEvent> {
-        let receiver = self.receiver.lock()
-            .map_err(|_| crate::error::DeepStreamError::Unknown(
-                "Failed to lock receiver".to_string()
-            ))?;
-        
-        receiver.recv()
-            .map_err(|e| crate::error::DeepStreamError::Unknown(
-                format!("Failed to receive event: {}", e)
-            ))
+        let receiver = self.receiver.lock().map_err(|_| {
+            crate::error::DeepStreamError::Unknown("Failed to lock receiver".to_string())
+        })?;
+
+        receiver.recv().map_err(|e| {
+            crate::error::DeepStreamError::Unknown(format!("Failed to receive event: {}", e))
+        })
     }
 }
 
@@ -118,7 +115,7 @@ pub fn handle_bus_message(
     event_handler: &SourceEventHandler,
 ) -> Result<()> {
     use gst::MessageView;
-    
+
     match msg.view() {
         MessageView::Eos(_) => {
             if let Some(id) = source_id {
@@ -162,7 +159,7 @@ pub fn handle_bus_message(
                     gst::State::Playing => SourceState::Playing,
                     _ => SourceState::Idle,
                 };
-                
+
                 let new = match state_changed.current() {
                     gst::State::Null => SourceState::Stopped,
                     gst::State::Ready => SourceState::Idle,
@@ -170,7 +167,7 @@ pub fn handle_bus_message(
                     gst::State::Playing => SourceState::Playing,
                     _ => SourceState::Idle,
                 };
-                
+
                 if old != new {
                     event_handler.emit(SourceEvent::StateChanged {
                         id,
@@ -182,7 +179,7 @@ pub fn handle_bus_message(
         }
         _ => {}
     }
-    
+
     Ok(())
 }
 
@@ -194,64 +191,60 @@ impl EosTracker {
     pub fn new(max_sources: usize) -> Self {
         let mut eos_list = Vec::with_capacity(max_sources);
         eos_list.resize(max_sources, false);
-        
+
         Self {
             eos_list: Arc::new(Mutex::new(eos_list)),
         }
     }
-    
+
     pub fn mark_eos(&self, source_id: SourceId) -> Result<()> {
-        let mut eos_list = self.eos_list.lock()
-            .map_err(|_| crate::error::DeepStreamError::Unknown(
-                "Failed to lock EOS list".to_string()
-            ))?;
-        
+        let mut eos_list = self.eos_list.lock().map_err(|_| {
+            crate::error::DeepStreamError::Unknown("Failed to lock EOS list".to_string())
+        })?;
+
         if source_id.0 < eos_list.len() {
             eos_list[source_id.0] = true;
         }
-        
+
         Ok(())
     }
-    
+
     pub fn clear_eos(&self, source_id: SourceId) -> Result<()> {
-        let mut eos_list = self.eos_list.lock()
-            .map_err(|_| crate::error::DeepStreamError::Unknown(
-                "Failed to lock EOS list".to_string()
-            ))?;
-        
+        let mut eos_list = self.eos_list.lock().map_err(|_| {
+            crate::error::DeepStreamError::Unknown("Failed to lock EOS list".to_string())
+        })?;
+
         if source_id.0 < eos_list.len() {
             eos_list[source_id.0] = false;
         }
-        
+
         Ok(())
     }
-    
+
     pub fn is_eos(&self, source_id: SourceId) -> Result<bool> {
-        let eos_list = self.eos_list.lock()
-            .map_err(|_| crate::error::DeepStreamError::Unknown(
-                "Failed to lock EOS list".to_string()
-            ))?;
-        
+        let eos_list = self.eos_list.lock().map_err(|_| {
+            crate::error::DeepStreamError::Unknown("Failed to lock EOS list".to_string())
+        })?;
+
         if source_id.0 < eos_list.len() {
             Ok(eos_list[source_id.0])
         } else {
             Ok(false)
         }
     }
-    
+
     pub fn get_eos_sources(&self) -> Result<Vec<SourceId>> {
-        let eos_list = self.eos_list.lock()
-            .map_err(|_| crate::error::DeepStreamError::Unknown(
-                "Failed to lock EOS list".to_string()
-            ))?;
-        
+        let eos_list = self.eos_list.lock().map_err(|_| {
+            crate::error::DeepStreamError::Unknown("Failed to lock EOS list".to_string())
+        })?;
+
         let mut eos_sources = Vec::new();
         for (i, &is_eos) in eos_list.iter().enumerate() {
             if is_eos {
                 eos_sources.push(SourceId(i));
             }
         }
-        
+
         Ok(eos_sources)
     }
 }
@@ -259,18 +252,18 @@ impl EosTracker {
 #[cfg(test)]
 mod tests {
     use super::*;
-    
+
     #[test]
     fn test_event_handler() {
         let handler = SourceEventHandler::new();
-        
+
         let event = SourceEvent::SourceAdded {
             id: SourceId(1),
             uri: "file:///test.mp4".to_string(),
         };
-        
+
         handler.emit(event.clone()).unwrap();
-        
+
         if let Some(received) = handler.poll_event() {
             match received {
                 SourceEvent::SourceAdded { id, uri } => {
@@ -283,24 +276,24 @@ mod tests {
             assert!(false, "No event received");
         }
     }
-    
+
     #[test]
     fn test_eos_tracker() {
         let tracker = EosTracker::new(5);
-        
+
         let source1 = SourceId(1);
         let source2 = SourceId(2);
-        
+
         tracker.mark_eos(source1).unwrap();
         assert!(tracker.is_eos(source1).unwrap());
         assert!(!tracker.is_eos(source2).unwrap());
-        
+
         tracker.mark_eos(source2).unwrap();
         let eos_sources = tracker.get_eos_sources().unwrap();
         assert_eq!(eos_sources.len(), 2);
         assert!(eos_sources.contains(&source1));
         assert!(eos_sources.contains(&source2));
-        
+
         tracker.clear_eos(source1).unwrap();
         assert!(!tracker.is_eos(source1).unwrap());
     }

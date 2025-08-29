@@ -12,7 +12,7 @@ fn main() {
             println!("cargo:warning=DLL setup issue: {e}");
         }
     }
-    
+
     // Also set up a rerun trigger for when ort completes
     println!("cargo:rerun-if-env-changed=ORT_STRATEGY");
     println!("cargo:rerun-if-env-changed=ORT_DYLIB_PATH");
@@ -22,62 +22,61 @@ fn main() {
 #[cfg(all(feature = "ort", target_os = "windows"))]
 fn copy_onnx_dlls() -> Result<(), String> {
     println!("cargo:rerun-if-changed=build.rs");
-    
+
     // Check environment variables for custom DLL paths
     if let Ok(dylib_path) = env::var("ORT_DYLIB_PATH") {
         println!("cargo:warning=Using ORT_DYLIB_PATH: {dylib_path}");
         return Ok(());
     }
-    
+
     let target_dir = get_target_dir();
     let profile = env::var("PROFILE").unwrap_or_else(|_| "debug".to_string());
     let profile_dir = target_dir.join(&profile);
-    
+
     // println!("cargo:warning=Looking for ONNX Runtime DLLs in: {}", profile_dir.display());
-    
+
     // ONNX Runtime DLL files to copy
     let dll_files = ["onnxruntime.dll", "onnxruntime_providers_shared.dll"];
-    
+
     // First, try to find the DLLs in various locations
     let mut dll_sources = Vec::new();
     for dll_name in &dll_files {
         let source = find_dll(&profile_dir, dll_name)?;
         dll_sources.push((dll_name, source));
     }
-    
+
     // Destination directories
     let destinations = vec![
         profile_dir.join("deps"),
         profile_dir.join("examples"),
         profile_dir.clone(), // Also copy to main target directory
     ];
-    
+
     // Create directories if they don't exist
     for dest_dir in &destinations {
-        fs::create_dir_all(dest_dir).map_err(|e| {
-            format!("Failed to create directory {}: {}", dest_dir.display(), e)
-        })?;
+        fs::create_dir_all(dest_dir)
+            .map_err(|e| format!("Failed to create directory {}: {}", dest_dir.display(), e))?;
     }
-    
+
     // Copy DLLs to all necessary locations
     for (dll_name, source) in &dll_sources {
         // println!("cargo:warning=Found {} at: {}", dll_name, source.display());
-        
+
         // Verify the DLL is valid (basic size check)
-        let metadata = fs::metadata(source).map_err(|e| {
-            format!("Failed to read metadata for {}: {}", source.display(), e)
-        })?;
-        
+        let metadata = fs::metadata(source)
+            .map_err(|e| format!("Failed to read metadata for {}: {}", source.display(), e))?;
+
         if metadata.len() < 1024 {
             return Err(format!(
                 "DLL {} seems too small ({} bytes), might be corrupted",
-                dll_name, metadata.len()
+                dll_name,
+                metadata.len()
             ));
         }
-        
+
         for dest_dir in &destinations {
             let dest = dest_dir.join(dll_name);
-            
+
             // Skip if already exists and has same size
             if dest.exists() {
                 if let Ok(dest_meta) = fs::metadata(&dest) {
@@ -87,18 +86,17 @@ fn copy_onnx_dlls() -> Result<(), String> {
                     }
                 }
             }
-            
-            fs::copy(source, &dest).map_err(|e| {
-                format!("Failed to copy {} to {}: {}", dll_name, dest.display(), e)
-            })?;
-            
+
+            fs::copy(source, &dest)
+                .map_err(|e| format!("Failed to copy {} to {}: {}", dll_name, dest.display(), e))?;
+
             // println!("cargo:warning=Successfully copied {} to {}", dll_name, dest_dir.file_name().unwrap_or_default().to_string_lossy());
         }
     }
-    
+
     // println!("cargo:warning=ONNX Runtime DLL setup completed successfully");
     // println!("cargo:warning=If you still get 0xc000007b errors, ensure Visual C++ Redistributables are installed");
-    
+
     Ok(())
 }
 
@@ -111,7 +109,8 @@ fn find_dll(profile_dir: &Path, dll_name: &str) -> Result<PathBuf, String> {
         // ORT might download to a subdirectory
         profile_dir.join("onnxruntime").join(dll_name),
         // Check parent directories (workspace root)
-        profile_dir.parent()
+        profile_dir
+            .parent()
             .and_then(|p| p.parent())
             .map(|p| p.join("target").join(dll_name))
             .unwrap_or_default(),
@@ -122,13 +121,13 @@ fn find_dll(profile_dir: &Path, dll_name: &str) -> Result<PathBuf, String> {
             .map(|p| p.join(dll_name))
             .unwrap_or_default(),
     ];
-    
+
     for path in search_paths {
         if path.exists() && path.is_file() {
             return Ok(path);
         }
     }
-    
+
     // If not found, provide helpful error message
     Err(format!(
         "Could not find {dll_name}. The ort crate should download it automatically. \
@@ -143,11 +142,11 @@ fn get_target_dir() -> PathBuf {
     if let Ok(target_dir) = env::var("CARGO_TARGET_DIR") {
         return PathBuf::from(target_dir);
     }
-    
+
     // Fallback: try to find target directory relative to manifest dir
     let manifest_dir = env::var("CARGO_MANIFEST_DIR").expect("CARGO_MANIFEST_DIR not set");
     let manifest_path = PathBuf::from(manifest_dir);
-    
+
     // Look for target directory in workspace root or current directory
     let mut current = manifest_path.as_path();
     loop {
@@ -155,13 +154,13 @@ fn get_target_dir() -> PathBuf {
         if target_candidate.exists() && target_candidate.is_dir() {
             return target_candidate;
         }
-        
+
         match current.parent() {
             Some(parent) => current = parent,
             None => break,
         }
     }
-    
+
     // Final fallback
     PathBuf::from("target")
 }

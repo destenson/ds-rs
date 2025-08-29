@@ -1,26 +1,26 @@
 //! Windows DLL validation and loading helper
-//! 
+//!
 //! This module provides utilities for validating and diagnosing DLL loading issues
 //! on Windows, particularly for ONNX Runtime dependencies.
 
-use std::path::Path;
 use std::env;
+use std::path::Path;
 
 /// Errors that can occur during DLL validation
 #[derive(Debug, thiserror::Error)]
 pub enum DllError {
     #[error("DLL not found: {path}")]
     NotFound { path: String },
-    
+
     #[error("DLL architecture mismatch: expected {expected}, got {actual}")]
     ArchitectureMismatch { expected: String, actual: String },
-    
+
     #[error("Missing Visual C++ Redistributable: {details}")]
     MissingRedistributable { details: String },
-    
+
     #[error("DLL loading failed: {details}")]
     LoadingFailed { details: String },
-    
+
     #[error("Environment variable {var} points to invalid location: {path}")]
     InvalidEnvironmentPath { var: String, path: String },
 }
@@ -39,7 +39,7 @@ pub struct DllValidationInfo {
 #[cfg(target_os = "windows")]
 pub fn validate_onnx_runtime_dlls() -> Vec<DllValidationInfo> {
     let mut results = Vec::new();
-    
+
     // Check for ORT_DYLIB_PATH environment variable
     if let Ok(dylib_path) = env::var("ORT_DYLIB_PATH") {
         log::info!("ORT_DYLIB_PATH is set to: {}", dylib_path);
@@ -60,17 +60,14 @@ pub fn validate_onnx_runtime_dlls() -> Vec<DllValidationInfo> {
             return results;
         }
     }
-    
+
     // DLLs to check
-    let required_dlls = [
-        "onnxruntime.dll",
-        "onnxruntime_providers_shared.dll",
-    ];
-    
+    let required_dlls = ["onnxruntime.dll", "onnxruntime_providers_shared.dll"];
+
     // Get the directory where the executable is located
     let exe_path = env::current_exe().ok();
     let exe_dir = exe_path.as_ref().and_then(|p| p.parent());
-    
+
     for dll_name in &required_dlls {
         let mut info = DllValidationInfo {
             dll_name: dll_name.to_string(),
@@ -79,7 +76,7 @@ pub fn validate_onnx_runtime_dlls() -> Vec<DllValidationInfo> {
             error: None,
             suggestions: Vec::new(),
         };
-        
+
         // Check if DLL exists next to executable
         if let Some(dir) = exe_dir {
             let dll_path = dir.join(dll_name);
@@ -88,30 +85,36 @@ pub fn validate_onnx_runtime_dlls() -> Vec<DllValidationInfo> {
                 info.is_valid = validate_dll_file(&dll_path);
                 if !info.is_valid {
                     info.error = Some(DllError::LoadingFailed {
-                        details: "DLL file exists but may be corrupted or wrong architecture".to_string(),
+                        details: "DLL file exists but may be corrupted or wrong architecture"
+                            .to_string(),
                     });
-                    info.suggestions.push("Ensure the DLL is for x64 architecture".to_string());
-                    info.suggestions.push("Try re-downloading ONNX Runtime".to_string());
+                    info.suggestions
+                        .push("Ensure the DLL is for x64 architecture".to_string());
+                    info.suggestions
+                        .push("Try re-downloading ONNX Runtime".to_string());
                 }
             } else {
                 info.error = Some(DllError::NotFound {
                     path: dll_path.display().to_string(),
                 });
-                info.suggestions.push(format!("Copy {} to: {}", dll_name, dll_path.display()));
-                info.suggestions.push("Or set ORT_DYLIB_PATH environment variable".to_string());
-                info.suggestions.push("Or rebuild with: cargo clean && cargo build --features ort".to_string());
+                info.suggestions
+                    .push(format!("Copy {} to: {}", dll_name, dll_path.display()));
+                info.suggestions
+                    .push("Or set ORT_DYLIB_PATH environment variable".to_string());
+                info.suggestions
+                    .push("Or rebuild with: cargo clean && cargo build --features ort".to_string());
             }
         }
-        
+
         results.push(info);
     }
-    
+
     // Check for Visual C++ Redistributables
     let vc_redist_info = check_vc_redistributables();
     if !vc_redist_info.is_valid {
         results.push(vc_redist_info);
     }
-    
+
     results
 }
 
@@ -125,11 +128,11 @@ fn check_vc_redistributables() -> DllValidationInfo {
         error: None,
         suggestions: Vec::new(),
     };
-    
+
     // Check for common VC++ runtime DLLs
     let vc_dlls = ["MSVCP140.dll", "VCRUNTIME140.dll"];
     let system32 = Path::new("C:\\Windows\\System32");
-    
+
     for dll in &vc_dlls {
         let dll_path = system32.join(dll);
         if !dll_path.exists() {
@@ -137,16 +140,14 @@ fn check_vc_redistributables() -> DllValidationInfo {
             info.error = Some(DllError::MissingRedistributable {
                 details: format!("{} not found in System32", dll),
             });
-            info.suggestions.push(
-                "Download and install Visual C++ Redistributable from:".to_string()
-            );
-            info.suggestions.push(
-                "https://aka.ms/vs/17/release/vc_redist.x64.exe".to_string()
-            );
+            info.suggestions
+                .push("Download and install Visual C++ Redistributable from:".to_string());
+            info.suggestions
+                .push("https://aka.ms/vs/17/release/vc_redist.x64.exe".to_string());
             break;
         }
     }
-    
+
     info
 }
 
@@ -173,30 +174,31 @@ pub fn print_dll_diagnostic_report() {
     #[cfg(target_os = "windows")]
     {
         println!("\n=== ONNX Runtime DLL Diagnostic Report ===\n");
-        
+
         let validations = validate_onnx_runtime_dlls();
         let all_valid = validations.iter().all(|v| v.is_valid);
-        
+
         if all_valid {
             println!(" All DLLs are properly configured!");
         } else {
             println!(" DLL configuration issues detected:\n");
-            
+
             for validation in validations {
                 if !validation.is_valid {
-                    println!("  {} {}", 
+                    println!(
+                        "  {} {}",
                         if validation.is_valid { "OK" } else { "BAD" },
                         validation.dll_name
                     );
-                    
+
                     if let Some(found_at) = &validation.found_at {
                         println!("    Location: {}", found_at);
                     }
-                    
+
                     if let Some(error) = &validation.error {
                         println!("    Error: {}", error);
                     }
-                    
+
                     if !validation.suggestions.is_empty() {
                         println!("    Suggestions:");
                         for suggestion in &validation.suggestions {
@@ -206,7 +208,7 @@ pub fn print_dll_diagnostic_report() {
                     println!();
                 }
             }
-            
+
             println!("\n=== Quick Fix Commands ===\n");
             println!("1. Clean and rebuild:");
             println!("   cargo clean");
@@ -220,10 +222,10 @@ pub fn print_dll_diagnostic_report() {
             println!("   Download: onnxruntime-win-x64-*.zip");
             println!("   Extract DLLs to your target\\debug\\examples\\ directory");
         }
-        
+
         println!("\n=========================================\n");
     }
-    
+
     #[cfg(not(target_os = "windows"))]
     {
         println!("DLL validation is only relevant on Windows platforms.");
@@ -233,7 +235,7 @@ pub fn print_dll_diagnostic_report() {
 #[cfg(test)]
 mod tests {
     use super::*;
-    
+
     #[test]
     fn test_dll_validation_structure() {
         let info = DllValidationInfo {
@@ -243,13 +245,13 @@ mod tests {
             error: None,
             suggestions: vec![],
         };
-        
+
         assert_eq!(info.dll_name, "test.dll");
         assert!(info.is_valid);
         assert!(info.error.is_none());
         assert!(info.suggestions.is_empty());
     }
-    
+
     #[test]
     #[cfg(target_os = "windows")]
     fn test_vc_redistributable_check() {

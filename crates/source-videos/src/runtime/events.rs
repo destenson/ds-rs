@@ -1,6 +1,6 @@
-use tokio::sync::broadcast;
-use serde::{Serialize, Deserialize};
+use serde::{Deserialize, Serialize};
 use std::path::PathBuf;
+use tokio::sync::broadcast;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub enum ConfigurationEvent {
@@ -47,20 +47,20 @@ impl EventBus {
         let (sender, _) = broadcast::channel(100);
         Self { sender }
     }
-    
+
     pub fn with_capacity(capacity: usize) -> Self {
         let (sender, _) = broadcast::channel(capacity);
         Self { sender }
     }
-    
+
     pub async fn emit(&self, event: ConfigurationEvent) {
         log::debug!("Emitting event: {:?}", event);
-        
+
         if let Err(e) = self.sender.send(event.clone()) {
             log::warn!("No subscribers for event: {:?} ({})", event, e);
         }
     }
-    
+
     pub fn subscribe(&self) -> broadcast::Receiver<ConfigurationEvent> {
         self.sender.subscribe()
     }
@@ -74,7 +74,7 @@ impl EventFilter {
     pub fn new(receiver: broadcast::Receiver<ConfigurationEvent>) -> Self {
         Self { receiver }
     }
-    
+
     pub async fn next_matching<F>(&mut self, filter: F) -> Option<ConfigurationEvent>
     where
         F: Fn(&ConfigurationEvent) -> bool,
@@ -86,13 +86,17 @@ impl EventFilter {
         }
         None
     }
-    
-    pub async fn collect_until<F>(&mut self, stop_condition: F, max_events: usize) -> Vec<ConfigurationEvent>
+
+    pub async fn collect_until<F>(
+        &mut self,
+        stop_condition: F,
+        max_events: usize,
+    ) -> Vec<ConfigurationEvent>
     where
         F: Fn(&ConfigurationEvent) -> bool,
     {
         let mut events = Vec::with_capacity(max_events);
-        
+
         while events.len() < max_events {
             match self.receiver.recv().await {
                 Ok(event) => {
@@ -105,7 +109,7 @@ impl EventFilter {
                 Err(_) => break,
             }
         }
-        
+
         events
     }
 }
@@ -124,18 +128,18 @@ impl EventLogger {
             log_path: None,
         }
     }
-    
+
     pub fn with_persistence(mut self, path: String) -> Self {
         self.persist = true;
         self.log_path = Some(path);
         self
     }
-    
+
     pub async fn start(mut self) {
         tokio::spawn(async move {
             while let Ok(event) = self.receiver.recv().await {
                 log::info!("Configuration event: {:?}", event);
-                
+
                 if self.persist {
                     if let Some(ref path) = self.log_path {
                         if let Ok(json) = serde_json::to_string(&event) {
@@ -149,7 +153,8 @@ impl EventLogger {
                                     .ok()?;
                                 file.write_all(json.as_bytes()).await.ok()?;
                                 file.write_all(b"\n").await.ok()
-                            }.await;
+                            }
+                            .await;
                         }
                     }
                 }
@@ -161,52 +166,58 @@ impl EventLogger {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use tokio::time::{timeout, Duration};
-    
+    use tokio::time::{Duration, timeout};
+
     #[tokio::test]
     async fn test_event_bus() {
         let bus = EventBus::new();
         let mut receiver = bus.subscribe();
-        
+
         bus.emit(ConfigurationEvent::SourceAdded {
             source: "test".to_string(),
-        }).await;
-        
+        })
+        .await;
+
         let event = timeout(Duration::from_secs(1), receiver.recv()).await;
         assert!(event.is_ok());
-        
+
         if let Ok(Ok(ConfigurationEvent::SourceAdded { source })) = event {
             assert_eq!(source, "test");
         } else {
             panic!("Unexpected event type");
         }
     }
-    
+
     #[tokio::test]
     async fn test_event_filter() {
         let bus = EventBus::new();
         let receiver = bus.subscribe();
         let mut filter = EventFilter::new(receiver);
-        
+
         // Emit various events
         bus.emit(ConfigurationEvent::SourceAdded {
             source: "source1".to_string(),
-        }).await;
-        
+        })
+        .await;
+
         bus.emit(ConfigurationEvent::SourceRemoved {
             source: "source2".to_string(),
-        }).await;
-        
+        })
+        .await;
+
         bus.emit(ConfigurationEvent::SourceAdded {
             source: "source3".to_string(),
-        }).await;
-        
+        })
+        .await;
+
         // Filter for SourceAdded events
         let task = tokio::spawn(async move {
-            let event = filter.next_matching(|e| matches!(e, ConfigurationEvent::SourceAdded { .. })).await;
+            let event = filter
+                .next_matching(|e| matches!(e, ConfigurationEvent::SourceAdded { .. }))
+                .await;
             event
         });
-        
+
         let result = timeout(Duration::from_secs(1), task).await;
         assert!(result.is_ok());
     }

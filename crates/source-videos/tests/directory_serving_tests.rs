@@ -1,10 +1,9 @@
 #![allow(unused)]
 
 use source_videos::{
-    DirectoryConfig, FileListConfig, FilterConfig, DirectoryScanner, BatchSourceLoader,
-    VideoSourceManager, VideoSourceType, is_video_file, 
-    detect_container_format, path_to_mount_point,
-    config_types::FileContainer,
+    BatchSourceLoader, DirectoryConfig, DirectoryScanner, FileListConfig, FilterConfig,
+    VideoSourceManager, VideoSourceType, config_types::FileContainer, detect_container_format,
+    is_video_file, path_to_mount_point,
 };
 use std::fs;
 use std::path::{Path, PathBuf};
@@ -12,7 +11,7 @@ use tempfile::TempDir;
 
 fn create_test_directory() -> TempDir {
     let temp_dir = TempDir::new().unwrap();
-    
+
     // Create some test video files (just empty files with video extensions)
     let video_files = vec![
         "video1.mp4",
@@ -24,7 +23,7 @@ fn create_test_directory() -> TempDir {
         "ignore.txt",
         "document.pdf",
     ];
-    
+
     for file in video_files {
         let path = temp_dir.path().join(file);
         if let Some(parent) = path.parent() {
@@ -32,7 +31,7 @@ fn create_test_directory() -> TempDir {
         }
         fs::write(&path, b"dummy content").unwrap();
     }
-    
+
     temp_dir
 }
 
@@ -46,13 +45,13 @@ fn test_directory_scanner_basic() {
         lazy_loading: false,
         mount_prefix: None,
     };
-    
+
     let mut scanner = DirectoryScanner::new(config);
     let configs = scanner.scan().unwrap();
-    
+
     // Should find 4 video files in root directory (not recursive)
     assert_eq!(configs.len(), 4);
-    
+
     // Check that all configs are File type
     for config in &configs {
         assert!(matches!(config.source_type, VideoSourceType::File { .. }));
@@ -69,10 +68,10 @@ fn test_directory_scanner_recursive() {
         lazy_loading: false,
         mount_prefix: None,
     };
-    
+
     let mut scanner = DirectoryScanner::new(config);
     let configs = scanner.scan().unwrap();
-    
+
     // Should find 6 video files total (4 in root + 2 in subdirs)
     assert_eq!(configs.len(), 6);
 }
@@ -91,13 +90,13 @@ fn test_directory_scanner_with_filters() {
         lazy_loading: false,
         mount_prefix: None,
     };
-    
+
     let mut scanner = DirectoryScanner::new(config);
     let configs = scanner.scan().unwrap();
-    
+
     // Should find only mp4 files
     assert_eq!(configs.len(), 2); // video1.mp4 and nested.mp4
-    
+
     for config in &configs {
         if let VideoSourceType::File { path, .. } = &config.source_type {
             assert!(path.ends_with(".mp4"));
@@ -119,13 +118,13 @@ fn test_directory_scanner_with_exclude() {
         lazy_loading: false,
         mount_prefix: None,
     };
-    
+
     let mut scanner = DirectoryScanner::new(config);
     let configs = scanner.scan().unwrap();
-    
+
     // Should exclude nested.mp4
     assert_eq!(configs.len(), 5);
-    
+
     for config in &configs {
         if let VideoSourceType::File { path, .. } = &config.source_type {
             assert!(!path.contains("nested"));
@@ -143,10 +142,10 @@ fn test_directory_scanner_with_mount_prefix() {
         lazy_loading: false,
         mount_prefix: Some("videos".to_string()),
     };
-    
+
     let mut scanner = DirectoryScanner::new(config);
     let configs = scanner.scan().unwrap();
-    
+
     // Mount prefix should be applied (though not directly visible in VideoSourceConfig)
     assert!(!configs.is_empty());
 }
@@ -154,9 +153,9 @@ fn test_directory_scanner_with_mount_prefix() {
 #[test]
 fn test_batch_source_loader() {
     let temp_dir = create_test_directory();
-    
+
     let mut loader = BatchSourceLoader::new();
-    
+
     // Add a directory
     loader.add_directory(DirectoryConfig {
         path: temp_dir.path().display().to_string(),
@@ -165,15 +164,15 @@ fn test_batch_source_loader() {
         lazy_loading: false,
         mount_prefix: None,
     });
-    
+
     // Add a file list
     loader.add_file_list(vec![
         temp_dir.path().join("video1.mp4").display().to_string(),
         temp_dir.path().join("video2.avi").display().to_string(),
     ]);
-    
+
     let configs = loader.load_all().unwrap();
-    
+
     // Should have configs from both directory and file list
     assert!(configs.len() >= 6); // 4 from directory + 2 from file list
 }
@@ -185,7 +184,7 @@ fn test_is_video_file() {
     assert!(is_video_file(Path::new("movie.mkv")));
     assert!(is_video_file(Path::new("clip.webm")));
     assert!(is_video_file(Path::new("test.MOV"))); // Case insensitive
-    
+
     assert!(!is_video_file(Path::new("document.pdf")));
     assert!(!is_video_file(Path::new("image.jpg")));
     assert!(!is_video_file(Path::new("audio.mp3")));
@@ -210,20 +209,17 @@ fn test_detect_container_format() {
         detect_container_format(Path::new("stream.webm")),
         Some(FileContainer::WebM)
     );
-    assert_eq!(
-        detect_container_format(Path::new("unknown.xyz")),
-        None
-    );
+    assert_eq!(detect_container_format(Path::new("unknown.xyz")), None);
 }
 
 #[test]
 fn test_path_to_mount_point() {
     let file_path = Path::new("/videos/movies/action/movie.mp4");
     let base_dir = "/videos";
-    
+
     let mount = path_to_mount_point(file_path, base_dir, None).unwrap();
     assert_eq!(mount, "movies/action/movie");
-    
+
     let mount_with_prefix = path_to_mount_point(file_path, base_dir, Some("stream")).unwrap();
     assert_eq!(mount_with_prefix, "stream/movies/action/movie");
 }
@@ -231,10 +227,10 @@ fn test_path_to_mount_point() {
 #[test]
 fn test_manager_batch_operations() {
     source_videos::init().unwrap();
-    
+
     let manager = VideoSourceManager::new();
     let temp_dir = create_test_directory();
-    
+
     // Test add_directory
     let dir_config = DirectoryConfig {
         path: temp_dir.path().display().to_string(),
@@ -243,20 +239,24 @@ fn test_manager_batch_operations() {
         lazy_loading: false,
         mount_prefix: None,
     };
-    
+
     let added = manager.add_directory(dir_config).unwrap();
     assert_eq!(added.len(), 4); // 4 video files in root
     assert_eq!(manager.source_count(), 4);
-    
+
     // Test add_file_list
     let file_config = FileListConfig {
         files: vec![
-            temp_dir.path().join("subdir/nested.mp4").display().to_string(),
+            temp_dir
+                .path()
+                .join("subdir/nested.mp4")
+                .display()
+                .to_string(),
         ],
         mount_prefix: None,
         lazy_loading: false,
     };
-    
+
     let added = manager.add_file_list(file_config).unwrap();
     assert_eq!(added.len(), 1);
     assert_eq!(manager.source_count(), 5); // 4 + 1
@@ -272,10 +272,10 @@ fn test_directory_scanner_empty_directory() {
         lazy_loading: false,
         mount_prefix: None,
     };
-    
+
     let mut scanner = DirectoryScanner::new(config);
     let configs = scanner.scan().unwrap();
-    
+
     assert_eq!(configs.len(), 0);
 }
 
@@ -288,10 +288,10 @@ fn test_directory_scanner_nonexistent_directory() {
         lazy_loading: false,
         mount_prefix: None,
     };
-    
+
     let mut scanner = DirectoryScanner::new(config);
     let result = scanner.scan();
-    
+
     assert!(result.is_err());
 }
 
@@ -309,10 +309,10 @@ fn test_filter_extensions() {
         lazy_loading: false,
         mount_prefix: None,
     };
-    
+
     let mut scanner = DirectoryScanner::new(config);
     let configs = scanner.scan().unwrap();
-    
+
     // Should find only mp4 and mkv files
     for config in &configs {
         if let VideoSourceType::File { path, .. } = &config.source_type {

@@ -79,7 +79,7 @@ pub struct ErrorClassifier {
 impl ErrorClassifier {
     pub fn new() -> Self {
         let mut patterns = HashMap::new();
-        
+
         // Network errors
         patterns.insert(
             "connection refused".to_string(),
@@ -93,7 +93,7 @@ impl ErrorClassifier {
                 description: "Network connection refused".to_string(),
             },
         );
-        
+
         patterns.insert(
             "timeout".to_string(),
             ErrorClassification {
@@ -106,7 +106,7 @@ impl ErrorClassifier {
                 description: "Network timeout".to_string(),
             },
         );
-        
+
         patterns.insert(
             "host not found".to_string(),
             ErrorClassification {
@@ -117,7 +117,7 @@ impl ErrorClassifier {
                 description: "Host not found".to_string(),
             },
         );
-        
+
         // RTSP specific
         patterns.insert(
             "rtsp".to_string(),
@@ -129,7 +129,7 @@ impl ErrorClassifier {
                 description: "RTSP stream error".to_string(),
             },
         );
-        
+
         // Codec errors
         patterns.insert(
             "decoder".to_string(),
@@ -143,7 +143,7 @@ impl ErrorClassifier {
                 description: "Decoder error".to_string(),
             },
         );
-        
+
         patterns.insert(
             "not-negotiated".to_string(),
             ErrorClassification {
@@ -154,7 +154,7 @@ impl ErrorClassifier {
                 description: "Caps negotiation failed".to_string(),
             },
         );
-        
+
         // Resource errors
         patterns.insert(
             "file not found".to_string(),
@@ -166,7 +166,7 @@ impl ErrorClassifier {
                 description: "File not found".to_string(),
             },
         );
-        
+
         patterns.insert(
             "out of memory".to_string(),
             ErrorClassification {
@@ -177,7 +177,7 @@ impl ErrorClassifier {
                 description: "Out of memory".to_string(),
             },
         );
-        
+
         // Pipeline errors
         patterns.insert(
             "state change".to_string(),
@@ -191,7 +191,7 @@ impl ErrorClassifier {
                 description: "Pipeline state change error".to_string(),
             },
         );
-        
+
         patterns.insert(
             "pad linking".to_string(),
             ErrorClassification {
@@ -202,21 +202,21 @@ impl ErrorClassifier {
                 description: "Pad linking failed".to_string(),
             },
         );
-        
+
         Self { patterns }
     }
 
     /// Classify an error based on its message
     pub fn classify_error(&self, error: &DeepStreamError) -> ErrorClassification {
         let error_str = error.to_string().to_lowercase();
-        
+
         // Check for pattern matches
         for (pattern, classification) in &self.patterns {
             if error_str.contains(pattern) {
                 return classification.clone();
             }
         }
-        
+
         // Default classification based on error type
         match error {
             DeepStreamError::GStreamer(_) | DeepStreamError::GStreamerBool(_) => {
@@ -288,7 +288,9 @@ impl ErrorClassifier {
         let classification = self.classify_error(error);
         matches!(
             classification.action,
-            RecoveryAction::RetryNow | RecoveryAction::RetryWithBackoff { .. } | RecoveryAction::Reconnect
+            RecoveryAction::RetryNow
+                | RecoveryAction::RetryWithBackoff { .. }
+                | RecoveryAction::Reconnect
         )
     }
 
@@ -329,10 +331,10 @@ mod tests {
     #[test]
     fn test_network_error_classification() {
         let classifier = ErrorClassifier::new();
-        
+
         let error = DeepStreamError::Unknown("Connection refused".to_string());
         let classification = classifier.classify_error(&error);
-        
+
         assert_eq!(classification.category, ErrorCategory::Network);
         assert_eq!(classification.persistence, ErrorPersistence::Transient);
         assert!(matches!(
@@ -344,10 +346,10 @@ mod tests {
     #[test]
     fn test_timeout_error_classification() {
         let classifier = ErrorClassifier::new();
-        
+
         let error = DeepStreamError::Timeout("Request timeout".to_string());
         let classification = classifier.classify_error(&error);
-        
+
         assert_eq!(classification.category, ErrorCategory::Network);
         assert_eq!(classification.persistence, ErrorPersistence::Transient);
         assert_eq!(classification.severity, ErrorSeverity::Recoverable);
@@ -356,10 +358,10 @@ mod tests {
     #[test]
     fn test_permanent_error_classification() {
         let classifier = ErrorClassifier::new();
-        
+
         let error = DeepStreamError::Unknown("File not found".to_string());
         let classification = classifier.classify_error(&error);
-        
+
         assert_eq!(classification.category, ErrorCategory::Resource);
         assert_eq!(classification.persistence, ErrorPersistence::Permanent);
         assert_eq!(classification.action, RecoveryAction::FailSource);
@@ -368,10 +370,10 @@ mod tests {
     #[test]
     fn test_is_retryable() {
         let classifier = ErrorClassifier::new();
-        
+
         let retryable_error = DeepStreamError::Timeout("Timeout".to_string());
         assert!(classifier.is_retryable(&retryable_error));
-        
+
         let permanent_error = DeepStreamError::Unknown("Out of memory".to_string());
         assert!(!classifier.is_retryable(&permanent_error));
     }
@@ -379,10 +381,10 @@ mod tests {
     #[test]
     fn test_retry_delay() {
         let classifier = ErrorClassifier::new();
-        
+
         let error = DeepStreamError::Unknown("Connection refused".to_string());
         let delay = classifier.get_retry_delay(&error);
-        
+
         assert!(delay.is_some());
         assert_eq!(delay.unwrap(), std::time::Duration::from_millis(1000));
     }
@@ -390,7 +392,7 @@ mod tests {
     #[test]
     fn test_custom_pattern() {
         let mut classifier = ErrorClassifier::new();
-        
+
         classifier.add_pattern(
             "custom error".to_string(),
             ErrorClassification {
@@ -401,10 +403,10 @@ mod tests {
                 description: "Custom fatal error".to_string(),
             },
         );
-        
+
         let error = DeepStreamError::Unknown("This is a custom error".to_string());
         let classification = classifier.classify_error(&error);
-        
+
         assert_eq!(classification.severity, ErrorSeverity::Fatal);
         assert_eq!(classification.action, RecoveryAction::NoRecovery);
     }

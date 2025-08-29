@@ -1,8 +1,8 @@
-pub mod detector;
-pub mod deepstream;
-pub mod standard;
-pub mod mock;
 pub mod cpu_vision;
+pub mod deepstream;
+pub mod detector;
+pub mod mock;
+pub mod standard;
 
 use crate::error::Result;
 use crate::platform::PlatformInfo;
@@ -59,31 +59,39 @@ impl Default for BackendCapabilities {
 
 pub trait Backend: Send + Sync {
     fn backend_type(&self) -> BackendType;
-    
+
     fn capabilities(&self) -> &BackendCapabilities;
-    
-    fn is_available() -> bool where Self: Sized;
-    
-    fn new(platform: &PlatformInfo) -> Result<Box<dyn Backend>> where Self: Sized;
-    
+
+    fn is_available() -> bool
+    where
+        Self: Sized;
+
+    fn new(platform: &PlatformInfo) -> Result<Box<dyn Backend>>
+    where
+        Self: Sized;
+
     fn create_stream_mux(&self, name: Option<&str>) -> Result<gst::Element>;
-    
+
     fn create_inference(&self, name: Option<&str>, config_path: &str) -> Result<gst::Element>;
-    
+
     fn create_tracker(&self, name: Option<&str>) -> Result<gst::Element>;
-    
+
     fn create_tiler(&self, name: Option<&str>) -> Result<gst::Element>;
-    
+
     fn create_osd(&self, name: Option<&str>) -> Result<gst::Element>;
-    
+
     fn create_video_convert(&self, name: Option<&str>) -> Result<gst::Element>;
-    
+
     fn create_video_sink(&self, name: Option<&str>) -> Result<gst::Element>;
-    
+
     fn create_decoder(&self, name: Option<&str>) -> Result<gst::Element>;
-    
-    fn configure_element(&self, element: &gst::Element, config: &HashMap<String, String>) -> Result<()>;
-    
+
+    fn configure_element(
+        &self,
+        element: &gst::Element,
+        config: &HashMap<String, String>,
+    ) -> Result<()>;
+
     fn get_element_mapping(&self, deepstream_element: &str) -> Option<&str>;
 }
 
@@ -96,16 +104,16 @@ impl BackendManager {
     pub fn new() -> Result<Self> {
         let platform = PlatformInfo::detect()?;
         let backend = detector::detect_and_create_backend(&platform)?;
-        
+
         log::info!(
             "Initialized {} backend on {:?} platform",
             backend.backend_type().name(),
             platform.platform
         );
-        
+
         Ok(Self { backend, platform })
     }
-    
+
     pub fn with_backend(backend_type: BackendType) -> Result<Self> {
         let platform = PlatformInfo::detect()?;
         let backend = match backend_type {
@@ -121,28 +129,28 @@ impl BackendManager {
             BackendType::Standard => standard::StandardBackend::new(&platform)?,
             BackendType::Mock => mock::MockBackend::new(&platform)?,
         };
-        
+
         log::info!(
             "Initialized {} backend on {:?} platform",
             backend.backend_type().name(),
             platform.platform
         );
-        
+
         Ok(Self { backend, platform })
     }
-    
+
     pub fn backend(&self) -> &dyn Backend {
         self.backend.as_ref()
     }
-    
+
     pub fn platform(&self) -> &PlatformInfo {
         &self.platform
     }
-    
+
     pub fn capabilities(&self) -> &BackendCapabilities {
         self.backend.capabilities()
     }
-    
+
     pub fn backend_type(&self) -> BackendType {
         self.backend.backend_type()
     }

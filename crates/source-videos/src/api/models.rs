@@ -1,6 +1,6 @@
+use crate::config_types::{FileContainer, Framerate, Resolution, VideoFormat};
+use crate::{SourceInfo, SourceState, TestPattern, VideoSourceConfig, VideoSourceType};
 use serde::{Deserialize, Serialize};
-use crate::{VideoSourceConfig, VideoSourceType, SourceInfo, SourceState, TestPattern};
-use crate::config_types::{Resolution, Framerate, VideoFormat, FileContainer};
 use std::collections::HashMap;
 
 // Source Management Models
@@ -24,9 +24,17 @@ pub struct AddSourceRequest {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(tag = "type", rename_all = "snake_case")]
 pub enum SourceTypeRequest {
-    TestPattern { pattern: String },
-    File { path: String, container: Option<FileContainer> },
-    Rtsp { mount_point: String, port: Option<u16> },
+    TestPattern {
+        pattern: String,
+    },
+    File {
+        path: String,
+        container: Option<FileContainer>,
+    },
+    Rtsp {
+        mount_point: String,
+        port: Option<u16>,
+    },
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -116,8 +124,12 @@ pub struct StartServerRequest {
     pub network_profile: Option<String>,
 }
 
-fn default_port() -> u16 { 8554 }
-fn default_address() -> String { "0.0.0.0".to_string() }
+fn default_port() -> u16 {
+    8554
+}
+fn default_address() -> String {
+    "0.0.0.0".to_string()
+}
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ServerStatusResponse {
@@ -230,11 +242,17 @@ pub struct GenerateVideoRequest {
 }
 
 fn default_resolution() -> Resolution {
-    Resolution { width: 1920, height: 1080 }
+    Resolution {
+        width: 1920,
+        height: 1080,
+    }
 }
 
 fn default_framerate() -> Framerate {
-    Framerate { numerator: 30, denominator: 1 }
+    Framerate {
+        numerator: 30,
+        denominator: 1,
+    }
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -275,7 +293,9 @@ pub struct StartWatchingRequest {
     pub debounce_ms: u64,
 }
 
-fn default_debounce() -> u64 { 500 }
+fn default_debounce() -> u64 {
+    500
+}
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct WatchStatusResponse {

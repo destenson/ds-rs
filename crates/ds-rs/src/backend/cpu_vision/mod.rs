@@ -1,11 +1,13 @@
-#[cfg(feature = "nalgebra")]
-pub mod tracker;
+pub mod cpudetector;
 pub mod elements;
 pub mod metadata;
-pub mod cpudetector;
+#[cfg(feature = "nalgebra")]
+pub mod tracker;
 
 // Re-export detector types from cpuinfer crate
-pub use gstcpuinfer::detector::{OnnxDetector, DetectorConfig, Detection, YoloVersion, DetectorError};
+pub use gstcpuinfer::detector::{
+    Detection, DetectorConfig, DetectorError, OnnxDetector, YoloVersion,
+};
 
 use crate::error::Result;
 
@@ -25,16 +27,16 @@ impl CpuVisionBackend {
             tracker: tracker::CentroidTracker::new(50.0, 30),
         })
     }
-    
+
     pub fn load_model(&mut self, model_path: &str) -> Result<()> {
         self.detector = Some(OnnxDetector::new(model_path)?);
         Ok(())
     }
-    
+
     pub fn detector(&self) -> Option<&OnnxDetector> {
         self.detector.as_ref()
     }
-    
+
     #[cfg(feature = "nalgebra")]
     pub fn tracker_mut(&mut self) -> &mut tracker::CentroidTracker {
         &mut self.tracker
@@ -44,7 +46,7 @@ impl CpuVisionBackend {
 #[cfg(test)]
 mod tests {
     use super::*;
-    
+
     #[test]
     fn test_cpu_vision_backend_creation() {
         let backend = CpuVisionBackend::new().unwrap();

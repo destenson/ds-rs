@@ -1,8 +1,8 @@
-use axum::{extract::State, Json};
-use std::sync::Arc;
+use crate::api::{ApiError, ApiResult, ApiState, models::*};
+use crate::{DirectoryConfig, DirectoryScanner, FilterConfig, TestPattern, generate_test_file};
+use axum::{Json, extract::State};
 use std::path::PathBuf;
-use crate::api::{ApiState, ApiError, ApiResult, models::*};
-use crate::{generate_test_file, TestPattern, DirectoryScanner, DirectoryConfig, FilterConfig};
+use std::sync::Arc;
 
 pub async fn generate_video(
     State(_state): State<Arc<ApiState>>,
@@ -12,11 +12,11 @@ pub async fn generate_video(
     let width = req.resolution.width;
     let height = req.resolution.height;
     let fps = req.framerate.numerator / req.framerate.denominator.max(1);
-    
+
     // Generate the test video file
     generate_test_file(&req.pattern, req.duration, &output_path)
         .map_err(|e| ApiError::internal(format!("Failed to generate video: {}", e)))?;
-    
+
     Ok(Json(SuccessResponse {
         success: true,
         message: Some(format!("Generated video at: {}", req.output)),
@@ -36,7 +36,7 @@ pub async fn scan_directory(
     } else {
         None
     };
-    
+
     let dir_config = DirectoryConfig {
         path: req.path.clone(),
         recursive: req.recursive,
@@ -44,15 +44,16 @@ pub async fn scan_directory(
         lazy_loading: false,
         mount_prefix: None,
     };
-    
+
     let mut scanner = DirectoryScanner::new(dir_config);
-    let source_configs = scanner.scan()
+    let source_configs = scanner
+        .scan()
         .map_err(|e| ApiError::internal(format!("Failed to scan directory: {}", e)))?;
-    
+
     let found_count = source_configs.len();
     let mut added_count = 0;
     let mut sources = Vec::new();
-    
+
     if req.add_to_server {
         for config in source_configs {
             match state.source_manager.add_source(config.clone()) {
@@ -74,7 +75,7 @@ pub async fn scan_directory(
             }
         }
     }
-    
+
     Ok(Json(ScanDirectoryResponse {
         found_count,
         added_count,
@@ -96,7 +97,7 @@ pub async fn list_patterns(
             }
         })
         .collect();
-    
+
     Ok(Json(patterns))
 }
 
@@ -106,22 +107,25 @@ pub async fn start_watching(
 ) -> ApiResult<Json<SuccessResponse>> {
     let mut watcher_manager = state.watcher_manager.write().await;
     let path = PathBuf::from(&req.directory);
-    
-    let watcher_id = watcher_manager.add_directory_watcher(&path, req.recursive).await
+
+    let watcher_id = watcher_manager
+        .add_directory_watcher(&path, req.recursive)
+        .await
         .map_err(|e| ApiError::internal(format!("Failed to start watching: {}", e)))?;
-    
+
     Ok(Json(SuccessResponse {
         success: true,
-        message: Some(format!("Started watching directory with ID: {}", watcher_id)),
+        message: Some(format!(
+            "Started watching directory with ID: {}",
+            watcher_id
+        )),
     }))
 }
 
-pub async fn stop_watching(
-    State(state): State<Arc<ApiState>>,
-) -> ApiResult<Json<SuccessResponse>> {
+pub async fn stop_watching(State(state): State<Arc<ApiState>>) -> ApiResult<Json<SuccessResponse>> {
     let mut watcher_manager = state.watcher_manager.write().await;
     watcher_manager.stop_all();
-    
+
     Ok(Json(SuccessResponse {
         success: true,
         message: Some("Stopped all file watchers".to_string()),
@@ -132,10 +136,10 @@ pub async fn watch_status(
     State(state): State<Arc<ApiState>>,
 ) -> ApiResult<Json<WatchStatusResponse>> {
     let watcher_manager = state.watcher_manager.read().await;
-    
+
     // Check if any watchers are active
     let active = true; // Simplified - would check actual watcher state
-    
+
     // Get watcher info
     let watchers = if active {
         vec![WatcherInfo {
@@ -147,9 +151,6 @@ pub async fn watch_status(
     } else {
         vec![]
     };
-    
-    Ok(Json(WatchStatusResponse {
-        active,
-        watchers,
-    }))
+
+    Ok(Json(WatchStatusResponse { active, watchers }))
 }

@@ -1,6 +1,6 @@
-pub mod sources;
-pub mod server;
 pub mod config;
+pub mod health;
 pub mod network;
 pub mod operations;
-pub mod health;
+pub mod server;
+pub mod sources;

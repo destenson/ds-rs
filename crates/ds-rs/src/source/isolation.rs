@@ -1,9 +1,9 @@
-use std::sync::{Arc, Mutex};
+use super::{SourceId, SourceInfo};
+use crate::error::{DeepStreamError, Result};
 use std::panic::{self, AssertUnwindSafe};
+use std::sync::{Arc, Mutex};
 use std::thread;
 use std::time::Duration;
-use crate::error::{DeepStreamError, Result};
-use super::{SourceId, SourceInfo};
 
 /// Isolation policy for source failures
 #[derive(Debug, Clone, Copy, PartialEq)]
@@ -106,7 +106,7 @@ impl ErrorBoundary {
                 } else {
                     "Unknown panic".to_string()
                 };
-                
+
                 log::error!("Source {} panicked: {}", self.source_id, msg);
                 IsolationResult::Panic(msg)
             }
@@ -121,10 +121,10 @@ impl ErrorBoundary {
     {
         let (tx, rx) = std::sync::mpsc::channel();
         let source_id = self.source_id;
-        
+
         let handle = thread::spawn(move || {
             let result = panic::catch_unwind(AssertUnwindSafe(|| f()));
-            
+
             match result {
                 Ok(Ok(value)) => {
                     let _ = tx.send(IsolationResult::Success(value));
@@ -140,7 +140,7 @@ impl ErrorBoundary {
                     } else {
                         "Unknown panic".to_string()
                     };
-                    
+
                     log::error!("Source {} thread panicked: {}", source_id, msg);
                     let _ = tx.send(IsolationResult::Panic(msg));
                 }
@@ -153,13 +153,13 @@ impl ErrorBoundary {
             Ok(result) => {
                 // Thread completed
                 let _ = handle.join();
-                
+
                 match &result {
                     IsolationResult::Error(_) => self.record_error(),
                     IsolationResult::Panic(_) => self.record_panic(),
                     _ => {}
                 }
-                
+
                 result
             }
             Err(_) => {
@@ -249,7 +249,7 @@ impl IsolatedSource {
         }
 
         let result = self.boundary.execute(f);
-        
+
         match result {
             IsolationResult::Success(value) => {
                 // Reset failure count on success
@@ -275,7 +275,7 @@ impl IsolatedSource {
     fn handle_failure(&self) {
         let mut count = self.failure_count.lock().unwrap();
         *count += 1;
-        
+
         if *count >= self.max_failures {
             self.quarantine(format!("Exceeded {} failures", self.max_failures));
         }
@@ -299,12 +299,10 @@ impl IsolationManager {
     /// Add a source to isolation management
     pub fn add_source(&self, source_id: SourceId) -> Arc<IsolatedSource> {
         let mut sources = self.sources.lock().unwrap();
-        
+
         sources
             .entry(source_id)
-            .or_insert_with(|| {
-                Arc::new(IsolatedSource::new(source_id, self.default_policy))
-            })
+            .or_insert_with(|| Arc::new(IsolatedSource::new(source_id, self.default_policy)))
             .clone()
     }
 
@@ -348,9 +346,9 @@ mod tests {
     #[test]
     fn test_error_boundary_success() {
         let boundary = ErrorBoundary::new(SourceId(0), IsolationPolicy::Basic);
-        
+
         let result = boundary.execute(|| Ok(42));
-        
+
         match result {
             IsolationResult::Success(value) => assert_eq!(value, 42),
             _ => panic!("Expected success"),
@@ -360,11 +358,10 @@ mod tests {
     #[test]
     fn test_error_boundary_error() {
         let boundary = ErrorBoundary::new(SourceId(0), IsolationPolicy::Basic);
-        
-        let result = boundary.execute(|| {
-            Err::<i32, _>(DeepStreamError::Unknown("Test error".to_string()))
-        });
-        
+
+        let result =
+            boundary.execute(|| Err::<i32, _>(DeepStreamError::Unknown("Test error".to_string())));
+
         match result {
             IsolationResult::Error(_) => {
                 let (errors, _) = boundary.get_stats();
@@ -377,11 +374,11 @@ mod tests {
     #[test]
     fn test_error_boundary_panic() {
         let boundary = ErrorBoundary::new(SourceId(0), IsolationPolicy::Basic);
-        
+
         let result = boundary.execute(|| -> Result<i32> {
             panic!("Test panic");
         });
-        
+
         match result {
             IsolationResult::Panic(msg) => {
                 assert!(msg.contains("Test panic"));
@@ -396,27 +393,27 @@ mod tests {
     fn test_isolated_source_quarantine() {
         let mut source = IsolatedSource::new(SourceId(0), IsolationPolicy::Basic);
         source.max_failures = 2;
-        
+
         // First failure
         let _ = source.execute_with_quarantine(|| {
             Err::<i32, _>(DeepStreamError::Unknown("Error 1".to_string()))
         });
         assert!(!source.is_quarantined());
-        
+
         // Second failure - should quarantine
         let _ = source.execute_with_quarantine(|| {
             Err::<i32, _>(DeepStreamError::Unknown("Error 2".to_string()))
         });
         assert!(source.is_quarantined());
-        
+
         // Further operations should fail
         let result = source.execute_with_quarantine(|| Ok(42));
         assert!(result.is_err());
-        
+
         // Release quarantine
         source.release_quarantine();
         assert!(!source.is_quarantined());
-        
+
         // Should work again
         let result = source.execute_with_quarantine(|| Ok(42));
         assert!(result.is_ok());
@@ -425,22 +422,22 @@ mod tests {
     #[test]
     fn test_isolation_manager() {
         let manager = IsolationManager::new(IsolationPolicy::Basic);
-        
+
         // Add sources
         let source1 = manager.add_source(SourceId(1));
         let source2 = manager.add_source(SourceId(2));
-        
+
         // Quarantine one source
         source1.quarantine("Test quarantine".to_string());
-        
+
         // Check quarantined sources
         let quarantined = manager.get_quarantined_sources();
         assert_eq!(quarantined.len(), 1);
         assert_eq!(quarantined[0], SourceId(1));
-        
+
         // Release all
         manager.release_all_quarantines();
-        
+
         let quarantined = manager.get_quarantined_sources();
         assert_eq!(quarantined.len(), 0);
     }

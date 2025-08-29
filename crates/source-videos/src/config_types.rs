@@ -6,25 +6,25 @@ use std::path::Path;
 pub struct VideoSourceConfig {
     #[serde(default = "default_name")]
     pub name: String,
-    
+
     #[serde(flatten)]
     pub source_type: VideoSourceType,
-    
+
     #[serde(default = "default_resolution")]
     pub resolution: Resolution,
-    
+
     #[serde(default = "default_framerate")]
     pub framerate: Framerate,
-    
+
     #[serde(default = "default_format")]
     pub format: VideoFormat,
-    
+
     #[serde(default)]
     pub duration: Option<u64>,
-    
+
     #[serde(default)]
     pub num_buffers: Option<i32>,
-    
+
     #[serde(default = "default_is_live")]
     pub is_live: bool,
 }
@@ -91,16 +91,16 @@ pub enum FileContainer {
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct DirectoryConfig {
     pub path: String,
-    
+
     #[serde(default = "default_recursive")]
     pub recursive: bool,
-    
+
     #[serde(default)]
     pub filters: Option<FilterConfig>,
-    
+
     #[serde(default = "default_lazy_loading")]
     pub lazy_loading: bool,
-    
+
     #[serde(default)]
     pub mount_prefix: Option<String>,
 }
@@ -108,10 +108,10 @@ pub struct DirectoryConfig {
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct FileListConfig {
     pub files: Vec<String>,
-    
+
     #[serde(default)]
     pub mount_prefix: Option<String>,
-    
+
     #[serde(default = "default_lazy_loading")]
     pub lazy_loading: bool,
 }
@@ -120,10 +120,10 @@ pub struct FileListConfig {
 pub struct FilterConfig {
     #[serde(default)]
     pub include: Vec<String>,
-    
+
     #[serde(default)]
     pub exclude: Vec<String>,
-    
+
     #[serde(default)]
     pub extensions: Vec<String>,
 }
@@ -132,25 +132,25 @@ pub struct FilterConfig {
 pub struct WatchConfig {
     #[serde(default = "default_watch_enabled")]
     pub enabled: bool,
-    
+
     #[serde(default = "default_auto_repeat")]
     pub auto_repeat: bool,
-    
+
     #[serde(default = "default_reload_on_change")]
     pub reload_on_change: bool,
-    
+
     #[serde(default = "default_debounce_duration")]
     pub debounce_duration_ms: u64,
-    
+
     #[serde(default)]
     pub exclude_patterns: Vec<String>,
-    
+
     #[serde(default)]
     pub max_loops: Option<u32>,
-    
+
     #[serde(default = "default_seamless_loop")]
     pub seamless_loop: bool,
-    
+
     #[serde(default = "default_gap_duration")]
     pub gap_duration_ms: u64,
 }
@@ -159,13 +159,13 @@ pub struct WatchConfig {
 pub struct RtspServerConfig {
     #[serde(default = "default_rtsp_port")]
     pub port: u16,
-    
+
     #[serde(default = "default_rtsp_address")]
     pub address: String,
-    
+
     #[serde(default = "default_max_connections")]
     pub max_connections: u32,
-    
+
     #[serde(default)]
     pub authentication: Option<BasicAuthConfig>,
 }
@@ -180,13 +180,13 @@ pub struct BasicAuthConfig {
 pub struct AppConfig {
     #[serde(default)]
     pub server: RtspServerConfig,
-    
+
     #[serde(default)]
     pub sources: Vec<VideoSourceConfig>,
-    
+
     #[serde(default = "default_log_level")]
     pub log_level: String,
-    
+
     #[serde(default)]
     pub output_dir: Option<String>,
 }
@@ -206,7 +206,7 @@ impl VideoSourceConfig {
             is_live: true,
         }
     }
-    
+
     pub fn file(name: impl Into<String>, path: impl Into<String>) -> Self {
         Self {
             name: name.into(),
@@ -222,7 +222,7 @@ impl VideoSourceConfig {
             is_live: false,
         }
     }
-    
+
     pub fn rtsp(name: impl Into<String>, mount_point: impl Into<String>) -> Self {
         Self {
             name: name.into(),
@@ -238,7 +238,7 @@ impl VideoSourceConfig {
             is_live: true,
         }
     }
-    
+
     pub fn get_uri(&self) -> String {
         match &self.source_type {
             VideoSourceType::TestPattern { .. } => {
@@ -265,7 +265,7 @@ impl AppConfig {
         let content = std::fs::read_to_string(path)?;
         toml::from_str(&content).map_err(Into::into)
     }
-    
+
     pub fn save<P: AsRef<Path>>(&self, path: P) -> Result<()> {
         let content = toml::to_string_pretty(self)
             .map_err(|e| SourceVideoError::config(format!("Failed to serialize config: {}", e)))?;
@@ -320,7 +320,7 @@ impl FileContainer {
             FileContainer::WebM => "webmmux",
         }
     }
-    
+
     pub fn extension(&self) -> &str {
         match self {
             FileContainer::Mp4 => "mp4",
@@ -420,7 +420,7 @@ fn default_gap_duration() -> u64 {
 #[cfg(test)]
 mod tests {
     use super::*;
-    
+
     #[test]
     fn test_config_serialization() {
         let config = AppConfig::default();
@@ -428,15 +428,15 @@ mod tests {
         let parsed: AppConfig = toml::from_str(&toml_str).unwrap();
         assert_eq!(parsed.server.port, config.server.port);
     }
-    
+
     #[test]
     fn test_source_uri_generation() {
         let pattern_source = VideoSourceConfig::test_pattern("test", "smpte");
         assert_eq!(pattern_source.get_uri(), "videotestsrc:///test");
-        
+
         let file_source = VideoSourceConfig::file("video", "/tmp/test.mp4");
         assert_eq!(file_source.get_uri(), "file:////tmp/test.mp4");
-        
+
         let rtsp_source = VideoSourceConfig::rtsp("stream", "test1");
         assert_eq!(rtsp_source.get_uri(), "rtsp://localhost:8554/test1");
     }

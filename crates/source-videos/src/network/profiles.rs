@@ -49,7 +49,7 @@ impl NetworkProfile {
                 max_delay_ms: 0,
                 delay_probability: 0.0,
             },
-            
+
             NetworkProfile::Mobile3G => NetworkConditions {
                 packet_loss: 2.0,
                 latency_ms: 150,
@@ -62,7 +62,7 @@ impl NetworkProfile {
                 max_delay_ms: 180,
                 delay_probability: 100.0,
             },
-            
+
             NetworkProfile::Mobile4G => NetworkConditions {
                 packet_loss: 0.5,
                 latency_ms: 50,
@@ -75,7 +75,7 @@ impl NetworkProfile {
                 max_delay_ms: 60,
                 delay_probability: 100.0,
             },
-            
+
             NetworkProfile::Mobile5G => NetworkConditions {
                 packet_loss: 0.1,
                 latency_ms: 10,
@@ -88,7 +88,7 @@ impl NetworkProfile {
                 max_delay_ms: 12,
                 delay_probability: 100.0,
             },
-            
+
             NetworkProfile::WiFiHome => NetworkConditions {
                 packet_loss: 0.2,
                 latency_ms: 5,
@@ -101,7 +101,7 @@ impl NetworkProfile {
                 max_delay_ms: 7,
                 delay_probability: 100.0,
             },
-            
+
             NetworkProfile::WiFiPublic => NetworkConditions {
                 packet_loss: 3.0,
                 latency_ms: 100,
@@ -114,7 +114,7 @@ impl NetworkProfile {
                 max_delay_ms: 150,
                 delay_probability: 100.0,
             },
-            
+
             NetworkProfile::Satellite => NetworkConditions {
                 packet_loss: 1.0,
                 latency_ms: 600,
@@ -122,12 +122,12 @@ impl NetworkProfile {
                 connection_dropped: false,
                 jitter_ms: 100,
                 duplicate_probability: 0.2,
-                allow_reordering: false,  // Satellite links maintain order
+                allow_reordering: false, // Satellite links maintain order
                 min_delay_ms: 550,
                 max_delay_ms: 700,
                 delay_probability: 100.0,
             },
-            
+
             NetworkProfile::Broadband => NetworkConditions {
                 packet_loss: 0.1,
                 latency_ms: 20,
@@ -140,7 +140,7 @@ impl NetworkProfile {
                 max_delay_ms: 25,
                 delay_probability: 100.0,
             },
-            
+
             NetworkProfile::Poor => NetworkConditions {
                 packet_loss: 10.0,
                 latency_ms: 500,
@@ -153,63 +153,63 @@ impl NetworkProfile {
                 max_delay_ms: 700,
                 delay_probability: 100.0,
             },
-            
+
             NetworkProfile::NoisyRadio => NetworkConditions {
-                packet_loss: 15.0,  // High packet loss due to interference
-                latency_ms: 80,     // Moderate latency
+                packet_loss: 15.0,    // High packet loss due to interference
+                latency_ms: 80,       // Moderate latency
                 bandwidth_kbps: 1000, // 1 Mbps limited bandwidth
                 connection_dropped: false,
-                jitter_ms: 150,     // High jitter from signal variations
-                duplicate_probability: 3.0,  // Radio interference can cause duplicates
-                allow_reordering: true,  // Signal reflections cause reordering
+                jitter_ms: 150,             // High jitter from signal variations
+                duplicate_probability: 3.0, // Radio interference can cause duplicates
+                allow_reordering: true,     // Signal reflections cause reordering
                 min_delay_ms: 20,
                 max_delay_ms: 230,
                 delay_probability: 100.0,
             },
-            
+
             NetworkProfile::IntermittentSatellite => NetworkConditions {
-                packet_loss: 3.0,   // Some packet loss
-                latency_ms: 750,    // Very high latency
-                bandwidth_kbps: 5000, // 5 Mbps when connected
+                packet_loss: 3.0,          // Some packet loss
+                latency_ms: 750,           // Very high latency
+                bandwidth_kbps: 5000,      // 5 Mbps when connected
                 connection_dropped: false, // Will be toggled periodically
-                jitter_ms: 200,     // High jitter from atmospheric conditions
+                jitter_ms: 200,            // High jitter from atmospheric conditions
                 duplicate_probability: 0.5,
                 allow_reordering: false,
                 min_delay_ms: 650,
                 max_delay_ms: 950,
                 delay_probability: 100.0,
             },
-            
+
             NetworkProfile::DroneUrban => NetworkConditions {
-                packet_loss: 20.0,  // High loss from building obstruction
-                latency_ms: 40,     // Low latency when signal gets through
+                packet_loss: 20.0,   // High loss from building obstruction
+                latency_ms: 40,      // Low latency when signal gets through
                 bandwidth_kbps: 800, // Limited bandwidth on UHF/VHF
                 connection_dropped: false,
-                jitter_ms: 120,     // Variable due to multipath reflections
-                duplicate_probability: 5.0,  // Multipath reflections cause duplicates
-                allow_reordering: true,  // Building reflections cause severe reordering
+                jitter_ms: 120,             // Variable due to multipath reflections
+                duplicate_probability: 5.0, // Multipath reflections cause duplicates
+                allow_reordering: true,     // Building reflections cause severe reordering
                 min_delay_ms: 10,
                 max_delay_ms: 160,
                 delay_probability: 100.0,
             },
-            
+
             NetworkProfile::DroneMountain => NetworkConditions {
-                packet_loss: 5.0,   // Lower loss in open terrain
-                latency_ms: 60,     // Slightly higher from distance
+                packet_loss: 5.0,     // Lower loss in open terrain
+                latency_ms: 60,       // Slightly higher from distance
                 bandwidth_kbps: 1500, // Better bandwidth in clear air
                 connection_dropped: false,
-                jitter_ms: 30,      // More stable than urban
+                jitter_ms: 30, // More stable than urban
                 duplicate_probability: 1.0,
                 allow_reordering: true,
                 min_delay_ms: 45,
                 max_delay_ms: 90,
                 delay_probability: 100.0,
             },
-            
+
             NetworkProfile::Custom => NetworkConditions::default(),
         }
     }
-    
+
     /// Get a description of the profile
     pub fn description(&self) -> &'static str {
         match self {
@@ -223,13 +223,19 @@ impl NetworkProfile {
             NetworkProfile::Broadband => "Cable/DSL broadband (100 Mbps, 20ms latency)",
             NetworkProfile::Poor => "Poor network conditions (500 kbps, 500ms latency)",
             NetworkProfile::NoisyRadio => "Noisy radio link (15% loss, high jitter, 1 Mbps)",
-            NetworkProfile::IntermittentSatellite => "Intermittent satellite (750ms latency, periodic drops)",
-            NetworkProfile::DroneUrban => "Drone UHF/VHF through buildings (20% loss, multipath, 800 kbps)",
-            NetworkProfile::DroneMountain => "Drone in mountain terrain (5% loss, distance effects, 1.5 Mbps)",
+            NetworkProfile::IntermittentSatellite => {
+                "Intermittent satellite (750ms latency, periodic drops)"
+            }
+            NetworkProfile::DroneUrban => {
+                "Drone UHF/VHF through buildings (20% loss, multipath, 800 kbps)"
+            }
+            NetworkProfile::DroneMountain => {
+                "Drone in mountain terrain (5% loss, distance effects, 1.5 Mbps)"
+            }
             NetworkProfile::Custom => "Custom network profile",
         }
     }
-    
+
     /// Get all available profiles
     pub fn all() -> Vec<NetworkProfile> {
         vec![
@@ -258,39 +264,39 @@ impl StandardProfiles {
     pub fn for_error_recovery() -> NetworkProfile {
         NetworkProfile::Poor
     }
-    
+
     /// Get profile for testing reconnection
     pub fn for_reconnection_test() -> NetworkConditions {
         let mut conditions = NetworkProfile::Mobile4G.into_conditions();
         conditions.connection_dropped = true;
         conditions
     }
-    
+
     /// Get profile for testing buffering
     pub fn for_buffer_test() -> NetworkProfile {
         NetworkProfile::Mobile3G
     }
-    
+
     /// Get profile for testing high latency
     pub fn for_latency_test() -> NetworkProfile {
         NetworkProfile::Satellite
     }
-    
+
     /// Get profile for testing noisy/unreliable connections
     pub fn for_reliability_test() -> NetworkProfile {
         NetworkProfile::NoisyRadio
     }
-    
+
     /// Get profile for testing intermittent connections
     pub fn for_intermittent_test() -> NetworkProfile {
         NetworkProfile::IntermittentSatellite
     }
-    
+
     /// Get profile for testing urban drone/UAV communications
     pub fn for_drone_test() -> NetworkProfile {
         NetworkProfile::DroneUrban
     }
-    
+
     /// Get profile for testing multipath and obstruction effects
     pub fn for_obstruction_test() -> NetworkProfile {
         NetworkProfile::DroneUrban
@@ -305,7 +311,7 @@ impl std::fmt::Display for NetworkProfile {
 
 impl std::str::FromStr for NetworkProfile {
     type Err = String;
-    
+
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         match s.to_lowercase().as_str() {
             "perfect" => Ok(NetworkProfile::Perfect),
@@ -318,9 +324,15 @@ impl std::str::FromStr for NetworkProfile {
             "broadband" | "cable" | "dsl" => Ok(NetworkProfile::Broadband),
             "poor" | "bad" => Ok(NetworkProfile::Poor),
             "noisy" | "noisyradio" | "radio" => Ok(NetworkProfile::NoisyRadio),
-            "intermittent" | "intermittentsatellite" | "intermittent-satellite" => Ok(NetworkProfile::IntermittentSatellite),
-            "drone" | "droneurban" | "drone-urban" | "uhf" | "vhf" => Ok(NetworkProfile::DroneUrban),
-            "mountain" | "dronemountain" | "drone-mountain" | "open-terrain" => Ok(NetworkProfile::DroneMountain),
+            "intermittent" | "intermittentsatellite" | "intermittent-satellite" => {
+                Ok(NetworkProfile::IntermittentSatellite)
+            }
+            "drone" | "droneurban" | "drone-urban" | "uhf" | "vhf" => {
+                Ok(NetworkProfile::DroneUrban)
+            }
+            "mountain" | "dronemountain" | "drone-mountain" | "open-terrain" => {
+                Ok(NetworkProfile::DroneMountain)
+            }
             "custom" => Ok(NetworkProfile::Custom),
             _ => Err(format!("Unknown network profile: {}", s)),
         }
@@ -330,40 +342,52 @@ impl std::str::FromStr for NetworkProfile {
 #[cfg(test)]
 mod tests {
     use super::*;
-    
+
     #[test]
     fn test_profile_conditions() {
         let perfect = NetworkProfile::Perfect.into_conditions();
         assert_eq!(perfect.packet_loss, 0.0);
         assert_eq!(perfect.latency_ms, 0);
-        
+
         let mobile3g = NetworkProfile::Mobile3G.into_conditions();
         assert!(mobile3g.packet_loss > 0.0);
         assert!(mobile3g.latency_ms > 100);
         assert!(mobile3g.bandwidth_kbps > 0);
-        
+
         let satellite = NetworkProfile::Satellite.into_conditions();
         assert!(satellite.latency_ms > 500);
     }
-    
+
     #[test]
     fn test_profile_parsing() {
-        assert_eq!("perfect".parse::<NetworkProfile>().unwrap(), NetworkProfile::Perfect);
-        assert_eq!("3g".parse::<NetworkProfile>().unwrap(), NetworkProfile::Mobile3G);
-        assert_eq!("lte".parse::<NetworkProfile>().unwrap(), NetworkProfile::Mobile4G);
-        assert_eq!("satellite".parse::<NetworkProfile>().unwrap(), NetworkProfile::Satellite);
-        
+        assert_eq!(
+            "perfect".parse::<NetworkProfile>().unwrap(),
+            NetworkProfile::Perfect
+        );
+        assert_eq!(
+            "3g".parse::<NetworkProfile>().unwrap(),
+            NetworkProfile::Mobile3G
+        );
+        assert_eq!(
+            "lte".parse::<NetworkProfile>().unwrap(),
+            NetworkProfile::Mobile4G
+        );
+        assert_eq!(
+            "satellite".parse::<NetworkProfile>().unwrap(),
+            NetworkProfile::Satellite
+        );
+
         assert!("invalid".parse::<NetworkProfile>().is_err());
     }
-    
+
     #[test]
     fn test_standard_profiles() {
         let recovery = StandardProfiles::for_error_recovery();
         assert_eq!(recovery, NetworkProfile::Poor);
-        
+
         let reconnect = StandardProfiles::for_reconnection_test();
         assert!(reconnect.connection_dropped);
-        
+
         let buffer = StandardProfiles::for_buffer_test();
         assert_eq!(buffer, NetworkProfile::Mobile3G);
     }

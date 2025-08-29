@@ -1,9 +1,11 @@
-use crate::config_types::{DirectoryConfig, FilterConfig, VideoSourceConfig, VideoSourceType, FileContainer};
+use crate::config_types::{
+    DirectoryConfig, FileContainer, FilterConfig, VideoSourceConfig, VideoSourceType,
+};
 use crate::error::{Result, SourceVideoError};
-use crate::file_utils::{is_video_file, path_to_mount_point, detect_container_format};
+use crate::file_utils::{detect_container_format, is_video_file, path_to_mount_point};
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
-use walkdir::{WalkDir, DirEntry};
+use walkdir::{DirEntry, WalkDir};
 
 pub struct DirectoryScanner {
     config: DirectoryConfig,
@@ -17,82 +19,80 @@ impl DirectoryScanner {
             discovered_files: Vec::new(),
         }
     }
-    
+
     pub fn scan(&mut self) -> Result<Vec<VideoSourceConfig>> {
         let path = Path::new(&self.config.path);
-        
+
         if !path.exists() {
             return Err(SourceVideoError::config(format!(
                 "Directory does not exist: {}",
                 self.config.path
             )));
         }
-        
+
         if !path.is_dir() {
             return Err(SourceVideoError::config(format!(
                 "Path is not a directory: {}",
                 self.config.path
             )));
         }
-        
+
         self.discovered_files.clear();
-        
+
         let walker = if self.config.recursive {
             WalkDir::new(path)
         } else {
             WalkDir::new(path).max_depth(1)
         };
-        
+
         for entry in walker.into_iter().filter_map(|e| e.ok()) {
             if self.should_include_entry(&entry) {
                 self.discovered_files.push(entry.path().to_path_buf());
             }
         }
-        
+
         log::info!(
             "Discovered {} video files in directory: {}",
             self.discovered_files.len(),
             self.config.path
         );
-        
+
         let configs = self.create_source_configs()?;
         Ok(configs)
     }
-    
+
     pub fn scan_async(&mut self) -> Result<Vec<VideoSourceConfig>> {
         // For now, just use synchronous scanning
         // Future: Implement background scanning with progress updates
         self.scan()
     }
-    
+
     fn should_include_entry(&self, entry: &DirEntry) -> bool {
         let path = entry.path();
-        
+
         // Skip directories
         if path.is_dir() {
             return false;
         }
-        
+
         // Check if it's a video file
         if !is_video_file(path) {
             return false;
         }
-        
+
         // Apply filters if configured
         if let Some(filters) = &self.config.filters {
             if !self.passes_filters(path, filters) {
                 return false;
             }
         }
-        
+
         true
     }
-    
+
     fn passes_filters(&self, path: &Path, filters: &FilterConfig) -> bool {
-        let file_name = path.file_name()
-            .and_then(|n| n.to_str())
-            .unwrap_or("");
-        
+        let file_name = path.file_name().and_then(|n| n.to_str()).unwrap_or("");
+
         // Check include patterns
         if !filters.include.is_empty() {
             let mut matches_include = false;
@@ -106,28 +106,30 @@ impl DirectoryScanner {
                 return false;
             }
         }
-        
+
         // Check exclude patterns
         for pattern in &filters.exclude {
             if self.matches_pattern(file_name, pattern) {
                 return false;
             }
         }
-        
+
         // Check extensions
         if !filters.extensions.is_empty() {
-            let extension = path.extension()
-                .and_then(|e| e.to_str())
-                .unwrap_or("");
-            
-            if !filters.extensions.iter().any(|ext| ext.eq_ignore_ascii_case(extension)) {
+            let extension = path.extension().and_then(|e| e.to_str()).unwrap_or("");
+
+            if !filters
+                .extensions
+                .iter()
+                .any(|ext| ext.eq_ignore_ascii_case(extension))
+            {
                 return false;
             }
         }
-        
+
         true
     }
-    
+
     fn matches_pattern(&self, file_name: &str, pattern: &str) -> bool {
         // Simple glob pattern matching
         // Future: Use proper glob library for more complex patterns
@@ -136,13 +138,13 @@ impl DirectoryScanner {
             if parts.is_empty() {
                 return true;
             }
-            
+
             let mut pos = 0;
             for (i, part) in parts.iter().enumerate() {
                 if part.is_empty() {
                     continue;
                 }
-                
+
                 if i == 0 && !pattern.starts_with('*') {
                     if !file_name.starts_with(part) {
                         return false;
@@ -163,28 +165,28 @@ impl DirectoryScanner {
             file_name == pattern
         }
     }
-    
+
     fn create_source_configs(&self) -> Result<Vec<VideoSourceConfig>> {
         let mut configs = Vec::new();
-        
+
         for (index, file_path) in self.discovered_files.iter().enumerate() {
             let mount_point = path_to_mount_point(
                 file_path,
                 &self.config.path,
-                self.config.mount_prefix.as_deref()
+                self.config.mount_prefix.as_deref(),
             )?;
-            
-            let container = detect_container_format(file_path)
-                .unwrap_or(FileContainer::Mp4);
-            
+
+            let container = detect_container_format(file_path).unwrap_or(FileContainer::Mp4);
+
             let source_name = format!(
                 "{}_{}",
-                file_path.file_stem()
+                file_path
+                    .file_stem()
                     .and_then(|s| s.to_str())
                     .unwrap_or("file"),
                 index
             );
-            
+
             let config = VideoSourceConfig {
                 name: source_name,
                 source_type: VideoSourceType::File {
@@ -204,13 +206,13 @@ impl DirectoryScanner {
                 num_buffers: None,
                 is_live: false,
             };
-            
+
             configs.push(config);
         }
-        
+
         Ok(configs)
     }
-    
+
     pub fn get_discovered_files(&self) -> &[PathBuf] {
         &self.discovered_files
     }
@@ -228,52 +230,49 @@ impl BatchSourceLoader {
             file_lists: Vec::new(),
         }
     }
-    
+
     pub fn add_directory(&mut self, config: DirectoryConfig) {
         self.directories.push(config);
     }
-    
+
     pub fn add_file_list(&mut self, files: Vec<String>) {
         self.file_lists.push(files);
     }
-    
+
     pub fn load_all(&mut self) -> Result<Vec<VideoSourceConfig>> {
         let mut all_configs = Vec::new();
-        
+
         // Process directories
         for dir_config in &self.directories {
             let mut scanner = DirectoryScanner::new(dir_config.clone());
             let configs = scanner.scan()?;
             all_configs.extend(configs);
         }
-        
+
         // Process file lists
         for (list_index, file_list) in self.file_lists.iter().enumerate() {
             for (file_index, file_path) in file_list.iter().enumerate() {
                 let path = Path::new(file_path);
-                
+
                 if !path.exists() {
                     log::warn!("File does not exist: {}", file_path);
                     continue;
                 }
-                
+
                 if !is_video_file(path) {
                     log::warn!("Not a video file: {}", file_path);
                     continue;
                 }
-                
-                let container = detect_container_format(path)
-                    .unwrap_or(FileContainer::Mp4);
-                
+
+                let container = detect_container_format(path).unwrap_or(FileContainer::Mp4);
+
                 let source_name = format!(
                     "list{}_file{}_{}",
                     list_index,
                     file_index,
-                    path.file_stem()
-                        .and_then(|s| s.to_str())
-                        .unwrap_or("video")
+                    path.file_stem().and_then(|s| s.to_str()).unwrap_or("video")
                 );
-                
+
                 let config = VideoSourceConfig {
                     name: source_name,
                     source_type: VideoSourceType::File {
@@ -293,11 +292,11 @@ impl BatchSourceLoader {
                     num_buffers: None,
                     is_live: false,
                 };
-                
+
                 all_configs.push(config);
             }
         }
-        
+
         Ok(all_configs)
     }
 }
@@ -307,7 +306,7 @@ mod tests {
     use super::*;
     use std::fs;
     use tempfile::TempDir;
-    
+
     #[test]
     fn test_directory_scanner_creation() {
         let config = DirectoryConfig {
@@ -317,11 +316,11 @@ mod tests {
             lazy_loading: true,
             mount_prefix: None,
         };
-        
+
         let scanner = DirectoryScanner::new(config);
         assert!(scanner.get_discovered_files().is_empty());
     }
-    
+
     #[test]
     fn test_pattern_matching() {
         let config = DirectoryConfig {
@@ -331,25 +330,25 @@ mod tests {
             lazy_loading: true,
             mount_prefix: None,
         };
-        
+
         let scanner = DirectoryScanner::new(config);
-        
+
         assert!(scanner.matches_pattern("test.mp4", "*.mp4"));
         assert!(scanner.matches_pattern("video.mp4", "*video*"));
         assert!(scanner.matches_pattern("test_video.mp4", "test_*"));
         assert!(!scanner.matches_pattern("test.avi", "*.mp4"));
         assert!(!scanner.matches_pattern("video.mp4", "audio*"));
     }
-    
+
     #[test]
     fn test_batch_source_loader() {
         let mut loader = BatchSourceLoader::new();
-        
+
         loader.add_file_list(vec![
             "/tmp/video1.mp4".to_string(),
             "/tmp/video2.avi".to_string(),
         ]);
-        
+
         assert_eq!(loader.file_lists.len(), 1);
         assert_eq!(loader.directories.len(), 0);
     }

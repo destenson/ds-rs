@@ -3,36 +3,36 @@
 use super::ResourceLimits;
 use super::StreamPriority;
 use gstcpuinfer::detector::DetectorConfig;
-use std::time::Duration;
 use serde::{Deserialize, Serialize};
+use std::time::Duration;
 
 /// Multi-stream configuration
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct MultiStreamConfig {
     /// Maximum number of concurrent streams
     pub max_concurrent_streams: usize,
-    
+
     /// Resource limits for the system
     pub resource_limits: ResourceLimits,
-    
+
     /// Detection configuration
     pub detector_config: DetectorConfig,
-    
+
     /// Load balancing configuration
     pub load_balancing: LoadBalancingConfig,
-    
+
     /// Quality control settings
     pub quality_control: QualityControlConfig,
-    
+
     /// Recovery configuration for failed streams
     pub recovery_config: StreamRecoveryConfig,
-    
+
     /// Metrics collection settings
     pub metrics_config: MetricsConfig,
-    
+
     /// Number of worker threads for async processing
     pub worker_threads: usize,
-    
+
     /// Enable debug logging
     pub debug_mode: bool,
 }
@@ -58,13 +58,13 @@ impl Default for MultiStreamConfig {
 pub struct LoadBalancingConfig {
     /// Strategy for load balancing
     pub strategy: LoadBalancingStrategy,
-    
+
     /// Rebalance interval
     pub rebalance_interval: Duration,
-    
+
     /// Enable dynamic rebalancing
     pub dynamic_rebalancing: bool,
-    
+
     /// Load threshold for triggering rebalancing
     pub rebalance_threshold: f32,
 }
@@ -98,22 +98,22 @@ pub enum LoadBalancingStrategy {
 pub struct QualityControlConfig {
     /// Enable adaptive quality control
     pub adaptive_quality: bool,
-    
+
     /// Minimum FPS to maintain
     pub min_fps: f32,
-    
+
     /// Target FPS for normal operation
     pub target_fps: f32,
-    
+
     /// Maximum FPS (for throttling)
     pub max_fps: f32,
-    
+
     /// Quality adjustment interval
     pub adjustment_interval: Duration,
-    
+
     /// Frame skip threshold (CPU usage %)
     pub frame_skip_threshold: f32,
-    
+
     /// Quality reduction factor when under pressure
     pub quality_reduction_factor: f32,
 }
@@ -137,16 +137,16 @@ impl Default for QualityControlConfig {
 pub struct StreamRecoveryConfig {
     /// Enable automatic recovery
     pub auto_recovery: bool,
-    
+
     /// Maximum recovery attempts
     pub max_recovery_attempts: usize,
-    
+
     /// Recovery backoff interval
     pub recovery_backoff: Duration,
-    
+
     /// Recovery timeout
     pub recovery_timeout: Duration,
-    
+
     /// Restart entire pipeline on critical failures
     pub restart_on_critical: bool,
 }
@@ -168,19 +168,19 @@ impl Default for StreamRecoveryConfig {
 pub struct MetricsConfig {
     /// Enable metrics collection
     pub enabled: bool,
-    
+
     /// Collection interval
     pub collection_interval: Duration,
-    
+
     /// History retention period
     pub retention_period: Duration,
-    
+
     /// Export metrics to file
     pub export_to_file: bool,
-    
+
     /// Metrics export path
     pub export_path: Option<String>,
-    
+
     /// Enable performance profiling
     pub profiling_enabled: bool,
 }
@@ -203,22 +203,22 @@ impl Default for MetricsConfig {
 pub struct StreamConfig {
     /// Stream URI
     pub uri: String,
-    
+
     /// Stream priority
     pub priority: StreamPriority,
-    
+
     /// Custom detector config for this stream
     pub detector_config: Option<DetectorConfig>,
-    
+
     /// Target FPS for this stream
     pub target_fps: Option<f32>,
-    
+
     /// Enable detection for this stream
     pub detection_enabled: bool,
-    
+
     /// Enable rendering for this stream
     pub rendering_enabled: bool,
-    
+
     /// Custom recovery settings
     pub recovery_override: Option<StreamRecoveryConfig>,
 }
@@ -235,17 +235,17 @@ impl StreamConfig {
             recovery_override: None,
         }
     }
-    
+
     pub fn with_priority(mut self, priority: StreamPriority) -> Self {
         self.priority = priority;
         self
     }
-    
+
     pub fn with_target_fps(mut self, fps: f32) -> Self {
         self.target_fps = Some(fps);
         self
     }
-    
+
     pub fn with_detection(mut self, enabled: bool) -> Self {
         self.detection_enabled = enabled;
         self
@@ -263,37 +263,37 @@ impl MultiStreamConfigBuilder {
             config: MultiStreamConfig::default(),
         }
     }
-    
+
     pub fn max_streams(mut self, max: usize) -> Self {
         self.config.max_concurrent_streams = max;
         self
     }
-    
+
     pub fn resource_limits(mut self, limits: ResourceLimits) -> Self {
         self.config.resource_limits = limits;
         self
     }
-    
+
     pub fn detector_config(mut self, config: DetectorConfig) -> Self {
         self.config.detector_config = config;
         self
     }
-    
+
     pub fn load_balancing_strategy(mut self, strategy: LoadBalancingStrategy) -> Self {
         self.config.load_balancing.strategy = strategy;
         self
     }
-    
+
     pub fn worker_threads(mut self, threads: usize) -> Self {
         self.config.worker_threads = threads;
         self
     }
-    
+
     pub fn debug_mode(mut self, enabled: bool) -> Self {
         self.config.debug_mode = enabled;
         self
     }
-    
+
     pub fn build(self) -> MultiStreamConfig {
         self.config
     }

@@ -1,8 +1,8 @@
 #![allow(unused)]
+use std::io::{BufRead, BufReader};
 use std::process::{Command, Stdio};
 use std::thread;
 use std::time::Duration;
-use std::io::{BufRead, BufReader};
 
 #[cfg(unix)]
 use nix::sys::signal::{self, Signal};
@@ -10,11 +10,11 @@ use nix::sys::signal::{self, Signal};
 use nix::unistd::Pid;
 
 #[cfg(windows)]
-use winapi::um::wincon::{GenerateConsoleCtrlEvent, CTRL_C_EVENT};
+use winapi::um::handleapi::CloseHandle;
 #[cfg(windows)]
 use winapi::um::processthreadsapi::OpenProcess;
 #[cfg(windows)]
-use winapi::um::handleapi::CloseHandle;
+use winapi::um::wincon::{CTRL_C_EVENT, GenerateConsoleCtrlEvent};
 #[cfg(windows)]
 use winapi::um::winnt::PROCESS_TERMINATE;
 
@@ -25,8 +25,12 @@ fn test_graceful_shutdown_on_ctrl_c() {
         .args(&["build", "--bin", "ds-app"])
         .output()
         .expect("Failed to build ds-app binary");
-    
-    assert!(build_output.status.success(), "Failed to build ds-app: {:?}", String::from_utf8_lossy(&build_output.stderr));
+
+    assert!(
+        build_output.status.success(),
+        "Failed to build ds-app: {:?}",
+        String::from_utf8_lossy(&build_output.stderr)
+    );
 
     // Find a video file that exists or use a test pattern
     let test_uri = if std::path::Path::new("C:/Users/deste/Videos/wows-sm.1.mp4").exists() {
@@ -56,7 +60,7 @@ fn test_graceful_shutdown_on_ctrl_c() {
     // Capture output in separate threads
     let stdout = child.stdout.take().expect("Failed to get stdout");
     let stderr = child.stderr.take().expect("Failed to get stderr");
-    
+
     let stdout_thread = thread::spawn(move || {
         let reader = BufReader::new(stdout);
         let mut lines = Vec::new();
@@ -99,7 +103,7 @@ fn test_graceful_shutdown_on_ctrl_c() {
             if handle != std::ptr::null_mut() {
                 // Give it a chance to handle the signal gracefully first
                 thread::sleep(Duration::from_millis(500));
-                
+
                 // Then terminate if needed
                 winapi::um::processthreadsapi::TerminateProcess(handle, 1);
                 CloseHandle(handle);
@@ -147,20 +151,20 @@ fn test_graceful_shutdown_on_ctrl_c() {
 
     // Verify the process exited cleanly
     assert!(
-        exited_cleanly, 
+        exited_cleanly,
         "Process did not exit cleanly after Ctrl+C. This is the bug we're trying to prevent from coming back!"
     );
 
     // Check for the shutdown message in output
-    let shutdown_message_found = stdout_lines.iter().any(|line| 
-        line.contains("Received interrupt signal") || 
-        line.contains("shutting down") ||
-        line.contains("Application exited")
-    ) || stderr_lines.iter().any(|line|
-        line.contains("Received interrupt signal") || 
-        line.contains("shutting down") ||
-        line.contains("Application exited")
-    );
+    let shutdown_message_found = stdout_lines.iter().any(|line| {
+        line.contains("Received interrupt signal")
+            || line.contains("shutting down")
+            || line.contains("Application exited")
+    }) || stderr_lines.iter().any(|line| {
+        line.contains("Received interrupt signal")
+            || line.contains("shutting down")
+            || line.contains("Application exited")
+    });
 
     // This is a warning, not a failure - the app might exit without printing
     if !shutdown_message_found {
@@ -168,14 +172,15 @@ fn test_graceful_shutdown_on_ctrl_c() {
     }
 
     // Check for multiple shutdown messages (indicates hanging)
-    let hang_count = stdout_lines.iter()
+    let hang_count = stdout_lines
+        .iter()
         .chain(stderr_lines.iter())
         .filter(|line| line.contains("Received interrupt signal"))
         .count();
-    
+
     assert!(
-        hang_count <= 1, 
-        "Found {} instances of 'Received interrupt signal', indicating the app is not exiting on first Ctrl+C", 
+        hang_count <= 1,
+        "Found {} instances of 'Received interrupt signal', indicating the app is not exiting on first Ctrl+C",
         hang_count
     );
 }
@@ -187,11 +192,11 @@ fn test_shutdown_within_reasonable_time() {
         .args(&["build", "--bin", "ds-app"])
         .output()
         .expect("Failed to build ds-app binary");
-    
+
     assert!(build_output.status.success(), "Failed to build ds-app");
 
     let test_uri = "videotestsrc://pattern=ball";
-    
+
     let mut child = Command::new("cargo")
         .args(&["run", "--bin", "ds-app", "--", test_uri])
         .stdin(Stdio::null())
@@ -201,7 +206,7 @@ fn test_shutdown_within_reasonable_time() {
         .expect("Failed to start ds-app");
 
     let child_id = child.id();
-    
+
     // Let it initialize
     thread::sleep(Duration::from_secs(2));
 
@@ -229,7 +234,7 @@ fn test_shutdown_within_reasonable_time() {
     // Wait for shutdown
     let mut shutdown_completed = false;
     let max_shutdown_time = Duration::from_secs(2);
-    
+
     while shutdown_start.elapsed() < max_shutdown_time {
         if let Ok(Some(_)) = child.try_wait() {
             shutdown_completed = true;

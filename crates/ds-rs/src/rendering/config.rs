@@ -8,25 +8,25 @@ use std::collections::HashMap;
 pub struct RenderingConfig {
     /// Enable bounding box rendering
     pub enable_bbox: bool,
-    
+
     /// Enable text labels
     pub enable_labels: bool,
-    
+
     /// Enable confidence scores
     pub enable_confidence: bool,
-    
+
     /// Enable tracking IDs
     pub enable_tracking_id: bool,
-    
+
     /// Default bounding box appearance
     pub default_bbox_style: BoundingBoxStyle,
-    
+
     /// Class-specific styles (overrides default)
     pub class_styles: HashMap<String, BoundingBoxStyle>,
-    
+
     /// Font configuration for labels
     pub font_config: FontConfig,
-    
+
     /// Performance settings
     pub performance: PerformanceConfig,
 }
@@ -34,35 +34,35 @@ pub struct RenderingConfig {
 impl Default for RenderingConfig {
     fn default() -> Self {
         let mut class_styles = HashMap::new();
-        
+
         // Default styles for common object classes
         class_styles.insert(
             "person".to_string(),
             BoundingBoxStyle {
-                color: Color::rgb(0, 255, 0),  // Green
+                color: Color::rgb(0, 255, 0), // Green
                 thickness: 2.0,
                 ..Default::default()
             },
         );
-        
+
         class_styles.insert(
             "vehicle".to_string(),
             BoundingBoxStyle {
-                color: Color::rgb(255, 0, 0),  // Red
+                color: Color::rgb(255, 0, 0), // Red
                 thickness: 2.0,
                 ..Default::default()
             },
         );
-        
+
         class_styles.insert(
             "ball".to_string(),
             BoundingBoxStyle {
-                color: Color::rgb(255, 255, 0),  // Yellow
+                color: Color::rgb(255, 255, 0), // Yellow
                 thickness: 3.0,
                 ..Default::default()
             },
         );
-        
+
         Self {
             enable_bbox: true,
             enable_labels: true,
@@ -81,22 +81,22 @@ impl Default for RenderingConfig {
 pub struct BoundingBoxStyle {
     /// Border color
     pub color: Color,
-    
+
     /// Line thickness in pixels
     pub thickness: f32,
-    
+
     /// Transparency (0.0 = transparent, 1.0 = opaque)
     pub alpha: f32,
-    
+
     /// Corner radius for rounded rectangles (0 = sharp corners)
     pub corner_radius: f32,
-    
+
     /// Draw filled rectangle instead of outline
     pub filled: bool,
-    
+
     /// Fill color (if filled is true)
     pub fill_color: Color,
-    
+
     /// Fill transparency
     pub fill_alpha: f32,
 }
@@ -104,7 +104,7 @@ pub struct BoundingBoxStyle {
 impl Default for BoundingBoxStyle {
     fn default() -> Self {
         Self {
-            color: Color::rgb(0, 255, 255),  // Cyan
+            color: Color::rgb(0, 255, 255), // Cyan
             thickness: 2.0,
             alpha: 1.0,
             corner_radius: 0.0,
@@ -128,7 +128,7 @@ impl Color {
     pub fn rgb(r: u8, g: u8, b: u8) -> Self {
         Self { r, g, b }
     }
-    
+
     /// Convert to normalized float values
     pub fn to_normalized(&self) -> (f64, f64, f64) {
         (
@@ -137,7 +137,7 @@ impl Color {
             self.b as f64 / 255.0,
         )
     }
-    
+
     /// Create from normalized float values
     pub fn from_normalized(r: f64, g: f64, b: f64) -> Self {
         Self {
@@ -153,25 +153,25 @@ impl Color {
 pub struct FontConfig {
     /// Font family name
     pub family: String,
-    
+
     /// Font size in points
     pub size: f32,
-    
+
     /// Bold text
     pub bold: bool,
-    
+
     /// Italic text
     pub italic: bool,
-    
+
     /// Text color
     pub color: Color,
-    
+
     /// Background color for labels
     pub background_color: Color,
-    
+
     /// Background transparency
     pub background_alpha: f32,
-    
+
     /// Text position relative to bounding box
     pub position: LabelPosition,
 }
@@ -183,8 +183,8 @@ impl Default for FontConfig {
             size: 12.0,
             bold: false,
             italic: false,
-            color: Color::rgb(255, 255, 255),  // White
-            background_color: Color::rgb(0, 0, 0),  // Black
+            color: Color::rgb(255, 255, 255),      // White
+            background_color: Color::rgb(0, 0, 0), // Black
             background_alpha: 0.5,
             position: LabelPosition::TopLeft,
         }
@@ -210,16 +210,16 @@ pub enum LabelPosition {
 pub struct PerformanceConfig {
     /// Maximum objects to render per frame
     pub max_objects_per_frame: usize,
-    
+
     /// Skip rendering if frame rate drops below this value
     pub min_fps_threshold: f32,
-    
+
     /// Enable GPU acceleration where available
     pub use_gpu_acceleration: bool,
-    
+
     /// Enable multi-threading for rendering
     pub use_multithreading: bool,
-    
+
     /// Cache rendered elements between frames
     pub enable_caching: bool,
 }
@@ -240,11 +240,11 @@ impl RenderingConfig {
     /// Create a configuration optimized for ball tracking
     pub fn for_ball_tracking() -> Self {
         let mut config = Self::default();
-        
+
         // Customize for ball tracking
         config.enable_tracking_id = true;
         config.enable_confidence = false;
-        
+
         // Yellow boxes for balls with thicker lines
         config.class_styles.insert(
             "ball".to_string(),
@@ -252,18 +252,18 @@ impl RenderingConfig {
                 color: Color::rgb(255, 255, 0),
                 thickness: 4.0,
                 alpha: 1.0,
-                corner_radius: 5.0,  // Slightly rounded for balls
+                corner_radius: 5.0, // Slightly rounded for balls
                 ..Default::default()
             },
         );
-        
+
         // Smaller font for ball labels
         config.font_config.size = 10.0;
         config.font_config.position = LabelPosition::Above;
-        
+
         config
     }
-    
+
     /// Create a minimal configuration for performance
     pub fn minimal() -> Self {
         Self {
@@ -286,10 +286,11 @@ impl RenderingConfig {
             },
         }
     }
-    
+
     /// Get style for a specific class
     pub fn get_style_for_class(&self, class_name: &str) -> &BoundingBoxStyle {
-        self.class_styles.get(class_name)
+        self.class_styles
+            .get(class_name)
             .unwrap_or(&self.default_bbox_style)
     }
 }

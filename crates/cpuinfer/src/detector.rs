@@ -1,6 +1,6 @@
 #![allow(unused)]
 //! ONNX-based object detector supporting multiple YOLO versions
-//! 
+//!
 //! This module provides CPU-based object detection using ONNX Runtime (ort) v1.16.3.
 //! It supports multiple YOLO versions (v3-v12) with automatic format detection and
 //! includes a mock detector for testing without actual models.
@@ -21,7 +21,7 @@ macro_rules! info {
 
 #[cfg(not(feature = "log"))]
 macro_rules! trace {
-    ($($arg:tt)*) => { 
+    ($($arg:tt)*) => {
         if std::env::var("RUST_LOG").map(|v| v.contains("trace")).unwrap_or(false) {
             eprintln!("[TRACE] {}", format!($($arg)*))
         }
@@ -63,18 +63,18 @@ pub struct Detection {
 /// YOLO model version for output format handling
 #[derive(Debug, Clone, Copy, serde::Serialize, serde::Deserialize)]
 pub enum YoloVersion {
-    V3,     // Output: [1, num_anchors, 85] classic format
-    V4,     // Output: Similar to V3 with improvements
-    V5,     // Output: [1, 25200, 85] with objectness for 640x640
-    V6,     // Output: Similar to V5 (MT-YOLOv6 different format)
-    V7,     // Output: Similar to V5 with objectness
-    V8,     // Output: [1, 84, 8400] transposed, no objectness  
-    V9,     // Output: [1, 84, 8400] similar to V8
-    V10,    // Output: NMS-free, one-to-one predictions
-    V11,    // Output: Ultralytics model, similar to V8 but optimized  
-    V12,    // Output: Latest production model with significant accuracy improvements
-    RD,     // YOLO-RD: Retriever-Dictionary variant
-    Auto,   // Auto-detect based on output shape
+    V3,   // Output: [1, num_anchors, 85] classic format
+    V4,   // Output: Similar to V3 with improvements
+    V5,   // Output: [1, 25200, 85] with objectness for 640x640
+    V6,   // Output: Similar to V5 (MT-YOLOv6 different format)
+    V7,   // Output: Similar to V5 with objectness
+    V8,   // Output: [1, 84, 8400] transposed, no objectness
+    V9,   // Output: [1, 84, 8400] similar to V8
+    V10,  // Output: NMS-free, one-to-one predictions
+    V11,  // Output: Ultralytics model, similar to V8 but optimized
+    V12,  // Output: Latest production model with significant accuracy improvements
+    RD,   // YOLO-RD: Retriever-Dictionary variant
+    Auto, // Auto-detect based on output shape
 }
 
 /// Configuration for the ONNX detector
@@ -104,8 +104,8 @@ impl Default for DetectorConfig {
             model_path: None,
             input_width: 640,
             input_height: 640,
-            confidence_threshold: 0.15,  // Balanced confidence threshold for better detection
-            nms_threshold: 0.45,  // Standard YOLO NMS threshold
+            confidence_threshold: 0.15, // Balanced confidence threshold for better detection
+            nms_threshold: 0.45,        // Standard YOLO NMS threshold
             num_threads: 4,
             yolo_version: YoloVersion::Auto,
             class_names: None,
@@ -136,7 +136,7 @@ impl OnnxDetector {
         };
         Self::new_with_config(config)
     }
-    
+
     /// Create a new ONNX detector with a configuration
     pub fn new_with_config(config: DetectorConfig) -> Result<Self> {
         #[cfg(feature = "ort")]
@@ -147,20 +147,16 @@ impl OnnxDetector {
                     (None, None)
                 } else {
                     match Self::load_onnx_model(model_path, config.num_threads) {
-                        Ok((env, sess)) => {
-                            (Some(sess), Some(env))
-                        },
-                        Err(_e) => {
-                            (None, None)
-                        }
+                        Ok((env, sess)) => (Some(sess), Some(env)),
+                        Err(_e) => (None, None),
                     }
                 }
             } else {
                 (None, None)
             };
-            
+
             let class_names = config.class_names.unwrap_or_else(Self::default_class_names);
-            
+
             Ok(Self {
                 session,
                 environment,
@@ -172,154 +168,168 @@ impl OnnxDetector {
                 yolo_version: config.yolo_version,
             })
         }
-        
+
         #[cfg(not(feature = "ort"))]
         {
             Err(DetectorError::Configuration(
-                "ONNX Runtime (ort) feature not enabled. OnnxDetector requires the 'ort' feature.".to_string()
+                "ONNX Runtime (ort) feature not enabled. OnnxDetector requires the 'ort' feature."
+                    .to_string(),
             ))
         }
     }
-    
+
     #[cfg(feature = "ort")]
-    fn load_onnx_model(model_path: &str, num_threads: usize) -> Result<(std::sync::Arc<ort::Environment>, ort::Session)> {
-        use ort::{Environment, SessionBuilder, GraphOptimizationLevel};
+    fn load_onnx_model(
+        model_path: &str,
+        num_threads: usize,
+    ) -> Result<(std::sync::Arc<ort::Environment>, ort::Session)> {
+        use ort::{Environment, GraphOptimizationLevel, SessionBuilder};
         use std::sync::Arc;
-        
+
         // Create environment first
-        let environment = Arc::new(Environment::builder()
-            .with_name("onnx_detector")
-            .build()
-            .map_err(|e| DetectorError::Configuration(
-                format!("Failed to create ONNX environment: {}", e)
-            ))?);
-        
+        let environment = Arc::new(
+            Environment::builder()
+                .with_name("onnx_detector")
+                .build()
+                .map_err(|e| {
+                    DetectorError::Configuration(format!(
+                        "Failed to create ONNX environment: {}",
+                        e
+                    ))
+                })?,
+        );
+
         // Create session with the environment
         let session = SessionBuilder::new(&environment)
-            .map_err(|e| DetectorError::Configuration(
-                format!("Failed to create session builder: {}", e)
-            ))?
+            .map_err(|e| {
+                DetectorError::Configuration(format!("Failed to create session builder: {}", e))
+            })?
             .with_optimization_level(GraphOptimizationLevel::Level3)
-            .map_err(|e| DetectorError::Configuration(
-                format!("Failed to set optimization level: {}", e)
-            ))?
+            .map_err(|e| {
+                DetectorError::Configuration(format!("Failed to set optimization level: {}", e))
+            })?
             .with_intra_threads(num_threads.try_into().unwrap_or(4))
-            .map_err(|e| DetectorError::Configuration(
-                format!("Failed to set intra threads: {}", e)
-            ))?
+            .map_err(|e| {
+                DetectorError::Configuration(format!("Failed to set intra threads: {}", e))
+            })?
             .with_model_from_file(model_path)
-            .map_err(|e| DetectorError::Configuration(
-                format!("Failed to load model from file: {}", e)
-            ))?;
-            
+            .map_err(|e| {
+                DetectorError::Configuration(format!("Failed to load model from file: {}", e))
+            })?;
+
         Ok((environment, session))
     }
-    
-    
+
     /// Perform detection on an image
     pub fn detect(&self, image: &DynamicImage) -> Result<Vec<Detection>> {
         #[cfg(feature = "ort")]
         {
             use ndarray::{Array, CowArray, IxDyn};
             use ort::Value;
-            
+
             // Check if we have a real session or should use mock
             let session = match self.session.as_ref() {
                 Some(s) => s,
                 None => {
                     return Err(DetectorError::Inference(
-                        "No ONNX model loaded for detection".to_string()
+                        "No ONNX model loaded for detection".to_string(),
                     ));
                 }
             };
-            
+
             // Preprocess image
             let input_tensor = self.preprocess_image(image)?;
-            
+
             // Create ndarray with correct shape for YOLO (batch, channels, height, width)
             let shape = vec![1, 3, self.input_height as usize, self.input_width as usize];
-            
+
             // Check if model expects float16 input
             let is_f16_input = format!("{:?}", session.inputs[0].input_type).contains("Float16");
-            
+
             // Handle both f32 and f16 models
             // We need to hold the arrays outside to ensure proper lifetimes
             #[cfg(feature = "half")]
             let f16_array: CowArray<half::f16, IxDyn>;
             let f32_array: CowArray<f32, IxDyn>;
-            
+
             let outputs: Vec<Value> = if is_f16_input {
                 #[cfg(feature = "half")]
                 {
                     use half::f16;
-                    
+
                     // Convert f32 tensor to f16
-                    let f16_tensor: Vec<f16> = input_tensor
-                        .iter()
-                        .map(|&v| f16::from_f32(v))
-                        .collect();
-                    
+                    let f16_tensor: Vec<f16> =
+                        input_tensor.iter().map(|&v| f16::from_f32(v)).collect();
+
                     // Create and store the array
                     f16_array = Array::from_shape_vec(shape.clone(), f16_tensor)
-                        .map_err(|e| DetectorError::Configuration(
-                            format!("Failed to create f16 ndarray: {}", e)
-                        ))?
+                        .map_err(|e| {
+                            DetectorError::Configuration(format!(
+                                "Failed to create f16 ndarray: {}",
+                                e
+                            ))
+                        })?
                         .into_dyn()
                         .into();
-                    
+
                     // Create Value and run
-                    let value = Value::from_array(session.allocator(), &f16_array)
-                        .map_err(|e| DetectorError::Configuration(
-                            format!("Failed to create f16 ORT value: {}", e)
-                        ))?;
-                    
-                    session.run(vec![value])
-                        .map_err(|e| DetectorError::Configuration(
-                            format!("Failed to run ONNX inference: {}", e)
-                        ))?
+                    let value =
+                        Value::from_array(session.allocator(), &f16_array).map_err(|e| {
+                            DetectorError::Configuration(format!(
+                                "Failed to create f16 ORT value: {}",
+                                e
+                            ))
+                        })?;
+
+                    session.run(vec![value]).map_err(|e| {
+                        DetectorError::Configuration(format!("Failed to run ONNX inference: {}", e))
+                    })?
                 }
                 #[cfg(not(feature = "half"))]
                 {
                     return Err(DetectorError::Configuration(
-                        "Model requires float16 but half feature is not enabled".to_string()
+                        "Model requires float16 but half feature is not enabled".to_string(),
                     ));
                 }
             } else {
                 // Use f32 input
                 f32_array = Array::from_shape_vec(shape.clone(), input_tensor)
-                    .map_err(|e| DetectorError::Configuration(
-                        format!("Failed to create f32 ndarray: {}", e)
-                    ))?
+                    .map_err(|e| {
+                        DetectorError::Configuration(format!("Failed to create f32 ndarray: {}", e))
+                    })?
                     .into_dyn()
                     .into();
-                
-                let value = Value::from_array(session.allocator(), &f32_array)
-                    .map_err(|e| DetectorError::Configuration(
-                        format!("Failed to create f32 ORT value: {}", e)
-                    ))?;
-                
-                session.run(vec![value])
-                    .map_err(|e| DetectorError::Configuration(
-                        format!("Failed to run ONNX inference: {}", e)
-                    ))?
+
+                let value = Value::from_array(session.allocator(), &f32_array).map_err(|e| {
+                    DetectorError::Configuration(format!("Failed to create f32 ORT value: {}", e))
+                })?;
+
+                session.run(vec![value]).map_err(|e| {
+                    DetectorError::Configuration(format!("Failed to run ONNX inference: {}", e))
+                })?
             };
             // Check if output is float16
-            let is_f16_output = session.outputs.get(0)
+            let is_f16_output = session
+                .outputs
+                .get(0)
                 .map(|output| format!("{:?}", output.output_type).contains("Float16"))
                 .unwrap_or(false);
-            
+
             // Extract output tensor based on type
             let output: Vec<f32> = if is_f16_output {
                 #[cfg(feature = "half")]
                 {
                     use half::f16;
-                    
+
                     // Extract as f16 tensor
-                    let output_tensor: ort::tensor::OrtOwnedTensor<f16, _> = outputs[0].try_extract()
-                        .map_err(|e| DetectorError::Configuration(
-                            format!("Failed to extract f16 output tensor: {}", e)
-                        ))?;
-                    
+                    let output_tensor: ort::tensor::OrtOwnedTensor<f16, _> =
+                        outputs[0].try_extract().map_err(|e| {
+                            DetectorError::Configuration(format!(
+                                "Failed to extract f16 output tensor: {}",
+                                e
+                            ))
+                        })?;
+
                     // Convert f16 to f32 for postprocessing
                     let output_view = output_tensor.view();
                     output_view.iter().map(|&v| v.to_f32()).collect()
@@ -327,48 +337,48 @@ impl OnnxDetector {
                 #[cfg(not(feature = "half"))]
                 {
                     return Err(DetectorError::Configuration(
-                        "Output is float16 but half feature is not enabled".to_string()
+                        "Output is float16 but half feature is not enabled".to_string(),
                     ));
                 }
             } else {
                 // Extract as f32 tensor
-                let output_tensor: ort::tensor::OrtOwnedTensor<f32, _> = outputs[0].try_extract()
-                    .map_err(|e| DetectorError::Configuration(
-                        format!("Failed to extract f32 output tensor: {}", e)
-                    ))?;
-                
+                let output_tensor: ort::tensor::OrtOwnedTensor<f32, _> =
+                    outputs[0].try_extract().map_err(|e| {
+                        DetectorError::Configuration(format!(
+                            "Failed to extract f32 output tensor: {}",
+                            e
+                        ))
+                    })?;
+
                 // Get view and convert to Vec
                 let output_view = output_tensor.view();
                 output_view.iter().cloned().collect()
             };
-            
+
             // Postprocess outputs
             return self.postprocess_outputs(&output, image.width(), image.height());
         }
-        
+
         #[cfg(not(feature = "ort"))]
         {
             Err(DetectorError::Configuration(
-                "ONNX Runtime (ort) feature not enabled. OnnxDetector requires the 'ort' feature.".to_string()
+                "ONNX Runtime (ort) feature not enabled. OnnxDetector requires the 'ort' feature."
+                    .to_string(),
             ))
         }
     }
-    
+
     /// Preprocess image for model input
     fn preprocess_image(&self, image: &DynamicImage) -> Result<Vec<f32>> {
         // Resize image to model input size
-        let resized = image.resize_exact(
-            self.input_width,
-            self.input_height,
-            FilterType::Triangle
-        );
-        
+        let resized = image.resize_exact(self.input_width, self.input_height, FilterType::Triangle);
+
         // Convert to RGB if needed
         let rgb_image = resized.to_rgb8();
-        
+
         // Create tensor in CHW format (Channels, Height, Width) for YOLO
         let mut tensor = Vec::with_capacity((3 * self.input_width * self.input_height) as usize);
-        
+
         // Normalize and arrange in CHW format
         // YOLO typically expects values normalized to [0, 1]
         for channel in 0..3 {
@@ -380,64 +390,74 @@ impl OnnxDetector {
                 }
             }
         }
-        
+
         Ok(tensor)
     }
-    
+
     /// Process model outputs to detections
-    fn postprocess_outputs(&self, outputs: &[f32], img_width: u32, img_height: u32) -> Result<Vec<Detection>> {
+    fn postprocess_outputs(
+        &self,
+        outputs: &[f32],
+        img_width: u32,
+        img_height: u32,
+    ) -> Result<Vec<Detection>> {
         // Auto-detect YOLO version based on output shape
         let version = match self.yolo_version {
             YoloVersion::Auto => self.detect_yolo_version(outputs),
             v => v,
         };
-        
+
         // debug!("Processing outputs with YOLO version: {:?}", version);
-        
+
         match version {
             // Classic format with objectness (v3-v7)
-            YoloVersion::V3 | YoloVersion::V4 | YoloVersion::V5 | 
-            YoloVersion::V6 | YoloVersion::V7 => {
-                self.postprocess_yolov5(outputs, img_width, img_height)
-            },
+            YoloVersion::V3
+            | YoloVersion::V4
+            | YoloVersion::V5
+            | YoloVersion::V6
+            | YoloVersion::V7 => self.postprocess_yolov5(outputs, img_width, img_height),
             // Modern format without objectness (v8-v12)
-            YoloVersion::V8 | YoloVersion::V9 | YoloVersion::V11 | 
-            YoloVersion::V12 | YoloVersion::RD => {
-                self.postprocess_yolov8(outputs, img_width, img_height)
-            },
+            YoloVersion::V8
+            | YoloVersion::V9
+            | YoloVersion::V11
+            | YoloVersion::V12
+            | YoloVersion::RD => self.postprocess_yolov8(outputs, img_width, img_height),
             // Special handling for v10 (NMS-free)
             YoloVersion::V10 => {
                 // V10 uses one-to-one predictions, may need special handling
                 // For now, treat similar to v8 but log the difference
                 // info!("Processing YOLOv10 with NMS-free design");
                 self.postprocess_yolov8(outputs, img_width, img_height)
-            },
+            }
             YoloVersion::Auto => {
                 // Fallback to V5 if auto-detection somehow fails
                 self.postprocess_yolov5(outputs, img_width, img_height)
             }
         }
     }
-    
+
     /// Detect YOLO version based on output tensor shape
     fn detect_yolo_version(&self, outputs: &[f32]) -> YoloVersion {
         let len = outputs.len();
-        
+
         // Common output patterns:
         // YOLOv3-v7: [1, num_anchors, 85] where 85 = 4 bbox + 1 objectness + 80 classes
         // YOLOv8-v11: [1, 84, num_anchors] where 84 = 4 bbox + 80 classes (no objectness)
         // YOLOv10: May have different format due to NMS-free design
-        
+
         // Check for v8+ transposed format (84 values per anchor)
         if len % 84 == 0 {
             let num_anchors = len / 84;
             if num_anchors > 1000 && num_anchors < 10000 {
                 // Likely v8, v9, v11 format
-                println!("Auto-detected YOLOv8+ format: {} values, {} anchors", len, num_anchors);
+                println!(
+                    "Auto-detected YOLOv8+ format: {} values, {} anchors",
+                    len, num_anchors
+                );
                 return YoloVersion::V8;
             }
         }
-        
+
         // Check for v3-v7 format (85 values per anchor)
         if len % 85 == 0 {
             let num_anchors = len / 85;
@@ -447,159 +467,192 @@ impl OnnxDetector {
                 return YoloVersion::V5; // Use v5 processing for v3-v7
             }
         }
-        
+
         // Check for smaller models or different input sizes
         if len % 85 == 0 || len % 84 == 0 {
-            let version = if len % 84 == 0 { YoloVersion::V8 } else { YoloVersion::V5 };
+            let version = if len % 84 == 0 {
+                YoloVersion::V8
+            } else {
+                YoloVersion::V5
+            };
             // info!("Auto-detected YOLO format with {} total values as {:?}", len, version);
             return version;
         }
-        
+
         // Unknown format
         // warn!("Unknown YOLO output format with {} elements, defaulting to V5", len);
         YoloVersion::V5
     }
-    
+
     /// Apply sigmoid activation function
     fn sigmoid(x: f32) -> f32 {
         1.0 / (1.0 + (-x).exp())
     }
-    
+
     /// Process YOLOv5 outputs
-    fn postprocess_yolov5(&self, outputs: &[f32], img_width: u32, img_height: u32) -> Result<Vec<Detection>> {
+    fn postprocess_yolov5(
+        &self,
+        outputs: &[f32],
+        img_width: u32,
+        img_height: u32,
+    ) -> Result<Vec<Detection>> {
         let mut detections = Vec::new();
-        
+
         // YOLOv5 output format: [batch_size, num_anchors, 85]
         // where 85 = cx, cy, w, h, objectness, class_scores[80]
         let num_classes = 80; // COCO dataset
         let output_size = 85; // 4 bbox + 1 objectness + 80 classes
         let num_anchors = outputs.len() / output_size;
-        
+
         // Check the range of values to understand the format
         let mut min_val = f32::MAX;
         let mut max_val = f32::MIN;
         let mut max_objectness = 0.0f32;
         for i in 0..num_anchors.min(100) {
             let obj_idx = if outputs.len() == num_anchors * 85 {
-                i * 85 + 4  // Normal format
+                i * 85 + 4 // Normal format
             } else {
-                4 * num_anchors + i  // Transposed format
+                4 * num_anchors + i // Transposed format
             };
             if obj_idx < outputs.len() {
                 let obj = outputs[obj_idx];
-                if obj > max_objectness { max_objectness = obj; }
+                if obj > max_objectness {
+                    max_objectness = obj;
+                }
             }
         }
         for &v in outputs.iter().take(1000) {
-            if v < min_val { min_val = v; }
-            if v > max_val { max_val = v; }
+            if v < min_val {
+                min_val = v;
+            }
+            if v > max_val {
+                max_val = v;
+            }
         }
-        debug!("YOLOv5 output range: [{:.3}, {:.3}], max objectness: {:.3}", min_val, max_val, max_objectness);
-        debug!("Total outputs: {}, num_anchors: {}, confidence_threshold: {}", 
-                 outputs.len(), num_anchors, self.confidence_threshold);
-        
+        debug!(
+            "YOLOv5 output range: [{:.3}, {:.3}], max objectness: {:.3}",
+            min_val, max_val, max_objectness
+        );
+        debug!(
+            "Total outputs: {}, num_anchors: {}, confidence_threshold: {}",
+            outputs.len(),
+            num_anchors,
+            self.confidence_threshold
+        );
+
         // Scale factors to convert from model coordinates to image coordinates
         let x_scale = img_width as f32 / self.input_width as f32;
         let y_scale = img_height as f32 / self.input_height as f32;
-        
+
         // Check if format is transposed [1, 85, 25200] instead of [1, 25200, 85]
         // In transposed format, all x coords are together, then all y coords, etc.
         let is_transposed = {
             // Check objectness scores at different positions
             let obj_positions = vec![
-                outputs[4],              // Normal: first anchor objectness
-                outputs[85 + 4],         // Normal: second anchor objectness
-                outputs[4 * num_anchors], // Transposed: first anchor objectness
+                outputs[4],                   // Normal: first anchor objectness
+                outputs[85 + 4],              // Normal: second anchor objectness
+                outputs[4 * num_anchors],     // Transposed: first anchor objectness
                 outputs[4 * num_anchors + 1], // Transposed: second anchor objectness
             ];
-            
+
             // Format detection
             trace!("Format detection:");
-            trace!("  If normal [25200,85]: obj[0]={:.6}, obj[1]={:.6}", obj_positions[0], obj_positions[1]);
-            trace!("  If transposed [85,25200]: obj[0]={:.6}, obj[1]={:.6}", obj_positions[2], obj_positions[3]);
-            
+            trace!(
+                "  If normal [25200,85]: obj[0]={:.6}, obj[1]={:.6}",
+                obj_positions[0], obj_positions[1]
+            );
+            trace!(
+                "  If transposed [85,25200]: obj[0]={:.6}, obj[1]={:.6}",
+                obj_positions[2], obj_positions[3]
+            );
+
             // If normal format has very low objectness, it's probably transposed
             let transposed = obj_positions[0] < 0.001 && obj_positions[1] < 0.001;
-            debug!("Detected format: {}", if transposed { "TRANSPOSED" } else { "NORMAL" });
+            debug!(
+                "Detected format: {}",
+                if transposed { "TRANSPOSED" } else { "NORMAL" }
+            );
             transposed
         };
-        
+
         // println!("[DEBUG] Using {} format", if is_transposed { "TRANSPOSED" } else { "NORMAL" });
-        
+
         // Process each anchor/detection
         for i in 0..num_anchors {
             // Extract bbox and scores based on format
             let (cx_raw, cy_raw, w_raw, h_raw, objectness_raw) = if is_transposed {
                 // Transposed format [1, 85, 25200]: feature_idx * num_anchors + anchor_idx
                 (
-                    outputs[0 * num_anchors + i],  // cx at position [0][i]
-                    outputs[1 * num_anchors + i],  // cy at position [1][i]
-                    outputs[2 * num_anchors + i],  // w at position [2][i]
-                    outputs[3 * num_anchors + i],  // h at position [3][i]
-                    outputs[4 * num_anchors + i],  // objectness at position [4][i]
+                    outputs[0 * num_anchors + i], // cx at position [0][i]
+                    outputs[1 * num_anchors + i], // cy at position [1][i]
+                    outputs[2 * num_anchors + i], // w at position [2][i]
+                    outputs[3 * num_anchors + i], // h at position [3][i]
+                    outputs[4 * num_anchors + i], // objectness at position [4][i]
                 )
             } else {
                 // Normal format [1, 25200, 85]: anchor_idx * features + feature_idx
                 let offset = i * output_size;
                 (
-                    outputs[offset + 0],  // cx
-                    outputs[offset + 1],  // cy
-                    outputs[offset + 2],  // w
-                    outputs[offset + 3],  // h
-                    outputs[offset + 4],  // objectness
+                    outputs[offset + 0], // cx
+                    outputs[offset + 1], // cy
+                    outputs[offset + 2], // w
+                    outputs[offset + 3], // h
+                    outputs[offset + 4], // objectness
                 )
             };
-            
+
             // IMPORTANT: ONNX exported YOLOv5 models output preprocessed values:
             // - Coordinates are in pixel space relative to MODEL INPUT size (640x640)
             // - Sigmoid is already applied to confidence scores
             // - Coordinates need to be kept as-is (they're already in the 640x640 space)
             let objectness = objectness_raw;
-            let cx = cx_raw;  // In 640x640 pixel space
-            let cy = cy_raw;  // In 640x640 pixel space
-            let w = w_raw;    // In 640x640 pixel space
-            let h = h_raw;    // In 640x640 pixel space
-            
+            let cx = cx_raw; // In 640x640 pixel space
+            let cy = cy_raw; // In 640x640 pixel space
+            let w = w_raw; // In 640x640 pixel space
+            let h = h_raw; // In 640x640 pixel space
+
             // Log detection details
             if i < 5 {
-                trace!("Anchor {}: raw_obj={:.3}, obj={:.3}, cx={:.1}, cy={:.1}, w={:.1}, h={:.1}", 
-                         i, objectness_raw, objectness, cx, cy, w, h);
+                trace!(
+                    "Anchor {}: raw_obj={:.3}, obj={:.3}, cx={:.1}, cy={:.1}, w={:.1}, h={:.1}",
+                    i, objectness_raw, objectness, cx, cy, w, h
+                );
             }
             if objectness > 0.01 && i < 100 {
                 debug!("High confidence anchor {} objectness: {:.3}", i, objectness);
             }
-            
+
             // Skip low confidence detections
             if objectness < self.confidence_threshold {
                 continue;
             }
-            
+
             // Debug first few high-confidence detections (commented out for production)
             // if objectness > 0.5 && i < 10 {
-            //     println!("Anchor {}: cx={:.1}, cy={:.1}, w={:.1}, h={:.1}, obj={:.3}", 
+            //     println!("Anchor {}: cx={:.1}, cy={:.1}, w={:.1}, h={:.1}, obj={:.3}",
             //              i, cx, cy, w, h, objectness);
             // }
-            
+
             // Sanity check: skip if coordinates are invalid
             if cx < 0.0 || cy < 0.0 || w <= 0.0 || h <= 0.0 {
                 continue;
             }
-            
+
             // Skip boxes outside model's input dimensions (likely errors)
             // Note: Some valid boxes may extend slightly beyond boundaries
             if cx > self.input_width as f32 * 1.5 || cy > self.input_height as f32 * 1.5 {
                 continue;
             }
-            
+
             // Skip extremely large boxes (likely errors)
             if w > self.input_width as f32 || h > self.input_height as f32 {
                 continue;
             }
-            
+
             // Find best class
             let mut max_class_score = 0.0;
             let mut best_class_id = 0;
-            
+
             for class_id in 0..num_classes {
                 let class_score_raw = if is_transposed {
                     // Transposed: class scores at position [5+class_id][i]
@@ -609,81 +662,89 @@ impl OnnxDetector {
                     let offset = i * output_size;
                     outputs[offset + 5 + class_id]
                 };
-                
+
                 // ONNX models already have sigmoid applied to class scores
                 let class_score = class_score_raw;
-                
+
                 if class_score > max_class_score {
                     max_class_score = class_score;
                     best_class_id = class_id;
                 }
             }
-            
+
             // Debug: Print top classes for high-confidence detections (commented out for production)
             // if objectness > 0.7 && i < 5 {
-            //     println!("High conf detection: obj={:.2}, best_class={} ({:.2})", 
+            //     println!("High conf detection: obj={:.2}, best_class={} ({:.2})",
             //              objectness, best_class_id, max_class_score);
             // }
-            
+
             // Combined confidence
             let confidence = objectness * max_class_score;
-            
+
             // Log high confidence detections before filtering
             if confidence > 0.005 {
-                info!("Detection candidate: confidence={:.3}, obj={:.3}, class_score={:.3}, class_id={}", 
-                          confidence, objectness, max_class_score, best_class_id);
+                info!(
+                    "Detection candidate: confidence={:.3}, obj={:.3}, class_score={:.3}, class_id={}",
+                    confidence, objectness, max_class_score, best_class_id
+                );
             }
-            
+
             // Validate confidence is in proper range
             if confidence < 0.0 || confidence > 1.0 {
-                warn!("Invalid confidence value: {:.6} (obj={:.6}, class={:.6})", 
-                          confidence, objectness, max_class_score);
+                warn!(
+                    "Invalid confidence value: {:.6} (obj={:.6}, class={:.6})",
+                    confidence, objectness, max_class_score
+                );
                 continue;
             }
-            
+
             // Additional validation: Skip detections with abnormally high raw values
             // This catches cases where the model outputs are corrupted
             if objectness > 100.0 || max_class_score > 100.0 {
-                warn!("Detected corrupted output: obj={:.3}, class={:.3} - skipping", 
-                          objectness, max_class_score);
+                warn!(
+                    "Detected corrupted output: obj={:.3}, class={:.3} - skipping",
+                    objectness, max_class_score
+                );
                 continue;
             }
-            
+
             if confidence >= self.confidence_threshold {
                 // Scale coordinates to image size
                 let scaled_cx = cx * x_scale;
                 let scaled_cy = cy * y_scale;
                 let scaled_w = w * x_scale;
                 let scaled_h = h * y_scale;
-                
+
                 // Convert from center format to top-left format
                 let x = (scaled_cx - scaled_w / 2.0).max(0.0);
                 let y = (scaled_cy - scaled_h / 2.0).max(0.0);
                 let width = scaled_w.min(img_width as f32 - x);
                 let height = scaled_h.min(img_height as f32 - y);
-                
+
                 // Skip invalid bounding boxes
                 if width <= 0.0 || height <= 0.0 {
                     continue;
                 }
-                
+
                 // Skip extremely small boxes (likely false positives)
                 if width < 5.0 || height < 5.0 {
                     continue;
                 }
-                
+
                 // Validate class ID is within expected range
                 if best_class_id >= num_classes {
                     continue;
                 }
-                
-                let class_name = self.class_names.get(best_class_id)
+
+                let class_name = self
+                    .class_names
+                    .get(best_class_id)
                     .unwrap_or(&"unknown".to_string())
                     .clone();
-                    
-                // eprintln!("[INFO] Detection added: {} (class_id={}) at ({:.1}, {:.1}) size={:.1}x{:.1} conf={:.3}", 
+
+                // eprintln!("[INFO] Detection added: {} (class_id={}) at ({:.1}, {:.1}) size={:.1}x{:.1} conf={:.3}",
                 //           class_name, best_class_id, x, y, width, height, confidence);
-                
+
                 detections.push(Detection {
                     x,
                     y,
@@ -695,10 +756,10 @@ impl OnnxDetector {
                 });
             }
         }
-        
+
         // Apply Non-Maximum Suppression
         let mut filtered_detections = self.apply_nms(detections);
-        
+
         // Limit maximum detections per frame to prevent excessive false positives
         const MAX_DETECTIONS_PER_FRAME: usize = 100;
         if filtered_detections.len() > MAX_DETECTIONS_PER_FRAME {
@@ -706,29 +767,37 @@ impl OnnxDetector {
             filtered_detections.sort_by(|a, b| b.confidence.partial_cmp(&a.confidence).unwrap());
             filtered_detections.truncate(MAX_DETECTIONS_PER_FRAME);
         }
-        
-        debug!("YOLOv5: Postprocessed {} anchors, {} detections after NMS", 
-                  num_anchors, filtered_detections.len());
-        
+
+        debug!(
+            "YOLOv5: Postprocessed {} anchors, {} detections after NMS",
+            num_anchors,
+            filtered_detections.len()
+        );
+
         Ok(filtered_detections)
     }
-    
+
     /// Process YOLOv8/v9/v11/v12 outputs  
     /// Note: v12 achieves mAP of 40.6-55.2 depending on model size (n/s/m/l/x)
-    fn postprocess_yolov8(&self, outputs: &[f32], img_width: u32, img_height: u32) -> Result<Vec<Detection>> {
+    fn postprocess_yolov8(
+        &self,
+        outputs: &[f32],
+        img_width: u32,
+        img_height: u32,
+    ) -> Result<Vec<Detection>> {
         let mut detections = Vec::new();
-        
+
         // YOLOv8/v9 output format: [batch_size, 84, 8400]
         // where 84 = cx, cy, w, h, class_scores[80] (no objectness)
         // Note: Output is transposed compared to v5
         let num_classes = 80;
         let num_values = 84; // 4 bbox + 80 classes
         let num_anchors = outputs.len() / num_values;
-        
+
         // Scale factors
         let x_scale = img_width as f32 / self.input_width as f32;
         let y_scale = img_height as f32 / self.input_height as f32;
-        
+
         // Process transposed format
         for anchor_idx in 0..num_anchors {
             // In v8/v9, data is arranged as [84, 8400]
@@ -737,11 +806,11 @@ impl OnnxDetector {
             let cy = outputs[1 * num_anchors + anchor_idx];
             let w = outputs[2 * num_anchors + anchor_idx];
             let h = outputs[3 * num_anchors + anchor_idx];
-            
+
             // Find best class (no objectness in v8/v9)
             let mut max_class_score = 0.0;
             let mut best_class_id = 0;
-            
+
             for class_id in 0..num_classes {
                 let class_score = outputs[(4 + class_id) * num_anchors + anchor_idx];
                 if class_score > max_class_score {
@@ -749,24 +818,26 @@ impl OnnxDetector {
                     best_class_id = class_id;
                 }
             }
-            
+
             // Use class score directly as confidence (no objectness)
             let confidence = max_class_score;
-            
+
             if confidence >= self.confidence_threshold {
                 // Convert and scale
                 let x = ((cx - w / 2.0) * x_scale).max(0.0);
                 let y = ((cy - h / 2.0) * y_scale).max(0.0);
                 let width = (w * x_scale).min(img_width as f32 - x);
                 let height = (h * y_scale).min(img_height as f32 - y);
-                
-                let class_name = self.class_names.get(best_class_id)
+
+                let class_name = self
+                    .class_names
+                    .get(best_class_id)
                     .unwrap_or(&"unknown".to_string())
                     .clone();
-                    
-                // eprintln!("[INFO] Detection added: {} (class_id={}) at ({:.1}, {:.1}) size={:.1}x{:.1} conf={:.3}", 
+
+                // eprintln!("[INFO] Detection added: {} (class_id={}) at ({:.1}, {:.1}) size={:.1}x{:.1} conf={:.3}",
                 //           class_name, best_class_id, x, y, width, height, confidence);
-                
+
                 detections.push(Detection {
                     x,
                     y,
@@ -778,117 +849,188 @@ impl OnnxDetector {
                 });
             }
         }
-        
+
         // Apply NMS
         let filtered_detections = self.apply_nms(detections);
-        
-        // debug!("YOLOv8/v9: Postprocessed {} anchors, {} detections after NMS", 
+
+        // debug!("YOLOv8/v9: Postprocessed {} anchors, {} detections after NMS",
         //           num_anchors, filtered_detections.len());
-        
+
         Ok(filtered_detections)
     }
-    
+
     /// Apply Non-Maximum Suppression
     fn apply_nms(&self, mut detections: Vec<Detection>) -> Vec<Detection> {
         detections.sort_by(|a, b| b.confidence.partial_cmp(&a.confidence).unwrap());
-        
+
         let mut keep = Vec::new();
-        
+
         while !detections.is_empty() {
             let current = detections.remove(0);
             keep.push(current.clone());
-            
+
             detections.retain(|det| {
                 if det.class_id != current.class_id {
                     return true;
                 }
-                
+
                 let iou = self.calculate_iou(&current, det);
                 iou < self.nms_threshold
             });
         }
-        
+
         keep
     }
-    
+
     /// Calculate Intersection over Union
     fn calculate_iou(&self, a: &Detection, b: &Detection) -> f32 {
         let x1 = a.x.max(b.x);
         let y1 = a.y.max(b.y);
         let x2 = (a.x + a.width).min(b.x + b.width);
         let y2 = (a.y + a.height).min(b.y + b.height);
-        
+
         if x2 < x1 || y2 < y1 {
             return 0.0;
         }
-        
+
         let intersection = (x2 - x1) * (y2 - y1);
         let area_a = a.width * a.height;
         let area_b = b.width * b.height;
         let union = area_a + area_b - intersection;
-        
+
         intersection / union
     }
-    
+
     #[cfg(test)]
     /// Create mock YOLO output for testing
     fn create_mock_yolo_output(&self) -> Vec<f32> {
         let num_anchors = 25200; // Typical for 640x640 YOLOv5
         let output_size = 85; // 4 bbox + 1 objectness + 80 classes
         let mut outputs = vec![-10.0; num_anchors * output_size]; // Initialize with low logits
-        
+
         // Add a few mock detections with proper logit values
         // Detection 1: Person at center (logit values that will become reasonable after sigmoid)
-        outputs[0] = 0.0;    // cx logit (sigmoid(0) = 0.5, * 640 = 320)
-        outputs[1] = 0.0;    // cy logit (sigmoid(0) = 0.5, * 640 = 320)
-        outputs[2] = 100.0;  // width (in pixels, not sigmoidified)
-        outputs[3] = 200.0;  // height (in pixels, not sigmoidified)
-        outputs[4] = 2.2;    // objectness logit (sigmoid(2.2) ≈ 0.9)
-        outputs[5] = 3.0;    // person class score logit (sigmoid(3.0) ≈ 0.95)
-        
+        outputs[0] = 0.0; // cx logit (sigmoid(0) = 0.5, * 640 = 320)
+        outputs[1] = 0.0; // cy logit (sigmoid(0) = 0.5, * 640 = 320)
+        outputs[2] = 100.0; // width (in pixels, not sigmoidified)
+        outputs[3] = 200.0; // height (in pixels, not sigmoidified)
+        outputs[4] = 2.2; // objectness logit (sigmoid(2.2) ≈ 0.9)
+        outputs[5] = 3.0; // person class score logit (sigmoid(3.0) ≈ 0.95)
+
         // Detection 2: Car
-        outputs[85] = -0.8;  // cx logit (sigmoid(-0.8) ≈ 0.31, * 640 ≈ 200)
-        outputs[86] = 0.5;   // cy logit (sigmoid(0.5) ≈ 0.62, * 640 ≈ 400)
+        outputs[85] = -0.8; // cx logit (sigmoid(-0.8) ≈ 0.31, * 640 ≈ 200)
+        outputs[86] = 0.5; // cy logit (sigmoid(0.5) ≈ 0.62, * 640 ≈ 400)
         outputs[87] = 150.0; // width
-        outputs[88] = 80.0;  // height
-        outputs[89] = 1.7;   // objectness logit (sigmoid(1.7) ≈ 0.85)
+        outputs[88] = 80.0; // height
+        outputs[89] = 1.7; // objectness logit (sigmoid(1.7) ≈ 0.85)
         outputs[90 + 2] = 2.2; // car class score logit
-        
+
         outputs
     }
-    
+
     /// Get default COCO class names
     fn default_class_names() -> Vec<String> {
         vec![
-            "person", "bicycle", "car", "motorcycle", "airplane", "bus", "train", "truck",
-            "boat", "traffic light", "fire hydrant", "stop sign", "parking meter", "bench",
-            "bird", "cat", "dog", "horse", "sheep", "cow", "elephant", "bear", "zebra",
-            "giraffe", "backpack", "umbrella", "handbag", "tie", "suitcase", "frisbee",
-            "skis", "snowboard", "sports ball", "kite", "baseball bat", "baseball glove",
-            "skateboard", "surfboard", "tennis racket", "bottle", "wine glass", "cup",
-            "fork", "knife", "spoon", "bowl", "banana", "apple", "sandwich", "orange",
-            "broccoli", "carrot", "hot dog", "pizza", "donut", "cake", "chair", "couch",
-            "potted plant", "bed", "dining table", "toilet", "tv", "laptop", "mouse",
-            "remote", "keyboard", "cell phone", "microwave", "oven", "toaster", "sink",
-            "refrigerator", "book", "clock", "vase", "scissors", "teddy bear", "hair drier",
-            "toothbrush"
-        ].iter().map(|s| s.to_string()).collect()
+            "person",
+            "bicycle",
+            "car",
+            "motorcycle",
+            "airplane",
+            "bus",
+            "train",
+            "truck",
+            "boat",
+            "traffic light",
+            "fire hydrant",
+            "stop sign",
+            "parking meter",
+            "bench",
+            "bird",
+            "cat",
+            "dog",
+            "horse",
+            "sheep",
+            "cow",
+            "elephant",
+            "bear",
+            "zebra",
+            "giraffe",
+            "backpack",
+            "umbrella",
+            "handbag",
+            "tie",
+            "suitcase",
+            "frisbee",
+            "skis",
+            "snowboard",
+            "sports ball",
+            "kite",
+            "baseball bat",
+            "baseball glove",
+            "skateboard",
+            "surfboard",
+            "tennis racket",
+            "bottle",
+            "wine glass",
+            "cup",
+            "fork",
+            "knife",
+            "spoon",
+            "bowl",
+            "banana",
+            "apple",
+            "sandwich",
+            "orange",
+            "broccoli",
+            "carrot",
+            "hot dog",
+            "pizza",
+            "donut",
+            "cake",
+            "chair",
+            "couch",
+            "potted plant",
+            "bed",
+            "dining table",
+            "toilet",
+            "tv",
+            "laptop",
+            "mouse",
+            "remote",
+            "keyboard",
+            "cell phone",
+            "microwave",
+            "oven",
+            "toaster",
+            "sink",
+            "refrigerator",
+            "book",
+            "clock",
+            "vase",
+            "scissors",
+            "teddy bear",
+            "hair drier",
+            "toothbrush",
+        ]
+        .iter()
+        .map(|s| s.to_string())
+        .collect()
     }
-    
+
     pub fn set_confidence_threshold(&mut self, threshold: f32) {
         self.confidence_threshold = threshold;
     }
-    
+
     pub fn set_nms_threshold(&mut self, threshold: f32) {
         self.nms_threshold = threshold;
     }
-    
+
     /// Set the YOLO version for output processing
     pub fn set_yolo_version(&mut self, version: YoloVersion) {
         self.yolo_version = version;
         // info!("Set YOLO version to: {:?}", version);
     }
-    
+
     #[cfg(test)]
     /// Create a mock detector for testing without an actual model
     pub fn new_mock() -> Self {
@@ -899,7 +1041,7 @@ impl OnnxDetector {
             environment: None,
             input_width: 640,
             input_height: 640,
-            confidence_threshold: 0.5,  // Higher threshold for mock detector
+            confidence_threshold: 0.5, // Higher threshold for mock detector
             nms_threshold: 0.4,
             class_names: Self::default_class_names(),
             yolo_version: YoloVersion::Auto,
@@ -910,28 +1052,32 @@ impl OnnxDetector {
 #[cfg(test)]
 mod tests {
     use super::*;
-    
+
     #[test]
     #[cfg(feature = "half")]
     fn test_f16_conversion() {
         use half::f16;
-        
+
         // Test f32 to f16 conversion
         let f32_values = vec![0.0f32, 1.0, -1.0, 0.5, 100.0];
         let f16_values: Vec<f16> = f32_values.iter().map(|&v| f16::from_f32(v)).collect();
-        
+
         // Test f16 to f32 conversion
         let f32_recovered: Vec<f32> = f16_values.iter().map(|&v| v.to_f32()).collect();
-        
+
         // Check values are approximately equal (some precision loss is expected)
         for (original, recovered) in f32_values.iter().zip(f32_recovered.iter()) {
             let diff = (original - recovered).abs();
             // f16 has limited precision, so we allow some tolerance
-            assert!(diff < 0.01 || (original.abs() > 10.0 && diff / original.abs() < 0.01),
-                    "Value {} converted to f16 and back differs by {}", original, diff);
+            assert!(
+                diff < 0.01 || (original.abs() > 10.0 && diff / original.abs() < 0.01),
+                "Value {} converted to f16 and back differs by {}",
+                original,
+                diff
+            );
         }
     }
-    
+
     #[test]
     fn test_mock_detector_creation() {
         let detector = OnnxDetector::new_mock();
@@ -940,7 +1086,7 @@ mod tests {
         assert_eq!(detector.confidence_threshold, 0.5);
         assert_eq!(detector.nms_threshold, 0.4);
     }
-    
+
     #[test]
     fn test_detector_config() {
         let config = DetectorConfig {
@@ -953,76 +1099,91 @@ mod tests {
             yolo_version: YoloVersion::V8,
             class_names: Some(vec!["test_class".to_string()]),
         };
-        
+
         let detector = OnnxDetector::new_with_config(config).unwrap();
         assert_eq!(detector.input_width, 416);
         assert_eq!(detector.input_height, 416);
         assert_eq!(detector.confidence_threshold, 0.6);
         assert_eq!(detector.nms_threshold, 0.5);
     }
-    
+
     #[test]
     fn test_yolo_version_detection() {
         let detector = OnnxDetector::new_mock();
-        
+
         // Test v5 format detection (85 values per anchor)
         let v5_output = vec![0.0; 25200 * 85];
         let version = detector.detect_yolo_version(&v5_output);
         assert!(matches!(version, YoloVersion::V5));
-        
+
         // Test v8 format detection (84 values per anchor)
         let v8_output = vec![0.0; 8400 * 84];
         let version = detector.detect_yolo_version(&v8_output);
         assert!(matches!(version, YoloVersion::V8));
     }
-    
+
     #[test]
     fn test_iou_calculation() {
         let detector = OnnxDetector::new_mock();
-        
+
         let det1 = Detection {
-            x: 100.0, y: 100.0, width: 100.0, height: 100.0,
-            confidence: 0.9, class_id: 0, class_name: "test".to_string(),
+            x: 100.0,
+            y: 100.0,
+            width: 100.0,
+            height: 100.0,
+            confidence: 0.9,
+            class_id: 0,
+            class_name: "test".to_string(),
         };
-        
+
         // Same box should have IoU of 1.0
         let det2 = det1.clone();
         assert_eq!(detector.calculate_iou(&det1, &det2), 1.0);
-        
+
         // Non-overlapping boxes should have IoU of 0.0
         let det3 = Detection {
-            x: 300.0, y: 300.0, width: 100.0, height: 100.0,
-            confidence: 0.9, class_id: 0, class_name: "test".to_string(),
+            x: 300.0,
+            y: 300.0,
+            width: 100.0,
+            height: 100.0,
+            confidence: 0.9,
+            class_id: 0,
+            class_name: "test".to_string(),
         };
         assert_eq!(detector.calculate_iou(&det1, &det3), 0.0);
-        
+
         // Partially overlapping boxes
         let det4 = Detection {
-            x: 150.0, y: 150.0, width: 100.0, height: 100.0,
-            confidence: 0.9, class_id: 0, class_name: "test".to_string(),
+            x: 150.0,
+            y: 150.0,
+            width: 100.0,
+            height: 100.0,
+            confidence: 0.9,
+            class_id: 0,
+            class_name: "test".to_string(),
         };
         let iou = detector.calculate_iou(&det1, &det4);
         assert!(iou > 0.0 && iou < 1.0);
     }
-    
+
     #[test]
     #[cfg(feature = "half")]
     fn test_f16_ndarray_creation() {
         use half::f16;
         use ndarray::Array;
-        
+
         // Create a small test tensor
         let f32_data = vec![1.0f32, 2.0, 3.0, 4.0, 5.0, 6.0];
         let f16_data: Vec<f16> = f32_data.iter().map(|&v| f16::from_f32(v)).collect();
-        
+
         // Create ndarray with f16 data
         let shape = vec![1, 2, 3];
         let array = Array::from_shape_vec(shape, f16_data.clone()).unwrap();
-        
+
         // Verify shape and data
         assert_eq!(array.shape(), &[1, 2, 3]);
         assert_eq!(array.len(), 6);
-        
+
         // Check that values can be accessed
         let flat_view: Vec<f16> = array.iter().cloned().collect();
         assert_eq!(flat_view, f16_data);

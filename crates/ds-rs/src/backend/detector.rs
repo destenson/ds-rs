@@ -29,23 +29,23 @@ const STANDARD_ELEMENTS: &[&str] = &[
 
 pub fn detect_available_backends() -> Vec<BackendType> {
     let mut available = Vec::new();
-    
+
     // Initialize GStreamer if not already done
     let _ = gst::init();
-    
+
     // Check for DeepStream backend
     if check_deepstream_availability() {
         available.push(BackendType::DeepStream);
     }
-    
+
     // Check for standard GStreamer backend
     if check_standard_availability() {
         available.push(BackendType::Standard);
     }
-    
+
     // Mock backend is always available
     available.push(BackendType::Mock);
-    
+
     available
 }
 
@@ -57,10 +57,10 @@ pub fn detect_and_create_backend(platform: &PlatformInfo) -> Result<Box<dyn Back
             return create_backend(cached_type, platform);
         }
     }
-    
+
     // Initialize GStreamer if not already done
     gst::init().map_err(|e| DeepStreamError::GStreamer(e.into()))?;
-    
+
     // Detect optimal backend
     let backend_type = if platform.has_nvidia_hardware() && check_deepstream_availability() {
         log::info!("DeepStream elements detected, using DeepStream backend");
@@ -72,12 +72,12 @@ pub fn detect_and_create_backend(platform: &PlatformInfo) -> Result<Box<dyn Back
         log::warn!("No suitable GStreamer elements found, using mock backend");
         BackendType::Mock
     };
-    
+
     // Cache the detection result
     if let Ok(mut cache) = DETECTION_CACHE.lock() {
         *cache = Some(backend_type);
     }
-    
+
     create_backend(backend_type, platform)
 }
 
@@ -118,31 +118,31 @@ pub fn check_element_availability(element_name: &str) -> bool {
 pub fn list_available_elements() -> Vec<String> {
     let registry = gst::Registry::get();
     let mut elements = Vec::new();
-    
+
     for feature in registry.features_by_plugin("nvcodec") {
         if let Ok(factory) = feature.downcast::<gst::ElementFactory>() {
             elements.push(factory.name().to_string());
         }
     }
-    
+
     for feature in registry.features_by_plugin("nvinfer") {
         if let Ok(factory) = feature.downcast::<gst::ElementFactory>() {
             elements.push(factory.name().to_string());
         }
     }
-    
+
     for feature in registry.features_by_plugin("nvstreammux") {
         if let Ok(factory) = feature.downcast::<gst::ElementFactory>() {
             elements.push(factory.name().to_string());
         }
     }
-    
+
     elements
 }
 
 pub fn get_element_properties(element_name: &str) -> HashMap<String, String> {
     let mut properties = HashMap::new();
-    
+
     if let Some(factory) = gst::ElementFactory::find(element_name) {
         if let Ok(element) = factory.create().build() {
             // Get element class for property listing
@@ -154,47 +154,47 @@ pub fn get_element_properties(element_name: &str) -> HashMap<String, String> {
             }
         }
     }
-    
+
     properties
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
-    
+
     #[test]
     fn test_backend_detection() {
         let _ = gst::init();
         let backends = detect_available_backends();
-        
+
         // At least mock backend should be available
         assert!(!backends.is_empty());
         assert!(backends.contains(&BackendType::Mock));
-        
+
         println!("Available backends: {:?}", backends);
     }
-    
+
     #[test]
     fn test_element_availability() {
         let _ = gst::init();
-        
+
         // Standard elements that should be available
         assert!(check_element_availability("queue"));
         assert!(check_element_availability("identity"));
-        
+
         // DeepStream elements might not be available
         let has_deepstream = check_element_availability("nvstreammux");
         println!("DeepStream available: {}", has_deepstream);
     }
-    
+
     #[test]
     fn test_cached_detection() {
         let _ = gst::init();
         let platform = PlatformInfo::detect().unwrap();
-        
+
         // First detection
         let _ = detect_and_create_backend(&platform);
-        
+
         // Second detection should use cache
         let result = detect_and_create_backend(&platform);
         assert!(result.is_ok());

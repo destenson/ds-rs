@@ -1,6 +1,6 @@
 #![allow(unused)]
 //! Example application demonstrating metadata extraction and object detection
-//! 
+//!
 //! This example shows how to:
 //! - Build a pipeline with inference elements
 //! - Extract metadata from buffers
@@ -8,16 +8,15 @@
 //! - Track objects across frames
 //! - Handle DeepStream messages
 
-use ds_rs::{
-    init, BackendManager,
-    MetadataExtractor, ObjectTracker, InferenceProcessor,
-    DSMessageHandler, DSMessageType,
-};
 use ds_rs::elements::factory::ElementFactory;
+use ds_rs::{
+    BackendManager, DSMessageHandler, DSMessageType, InferenceProcessor, MetadataExtractor,
+    ObjectTracker, init,
+};
 use gstreamer as gst;
 use gstreamer::prelude::*;
-use std::sync::{Arc, Mutex};
 use std::collections::HashMap;
+use std::sync::{Arc, Mutex};
 
 /// Detection statistics
 struct DetectionStats {
@@ -34,12 +33,15 @@ impl DetectionStats {
             detections_by_class: HashMap::new(),
         }
     }
-    
+
     fn update(&mut self, class_name: &str) {
         self.total_detections += 1;
-        *self.detections_by_class.entry(class_name.to_string()).or_insert(0) += 1;
+        *self
+            .detections_by_class
+            .entry(class_name.to_string())
+            .or_insert(0) += 1;
     }
-    
+
     fn print(&self) {
         println!("\n=== Detection Statistics ===");
         println!("Frames processed: {}", self.frames_processed);
@@ -54,30 +56,30 @@ impl DetectionStats {
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     // Initialize the library
     init()?;
-    
+
     println!("DeepStream Rust - Object Detection Example");
     println!("==========================================\n");
-    
+
     // Create backend manager
     let backend_manager = Arc::new(BackendManager::new()?);
     println!("Using backend: {}", backend_manager.backend_type().name());
-    
+
     // Create element factory
     let factory = ElementFactory::new(backend_manager.clone());
-    
+
     // Build detection pipeline
     let pipeline = build_detection_pipeline(&factory)?;
-    
+
     // Set up metadata extraction
     let metadata_extractor = Arc::new(MetadataExtractor::new());
     let object_tracker = Arc::new(Mutex::new(ObjectTracker::new(100, 30, 50)));
     let _inference_processor = Arc::new(InferenceProcessor::default());
     let stats = Arc::new(Mutex::new(DetectionStats::new()));
-    
+
     // Set up message handler
     let message_handler = Arc::new(DSMessageHandler::new());
     setup_message_callbacks(&message_handler);
-    
+
     // Add probe to extract metadata
     add_metadata_probe(
         &pipeline,
@@ -85,50 +87,52 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         object_tracker.clone(),
         stats.clone(),
     )?;
-    
+
     // Set up bus watch
     setup_bus_watch(&pipeline, message_handler.clone())?;
-    
+
     // Start pipeline
     println!("Starting pipeline...");
     pipeline.set_state(gst::State::Playing)?;
-    
+
     // Run for a while
     println!("Processing... Press Ctrl+C to stop\n");
-    
+
     // Set up signal handler
     let running = Arc::new(Mutex::new(true));
     let running_clone = running.clone();
-    
+
     ctrlc::set_handler(move || {
         println!("\nStopping pipeline...");
         if let Ok(mut r) = running_clone.lock() {
             *r = false;
         }
     })?;
-    
+
     // Main loop
     while *running.lock().unwrap() {
         std::thread::sleep(std::time::Duration::from_millis(100));
     }
-    
+
     // Stop pipeline
     pipeline.set_state(gst::State::Null)?;
-    
+
     // Print final statistics
     if let Ok(s) = stats.lock() {
         s.print();
     }
-    
+
     println!("\nExample completed successfully!");
-    
+
     Ok(())
 }
 
 /// Build a detection pipeline
-fn build_detection_pipeline(factory: &ElementFactory) -> Result<gst::Pipeline, Box<dyn std::error::Error>> {
+fn build_detection_pipeline(
+    factory: &ElementFactory,
+) -> Result<gst::Pipeline, Box<dyn std::error::Error>> {
     let pipeline = gst::Pipeline::builder().name("detection-pipeline").build();
-    
+
     // Create elements
     let source = gst::ElementFactory::make("videotestsrc")
         .name("source")
@@ -141,23 +145,21 @@ fn build_detection_pipeline(factory: &ElementFactory) -> Result<gst::Pipeline, B
     let capsfilter = gst::ElementFactory::make("capsfilter")
         .property("caps", &caps)
         .build()?;
-    
+
     let convert = factory.create_video_convert(Some("convert"))?;
     let scale = gst::ElementFactory::make("videoscale").build()?;
-    let sink = gst::ElementFactory::make("fakesink")
-        .name("sink")
-        .build()?;
-    
+    let sink = gst::ElementFactory::make("fakesink").name("sink").build()?;
+
     // Configure test source
     source.set_property_from_str("pattern", "ball");
     source.set_property("num-buffers", 300i32);
-    
+
     // Add elements to pipeline
     pipeline.add_many([&source, &capsfilter, &convert, &scale, &sink])?;
-    
+
     // Link elements
     gst::Element::link_many([&source, &capsfilter, &convert, &scale, &sink])?;
-    
+
     Ok(pipeline)
 }
 
@@ -169,13 +171,11 @@ fn add_metadata_probe(
     stats: Arc<Mutex<DetectionStats>>,
 ) -> Result<(), Box<dyn std::error::Error>> {
     // Get the sink element
-    let sink = pipeline.by_name("sink")
-        .ok_or("Sink element not found")?;
-    
+    let sink = pipeline.by_name("sink").ok_or("Sink element not found")?;
+
     // Get sink pad
-    let sinkpad = sink.static_pad("sink")
-        .ok_or("Sink pad not found")?;
-    
+    let sinkpad = sink.static_pad("sink").ok_or("Sink pad not found")?;
+
     // Add probe
     sinkpad.add_probe(gst::PadProbeType::BUFFER, move |_pad, info| {
         if let Some(buffer) = info.buffer() {
@@ -186,7 +186,7 @@ fn add_metadata_probe(
                     // Update statistics
                     if let Ok(mut s) = stats.lock() {
                         s.frames_processed += 1;
-                        
+
                         // Process objects
                         for obj in frame.objects() {
                             // Track object
@@ -198,10 +198,10 @@ fn add_metadata_probe(
                                     println!("New track created: ID={}", track_id);
                                 }
                             }
-                            
+
                             // Update detection stats
                             s.update(obj.class_name());
-                            
+
                             // Print detection info
                             if s.total_detections % 10 == 0 {
                                 println!(
@@ -217,7 +217,7 @@ fn add_metadata_probe(
                         }
                     }
                 }
-                
+
                 // Print tracker statistics periodically
                 if let Ok(s) = stats.lock() {
                     if s.frames_processed % 100 == 0 {
@@ -234,10 +234,10 @@ fn add_metadata_probe(
                 }
             }
         }
-        
+
         gst::PadProbeReturn::Ok
     });
-    
+
     Ok(())
 }
 
@@ -249,7 +249,7 @@ fn setup_message_callbacks(handler: &Arc<DSMessageHandler>) {
             println!("Stream {} received EOS", stream_id);
         }
     });
-    
+
     // Handle stream added
     handler.register_callback("stream_added", |msg| {
         if let DSMessageType::StreamAdded(stream_id) = msg {
@@ -264,11 +264,11 @@ fn setup_bus_watch(
     handler: Arc<DSMessageHandler>,
 ) -> Result<(), Box<dyn std::error::Error>> {
     let bus = pipeline.bus().ok_or("Pipeline has no bus")?;
-    
+
     bus.add_watch(move |_bus, msg| {
         // Handle DeepStream messages
         handler.handle_message(msg).ok();
-        
+
         // Handle standard GStreamer messages
         match msg.view() {
             gst::MessageView::Eos(_) => {
@@ -285,7 +285,11 @@ fn setup_bus_watch(
                 gstreamer::glib::ControlFlow::Break
             }
             gst::MessageView::StateChanged(state_changed) => {
-                if state_changed.src().map(|s| s == msg.src().unwrap()).unwrap_or(false) {
+                if state_changed
+                    .src()
+                    .map(|s| s == msg.src().unwrap())
+                    .unwrap_or(false)
+                {
                     println!(
                         "[{:.3}] Pipeline state changed from {:?} to {:?}",
                         ds_rs::timestamp(),
@@ -298,6 +302,6 @@ fn setup_bus_watch(
             _ => gstreamer::glib::ControlFlow::Continue,
         }
     })?;
-    
+
     Ok(())
 }

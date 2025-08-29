@@ -66,7 +66,7 @@ impl TestPattern {
             ))),
         }
     }
-    
+
     pub fn to_gst_pattern(&self) -> i32 {
         match self {
             Self::Smpte => 0,
@@ -96,7 +96,7 @@ impl TestPattern {
             Self::Colors => 24,
         }
     }
-    
+
     pub fn description(&self) -> &str {
         match self {
             Self::Smpte => "SMPTE 100% color bars",
@@ -126,7 +126,7 @@ impl TestPattern {
             Self::Colors => "All colors pattern",
         }
     }
-    
+
     pub fn use_case(&self) -> &str {
         match self {
             Self::Smpte | Self::Smpte75 | Self::Smpte100 => {
@@ -145,7 +145,7 @@ impl TestPattern {
             _ => "General testing purposes",
         }
     }
-    
+
     pub fn all() -> Vec<Self> {
         vec![
             Self::Smpte,
@@ -175,11 +175,11 @@ impl TestPattern {
             Self::Colors,
         ]
     }
-    
+
     pub fn animated_patterns() -> Vec<Self> {
         vec![Self::Ball, Self::Bar, Self::Blink, Self::Snow]
     }
-    
+
     pub fn static_patterns() -> Vec<Self> {
         Self::all()
             .into_iter()
@@ -206,29 +206,29 @@ impl PatternRotator {
             current_index: 0,
         }
     }
-    
+
     pub fn all_patterns() -> Self {
         Self::new(TestPattern::all())
     }
-    
+
     pub fn animated_only() -> Self {
         Self::new(TestPattern::animated_patterns())
     }
-    
+
     pub fn static_only() -> Self {
         Self::new(TestPattern::static_patterns())
     }
-    
+
     pub fn next(&mut self) -> TestPattern {
         if self.patterns.is_empty() {
             return TestPattern::Smpte;
         }
-        
+
         let pattern = self.patterns[self.current_index];
         self.current_index = (self.current_index + 1) % self.patterns.len();
         pattern
     }
-    
+
     pub fn current(&self) -> TestPattern {
         if self.patterns.is_empty() {
             TestPattern::Smpte
@@ -236,7 +236,7 @@ impl PatternRotator {
             self.patterns[self.current_index]
         }
     }
-    
+
     pub fn reset(&mut self) {
         self.current_index = 0;
     }
@@ -245,22 +245,25 @@ impl PatternRotator {
 #[cfg(test)]
 mod tests {
     use super::*;
-    
+
     #[test]
     fn test_pattern_from_str() {
         assert_eq!(TestPattern::from_str("smpte").unwrap(), TestPattern::Smpte);
         assert_eq!(TestPattern::from_str("BALL").unwrap(), TestPattern::Ball);
-        assert_eq!(TestPattern::from_str("zone-plate").unwrap(), TestPattern::ZonePlate);
+        assert_eq!(
+            TestPattern::from_str("zone-plate").unwrap(),
+            TestPattern::ZonePlate
+        );
         assert!(TestPattern::from_str("invalid").is_err());
     }
-    
+
     #[test]
     fn test_pattern_to_gst() {
         assert_eq!(TestPattern::Smpte.to_gst_pattern(), 0);
         assert_eq!(TestPattern::Ball.to_gst_pattern(), 18);
         assert_eq!(TestPattern::Colors.to_gst_pattern(), 24);
     }
-    
+
     #[test]
     fn test_pattern_rotator() {
         let mut rotator = PatternRotator::new(vec![
@@ -268,20 +271,20 @@ mod tests {
             TestPattern::Ball,
             TestPattern::Snow,
         ]);
-        
+
         assert_eq!(rotator.current(), TestPattern::Smpte);
         assert_eq!(rotator.next(), TestPattern::Smpte);
         assert_eq!(rotator.next(), TestPattern::Ball);
         assert_eq!(rotator.next(), TestPattern::Snow);
         assert_eq!(rotator.next(), TestPattern::Smpte);
     }
-    
+
     #[test]
     fn test_animated_vs_static() {
         let animated = TestPattern::animated_patterns();
         assert!(animated.contains(&TestPattern::Ball));
         assert!(!animated.contains(&TestPattern::Smpte));
-        
+
         let static_patterns = TestPattern::static_patterns();
         assert!(!static_patterns.contains(&TestPattern::Ball));
         assert!(static_patterns.contains(&TestPattern::Smpte));

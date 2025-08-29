@@ -1,13 +1,13 @@
+use crate::detector::{DetectorConfig, OnnxDetector};
 use gstreamer::glib;
 use gstreamer::prelude::*;
 use gstreamer::subclass::prelude::*;
 use gstreamer_base::subclass::prelude::*;
 use gstreamer_video as gst_video;
 use gstreamer_video::VideoFrameExt;
+use image::DynamicImage;
 use once_cell::sync::Lazy;
 use std::sync::Mutex;
-use crate::detector::{OnnxDetector, DetectorConfig};
-use image::DynamicImage;
 
 static CAT: Lazy<gstreamer::DebugCategory> = Lazy::new(|| {
     gstreamer::DebugCategory::new(
@@ -25,22 +25,22 @@ const DEFAULT_INPUT_HEIGHT: u32 = 640;
 const DEFAULT_PROCESS_EVERY_N_FRAMES: u32 = 1;
 const DEFAULT_BATCH_SIZE: u32 = 2;
 const DEFAULT_UNIQUE_ID: u32 = 0;
-const DEFAULT_PROCESS_MODE: u32 = 1;  // Primary mode
+const DEFAULT_PROCESS_MODE: u32 = 1; // Primary mode
 const DEFAULT_OUTPUT_TENSOR_META: bool = false;
 
 #[derive(Debug, Clone)]
 struct Settings {
     model_path: String,
-    config_file_path: Option<String>,  // nvinfer compatibility
+    config_file_path: Option<String>, // nvinfer compatibility
     confidence_threshold: f64,
     nms_threshold: f64,
     input_width: u32,
     input_height: u32,
     process_every_n_frames: u32,
-    batch_size: u32,  // nvinfer compatibility
-    unique_id: u32,  // nvinfer compatibility
-    process_mode: u32,  // nvinfer compatibility (1=primary, 2=secondary)
-    output_tensor_meta: bool,  // nvinfer compatibility
+    batch_size: u32,          // nvinfer compatibility
+    unique_id: u32,           // nvinfer compatibility
+    process_mode: u32,        // nvinfer compatibility (1=primary, 2=secondary)
+    output_tensor_meta: bool, // nvinfer compatibility
 }
 
 impl Default for Settings {
@@ -79,24 +79,34 @@ impl CpuDetector {
             num_threads: 4,
             ..Default::default()
         };
-        
+
         OnnxDetector::new_with_config(config)
             .map_err(|e| format!("Failed to create detector: {}", e))
     }
-    
+
     fn ensure_detector_loaded(&self) {
         let settings = self.settings.lock().unwrap().clone();
         let mut detector_guard = self.detector.lock().unwrap();
-        
+
         if detector_guard.is_none() {
             match self.initialize_detector(&settings) {
                 Ok(detector) => {
-                    gstreamer::info!(CAT, imp = self, "Loaded ONNX detector from: {}", settings.model_path);
+                    gstreamer::info!(
+                        CAT,
+                        imp = self,
+                        "Loaded ONNX detector from: {}",
+                        settings.model_path
+                    );
                     *detector_guard = Some(detector);
-                },
+                }
                 #[cfg(test)]
                 Err(e) => {
-                    gstreamer::warning!(CAT, imp = self, "Failed to load detector: {}, using mock", e);
+                    gstreamer::warning!(
+                        CAT,
+                        imp = self,
+                        "Failed to load detector: {}, using mock",
+                        e
+                    );
                     *detector_guard = Some(OnnxDetector::new_mock());
                 }
                 #[cfg(not(test))]
@@ -106,17 +116,20 @@ impl CpuDetector {
             }
         }
     }
-    
-    fn frame_to_image(&self, frame: &gst_video::VideoFrameRef<&gstreamer::BufferRef>) -> Option<DynamicImage> {
+
+    fn frame_to_image(
+        &self,
+        frame: &gst_video::VideoFrameRef<&gstreamer::BufferRef>,
+    ) -> Option<DynamicImage> {
         let width = frame.width();
         let height = frame.height();
         let format = frame.format();
-        
+
         match format {
             gst_video::VideoFormat::Rgb => {
                 let data = frame.plane_data(0).ok()?;
                 let stride = frame.plane_stride()[0] as usize;
-                
+
                 // Convert strided RGB to contiguous RGB
                 let mut rgb_data = Vec::with_capacity((width * height * 3) as usize);
                 for y in 0..height {
@@ -126,14 +139,13 @@ impl CpuDetector {
                         rgb_data.extend_from_slice(&data[row_start..row_end]);
                     }
                 }
-                
-                image::RgbImage::from_raw(width, height, rgb_data)
-                    .map(DynamicImage::ImageRgb8)
-            },
+
+                image::RgbImage::from_raw(width, height, rgb_data).map(DynamicImage::ImageRgb8)
+            }
             gst_video::VideoFormat::Bgr => {
                 let data = frame.plane_data(0).ok()?;
                 let stride = frame.plane_stride()[0] as usize;
-                
+
                 // Convert BGR to RGB
                 let mut rgb_data = Vec::with_capacity((width * height * 3) as usize);
                 for y in 0..height {
@@ -143,14 +155,13 @@ impl CpuDetector {
                         if pixel_start + 2 < data.len() {
                             rgb_data.push(data[pixel_start + 2]); // R
                             rgb_data.push(data[pixel_start + 1]); // G
-                            rgb_data.push(data[pixel_start]);     // B
+                            rgb_data.push(data[pixel_start]); // B
                         }
                     }
                 }
-                
-                image::RgbImage::from_raw(width, height, rgb_data)
-                    .map(DynamicImage::ImageRgb8)
-            },
+
+                image::RgbImage::from_raw(width, height, rgb_data).map(DynamicImage::ImageRgb8)
+            }
             _ => {
                 gstreamer::warning!(CAT, imp = self, "Unsupported video format: {:?}", format);
                 None
@@ -172,16 +183,16 @@ impl ObjectImpl for CpuDetector {
             vec![
                 glib::subclass::Signal::builder("inference-done")
                     .param_types([
-                        u64::static_type(),    // frame number
-                        u32::static_type(),    // detection count
+                        u64::static_type(), // frame number
+                        u32::static_type(), // detection count
                     ])
                     .build(),
             ]
         });
-        
+
         SIGNALS.as_ref()
     }
-    
+
     fn properties() -> &'static [glib::ParamSpec] {
         static PROPERTIES: Lazy<Vec<glib::ParamSpec>> = Lazy::new(|| {
             vec![
@@ -269,13 +280,13 @@ impl ObjectImpl for CpuDetector {
                     .build(),
             ]
         });
-        
+
         PROPERTIES.as_ref()
     }
-    
+
     fn set_property(&self, _id: usize, value: &glib::Value, pspec: &glib::ParamSpec) {
         let mut settings = self.settings.lock().unwrap();
-        
+
         match pspec.name() {
             "model-path" => {
                 let model_path: String = value.get().expect("type checked upstream");
@@ -283,7 +294,7 @@ impl ObjectImpl for CpuDetector {
                 settings.model_path = model_path;
                 // Reset detector to reload with new model
                 *self.detector.lock().unwrap() = None;
-            },
+            }
             "confidence-threshold" => {
                 let threshold: f64 = value.get().expect("type checked upstream");
                 settings.confidence_threshold = threshold;
@@ -291,82 +302,109 @@ impl ObjectImpl for CpuDetector {
                 if let Some(ref mut detector) = *self.detector.lock().unwrap() {
                     detector.set_confidence_threshold(threshold as f32);
                 }
-            },
+            }
             "nms-threshold" => {
                 let threshold: f64 = value.get().expect("type checked upstream");
                 settings.nms_threshold = threshold;
                 if let Some(ref mut detector) = *self.detector.lock().unwrap() {
                     detector.set_nms_threshold(threshold as f32);
                 }
-            },
+            }
             "input-width" => {
                 settings.input_width = value.get().expect("type checked upstream");
                 *self.detector.lock().unwrap() = None;
-            },
+            }
             "input-height" => {
                 settings.input_height = value.get().expect("type checked upstream");
                 *self.detector.lock().unwrap() = None;
-            },
+            }
             "process-every-n-frames" => {
                 settings.process_every_n_frames = value.get().expect("type checked upstream");
-            },
+            }
             "config-file-path" => {
                 let config_path: Option<String> = value.get().ok();
                 settings.config_file_path = config_path.clone();
                 if let Some(path) = config_path {
                     gstreamer::info!(CAT, imp = self, "Loading config file: {}", path);
-                    
+
                     // Parse config file and update settings
                     match crate::config::parse_config_file(&path) {
                         Ok(config) => {
                             // Apply settings from config file
                             if let Some(onnx_file) = config.onnx_file {
                                 settings.model_path = onnx_file;
-                                gstreamer::info!(CAT, imp = self, "Model path from config: {}", settings.model_path);
+                                gstreamer::info!(
+                                    CAT,
+                                    imp = self,
+                                    "Model path from config: {}",
+                                    settings.model_path
+                                );
                             }
                             settings.batch_size = config.batch_size;
                             settings.unique_id = config.unique_id;
                             settings.process_mode = config.process_mode;
                             settings.confidence_threshold = config.pre_cluster_threshold as f64;
                             settings.nms_threshold = config.nms_iou_threshold as f64;
-                            
+
                             // Reset detector to reload with new settings
                             *self.detector.lock().unwrap() = None;
-                            
+
                             gstreamer::info!(CAT, imp = self, "Config loaded successfully");
                         }
                         Err(e) => {
-                            gstreamer::error!(CAT, imp = self, "Failed to parse config file: {}", e);
+                            gstreamer::error!(
+                                CAT,
+                                imp = self,
+                                "Failed to parse config file: {}",
+                                e
+                            );
                         }
                     }
                 }
-            },
+            }
             "batch-size" => {
                 settings.batch_size = value.get().expect("type checked upstream");
-                gstreamer::info!(CAT, imp = self, "Batch size set to: {}", settings.batch_size);
-            },
+                gstreamer::info!(
+                    CAT,
+                    imp = self,
+                    "Batch size set to: {}",
+                    settings.batch_size
+                );
+            }
             "unique-id" => {
                 settings.unique_id = value.get().expect("type checked upstream");
-            },
+            }
             "process-mode" => {
                 settings.process_mode = value.get().expect("type checked upstream");
-                gstreamer::info!(CAT, imp = self, "Process mode set to: {} ({})", 
+                gstreamer::info!(
+                    CAT,
+                    imp = self,
+                    "Process mode set to: {} ({})",
                     settings.process_mode,
-                    if settings.process_mode == 1 { "primary" } else { "secondary" }
+                    if settings.process_mode == 1 {
+                        "primary"
+                    } else {
+                        "secondary"
+                    }
                 );
-            },
+            }
             "output-tensor-meta" => {
                 settings.output_tensor_meta = value.get().expect("type checked upstream");
-            },
+            }
             _ => {
-                gstreamer::warning!(CAT, imp = self, "Unknown property '{}' in set_property", pspec.name());
+                gstreamer::warning!(
+                    CAT,
+                    imp = self,
+                    "Unknown property '{}' in set_property",
+                    pspec.name()
+                );
             }
         }
     }
-    
+
     fn property(&self, _id: usize, pspec: &glib::ParamSpec) -> glib::Value {
         let settings = self.settings.lock().unwrap();
-        
+
         match pspec.name() {
             "model-path" => settings.model_path.to_value(),
             "confidence-threshold" => settings.confidence_threshold.to_value(),
@@ -380,7 +418,12 @@ impl ObjectImpl for CpuDetector {
             "process-mode" => settings.process_mode.to_value(),
             "output-tensor-meta" => settings.output_tensor_meta.to_value(),
             _ => {
-                gstreamer::warning!(CAT, imp = self, "Unknown property '{}' in property getter", pspec.name());
+                gstreamer::warning!(
+                    CAT,
+                    imp = self,
+                    "Unknown property '{}' in property getter",
+                    pspec.name()
+                );
                 // Return a default value to avoid crashes
                 glib::Value::from(&0u32)
             }
@@ -400,10 +443,10 @@ impl ElementImpl for CpuDetector {
                 "DeepStream Rust Team <dev@example.com>",
             )
         });
-        
+
         Some(&*ELEMENT_METADATA)
     }
-    
+
     fn pad_templates() -> &'static [gstreamer::PadTemplate] {
         static PAD_TEMPLATES: Lazy<Vec<gstreamer::PadTemplate>> = Lazy::new(|| {
             let caps = gst_video::VideoCapsBuilder::new()
@@ -414,7 +457,7 @@ impl ElementImpl for CpuDetector {
                     gst_video::VideoFormat::Bgra,
                 ])
                 .build();
-            
+
             let src_pad_template = gstreamer::PadTemplate::new(
                 "src",
                 gstreamer::PadDirection::Src,
@@ -422,7 +465,7 @@ impl ElementImpl for CpuDetector {
                 &caps,
             )
             .unwrap();
-            
+
             let sink_pad_template = gstreamer::PadTemplate::new(
                 "sink",
                 gstreamer::PadDirection::Sink,
@@ -430,25 +473,25 @@ impl ElementImpl for CpuDetector {
                 &caps,
             )
             .unwrap();
-            
+
             vec![src_pad_template, sink_pad_template]
         });
-        
+
         PAD_TEMPLATES.as_ref()
     }
 }
 
 impl BaseTransformImpl for CpuDetector {
-    const MODE: gstreamer_base::subclass::BaseTransformMode = 
+    const MODE: gstreamer_base::subclass::BaseTransformMode =
         gstreamer_base::subclass::BaseTransformMode::AlwaysInPlace;
     const PASSTHROUGH_ON_SAME_CAPS: bool = true;
     const TRANSFORM_IP_ON_PASSTHROUGH: bool = true;
-    
+
     fn start(&self) -> Result<(), gstreamer::ErrorMessage> {
         self.ensure_detector_loaded();
         Ok(())
     }
-    
+
     fn transform_caps(
         &self,
         direction: gstreamer::PadDirection,
@@ -457,11 +500,16 @@ impl BaseTransformImpl for CpuDetector {
     ) -> Option<gstreamer::Caps> {
         // Since we're a passthrough element that doesn't modify the video format,
         // we return the same caps for both directions
-        gstreamer::debug!(CAT, imp = self, 
-            "transform_caps called with direction {:?}, caps: {}", direction, caps);
-        
+        gstreamer::debug!(
+            CAT,
+            imp = self,
+            "transform_caps called with direction {:?}, caps: {}",
+            direction,
+            caps
+        );
+
         let same_caps = caps.clone();
-        
+
         // Apply optional filter
         if let Some(filter) = filter {
             Some(filter.intersect_with_mode(&same_caps, gstreamer::CapsIntersectMode::First))
@@ -469,62 +517,77 @@ impl BaseTransformImpl for CpuDetector {
             Some(same_caps)
         }
     }
-    
-    fn transform_ip_passthrough(&self, buf: &gstreamer::Buffer) -> Result<gstreamer::FlowSuccess, gstreamer::FlowError> {
+
+    fn transform_ip_passthrough(
+        &self,
+        buf: &gstreamer::Buffer,
+    ) -> Result<gstreamer::FlowSuccess, gstreamer::FlowError> {
         let mut frame_count = self.frame_count.lock().unwrap();
         *frame_count += 1;
-        
+
         let settings = self.settings.lock().unwrap().clone();
-        
+
         // Skip processing if not on the right frame interval
         if *frame_count % (settings.process_every_n_frames as u64) != 0 {
             return Ok(gstreamer::FlowSuccess::Ok);
         }
-        
+
         // Get video info from sink pad caps
         let element = self.obj();
         let sink_pad = element.static_pad("sink").unwrap();
-        let caps = sink_pad.current_caps().ok_or(gstreamer::FlowError::NotNegotiated)?;
+        let caps = sink_pad
+            .current_caps()
+            .ok_or(gstreamer::FlowError::NotNegotiated)?;
         let info = gst_video::VideoInfo::from_caps(&caps)
             .map_err(|_| gstreamer::FlowError::NotSupported)?;
-        
+
         // Map buffer for reading (we don't modify the video data)
         let frame = gst_video::VideoFrameRef::from_buffer_ref_readable(buf.as_ref(), &info)
             .map_err(|_| gstreamer::FlowError::Error)?;
-        
+
         // Convert frame to image for detection
         if let Some(image) = self.frame_to_image(&frame) {
             if let Some(ref detector) = *self.detector.lock().unwrap() {
                 match detector.detect(&image) {
                     Ok(detections) => {
                         let detection_count = detections.len() as u32;
-                        
-                        gstreamer::trace!(CAT, imp = self, 
-                                   "Frame {}: Detected {} objects", *frame_count, detection_count);
-                        
+
+                        gstreamer::trace!(
+                            CAT,
+                            imp = self,
+                            "Frame {}: Detected {} objects",
+                            *frame_count,
+                            detection_count
+                        );
+
                         // Emit signal with detection results
                         element.emit_by_name::<()>(
                             "inference-done",
                             &[&(*frame_count as u64), &detection_count],
                         );
-                        
+
                         // Log detections for debugging
                         for detection in &detections {
-                            gstreamer::trace!(CAT, imp = self,
-                                       "Detection: {} at ({:.1}, {:.1}) {}x{} conf={:.2}",
-                                       detection.class_name,
-                                       detection.x, detection.y,
-                                       detection.width, detection.height,
-                                       detection.confidence);
+                            gstreamer::trace!(
+                                CAT,
+                                imp = self,
+                                "Detection: {} at ({:.1}, {:.1}) {}x{} conf={:.2}",
+                                detection.class_name,
+                                detection.x,
+                                detection.y,
+                                detection.width,
+                                detection.height,
+                                detection.confidence
+                            );
                         }
-                    },
+                    }
                     Err(e) => {
                         gstreamer::warning!(CAT, imp = self, "Detection failed: {}", e);
                     }
                 }
             }
         }
-        
+
         // Buffer passes through unchanged (identity behavior)
         Ok(gstreamer::FlowSuccess::Ok)
     }

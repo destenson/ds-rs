@@ -1,17 +1,17 @@
 #![allow(unused)]
-use gstreamer::glib;
+use crate::error::Result;
+use gstcpuinfer::detector::{DetectorConfig, OnnxDetector};
 use gstreamer as gst;
+use gstreamer::glib;
 use gstreamer::prelude::*;
 use gstreamer::subclass::prelude::*;
 use gstreamer_base as gst_base;
 use gstreamer_base::subclass::prelude::*;
 use gstreamer_video as gst_video;
 use gstreamer_video::prelude::*;
-use std::sync::{LazyLock, Mutex};
-use gstcpuinfer::detector::{OnnxDetector, DetectorConfig};
-use crate::error::Result;
 use image::DynamicImage;
 use serde_json;
+use std::sync::{LazyLock, Mutex};
 
 static CAT: LazyLock<gst::DebugCategory> = LazyLock::new(|| {
     gst::DebugCategory::new(
@@ -60,7 +60,7 @@ pub struct CpuDetector {
 
 impl CpuDetector {
     fn initialize_detector(&self, settings: &Settings) -> Result<OnnxDetector> {
-        use gstcpuinfer::detector::{OnnxDetector, DetectorConfig};
+        use gstcpuinfer::detector::{DetectorConfig, OnnxDetector};
         let config = DetectorConfig {
             model_path: Some(settings.model_path.clone()),
             input_width: settings.input_width,
@@ -70,37 +70,45 @@ impl CpuDetector {
             num_threads: 4,
             ..Default::default()
         };
-        
+
         OnnxDetector::new_with_config(config).map_err(|e| e.into())
     }
-    
+
     fn ensure_detector_loaded(&self) {
         let settings = self.settings.lock().unwrap().clone();
         let mut detector_guard = self.detector.lock().unwrap();
-        
+
         if detector_guard.is_none() {
             match self.initialize_detector(&settings) {
                 Ok(detector) => {
-                    gst::info!(CAT, imp = self, "Loaded ONNX detector from: {}", settings.model_path);
+                    gst::info!(
+                        CAT,
+                        imp = self,
+                        "Loaded ONNX detector from: {}",
+                        settings.model_path
+                    );
                     *detector_guard = Some(detector);
-                },
+                }
                 Err(e) => {
                     panic!("Failed to load ONNX model: {}", e);
                 }
             }
         }
     }
-    
-    fn frame_to_image(&self, frame: &gst_video::VideoFrameRef<&gst::BufferRef>) -> Option<DynamicImage> {
+
+    fn frame_to_image(
+        &self,
+        frame: &gst_video::VideoFrameRef<&gst::BufferRef>,
+    ) -> Option<DynamicImage> {
         let width = frame.width();
         let height = frame.height();
         let format = frame.format();
-        
+
         match format {
             gst_video::VideoFormat::Rgb => {
                 let data = frame.plane_data(0).ok()?;
                 let stride = frame.plane_stride()[0] as usize;
-                
+
                 // Convert strided RGB to contiguous RGB
                 let mut rgb_data = Vec::with_capacity((width * height * 3) as usize);
                 for y in 0..height {
@@ -110,14 +118,13 @@ impl CpuDetector {
                         rgb_data.extend_from_slice(&data[row_start..row_end]);
                     }
                 }
-                
-                image::RgbImage::from_raw(width, height, rgb_data)
-                    .map(DynamicImage::ImageRgb8)
-            },
+
+                image::RgbImage::from_raw(width, height, rgb_data).map(DynamicImage::ImageRgb8)
+            }
             gst_video::VideoFormat::Bgr => {
                 let data = frame.plane_data(0).ok()?;
                 let stride = frame.plane_stride()[0] as usize;
-                
+
                 // Convert BGR to RGB
                 let mut rgb_data = Vec::with_capacity((width * height * 3) as usize);
                 for y in 0..height {
@@ -127,71 +134,94 @@ impl CpuDetector {
                         if pixel_start + 2 < data.len() {
                             rgb_data.push(data[pixel_start + 2]); // R
                             rgb_data.push(data[pixel_start + 1]); // G
-                            rgb_data.push(data[pixel_start]);     // B
+                            rgb_data.push(data[pixel_start]); // B
                         }
                     }
                 }
-                
-                image::RgbImage::from_raw(width, height, rgb_data)
-                    .map(DynamicImage::ImageRgb8)
-            },
+
+                image::RgbImage::from_raw(width, height, rgb_data).map(DynamicImage::ImageRgb8)
+            }
             _ => {
                 gst::warning!(CAT, imp = self, "Unsupported video format: {:?}", format);
                 None
             }
         }
     }
-    
-    fn emit_inference_results(&self, frame_num: u64, detections: &[gstcpuinfer::detector::Detection]) {
+
+    fn emit_inference_results(
+        &self,
+        frame_num: u64,
+        detections: &[gstcpuinfer::detector::Detection],
+    ) {
         // Convert detections to a simple serializable format
-        let detection_data: Vec<serde_json::Value> = detections.iter().map(|d| {
-            serde_json::json!({
-                "class_name": d.class_name,
-                "class_id": d.class_id,
-                "confidence": d.confidence,
-                "x": d.x,
-                "y": d.y,
-                "width": d.width,
-                "height": d.height,
+        let detection_data: Vec<serde_json::Value> = detections
+            .iter()
+            .map(|d| {
+                serde_json::json!({
+                    "class_name": d.class_name,
+                    "class_id": d.class_id,
+                    "confidence": d.confidence,
+                    "x": d.x,
+                    "y": d.y,
+                    "width": d.width,
+                    "height": d.height,
+                })
             })
-        }).collect();
-        
+            .collect();
+
         let json_string = serde_json::json!({
             "frame_num": frame_num,
             "detections": detection_data,
-        }).to_string();
-        
+        })
+        .to_string();
+
         // Emit the signal
-        self.obj().emit_by_name::<()>("inference-results", &[&frame_num, &json_string]);
-        
+        self.obj()
+            .emit_by_name::<()>("inference-results", &[&frame_num, &json_string]);
+
         if !detections.is_empty() {
-            log::info!("🎆 Frame {}: Emitting {} detections via signal", frame_num, detections.len());
-            
+            log::info!(
+                "🎆 Frame {}: Emitting {} detections via signal",
+                frame_num,
+                detections.len()
+            );
+
             // Log detailed detection information
             for (i, detection) in detections.iter().enumerate() {
-                log::info!("  ➡️ Detection {}: {} (class_id={}) at ({:.1}, {:.1}) size={}x{} conf={:.2}",
-                          i + 1,
-                          detection.class_name,
-                          detection.class_id,
-                          detection.x,
-                          detection.y,
-                          detection.width,
-                          detection.height,
-                          detection.confidence);
+                log::info!(
+                    "  ➡️ Detection {}: {} (class_id={}) at ({:.1}, {:.1}) size={}x{} conf={:.2}",
+                    i + 1,
+                    detection.class_name,
+                    detection.class_id,
+                    detection.x,
+                    detection.y,
+                    detection.width,
+                    detection.height,
+                    detection.confidence
+                );
             }
         }
     }
-    
-    fn attach_detection_metadata(&self, _buf: &mut gst::BufferRef, detections: &[gstcpuinfer::detector::Detection]) {
+
+    fn attach_detection_metadata(
+        &self,
+        _buf: &mut gst::BufferRef,
+        detections: &[gstcpuinfer::detector::Detection],
+    ) {
         // TODO: Attach custom metadata to buffer
         // For now, we could use custom metadata or simply pass through
         // This would be where we'd attach DetectionMeta to the buffer
-        
+
         // Example structure (not fully implemented):
         // let detection_meta = DetectionMeta::new(detections);
         // buf.add_meta(detection_meta);
-        
-        gst::trace!(CAT, imp = self, "Attached {} detections as metadata", detections.len());
+
+        gst::trace!(
+            CAT,
+            imp = self,
+            "Attached {} detections as metadata",
+            detections.len()
+        );
     }
 }
 
@@ -208,16 +238,16 @@ impl ObjectImpl for CpuDetector {
             vec![
                 glib::subclass::Signal::builder("inference-results")
                     .param_types([
-                        u64::static_type(),     // frame_num
-                        String::static_type(),  // serialized detections (JSON)
+                        u64::static_type(),    // frame_num
+                        String::static_type(), // serialized detections (JSON)
                     ])
                     .build(),
             ]
         });
-        
+
         SIGNALS.as_ref()
     }
-    
+
     fn properties() -> &'static [glib::ParamSpec] {
         static PROPERTIES: LazyLock<Vec<glib::ParamSpec>> = LazyLock::new(|| {
             vec![
@@ -269,13 +299,13 @@ impl ObjectImpl for CpuDetector {
                     .build(),
             ]
         });
-        
+
         PROPERTIES.as_ref()
     }
-    
+
     fn set_property(&self, _id: usize, value: &glib::Value, pspec: &glib::ParamSpec) {
         let mut settings = self.settings.lock().unwrap();
-        
+
         match pspec.name() {
             "model-path" => {
                 let model_path: String = value.get().expect("type checked upstream");
@@ -283,7 +313,7 @@ impl ObjectImpl for CpuDetector {
                 settings.model_path = model_path;
                 // Reset detector to reload with new model
                 *self.detector.lock().unwrap() = None;
-            },
+            }
             "confidence-threshold" => {
                 let threshold: f64 = value.get().expect("type checked upstream");
                 settings.confidence_threshold = threshold;
@@ -291,34 +321,39 @@ impl ObjectImpl for CpuDetector {
                 if let Some(ref mut detector) = *self.detector.lock().unwrap() {
                     detector.set_confidence_threshold(threshold as f32);
                 }
-            },
+            }
             "nms-threshold" => {
                 let threshold: f64 = value.get().expect("type checked upstream");
                 settings.nms_threshold = threshold;
                 if let Some(ref mut detector) = *self.detector.lock().unwrap() {
                     detector.set_nms_threshold(threshold as f32);
                 }
-            },
+            }
             "input-width" => {
                 settings.input_width = value.get().expect("type checked upstream");
                 *self.detector.lock().unwrap() = None;
-            },
+            }
             "input-height" => {
                 settings.input_height = value.get().expect("type checked upstream");
                 *self.detector.lock().unwrap() = None;
-            },
+            }
             "process-every-n-frames" => {
                 settings.process_every_n_frames = value.get().expect("type checked upstream");
-            },
+            }
             _ => {
-                gstreamer::warning!(CAT, imp = self, "Unknown property '{}' in set_property", pspec.name());
+                gstreamer::warning!(
+                    CAT,
+                    imp = self,
+                    "Unknown property '{}' in set_property",
+                    pspec.name()
+                );
             }
         }
     }
-    
+
     fn property(&self, _id: usize, pspec: &glib::ParamSpec) -> glib::Value {
         let settings = self.settings.lock().unwrap();
-        
+
         match pspec.name() {
             "model-path" => settings.model_path.to_value(),
             "confidence-threshold" => settings.confidence_threshold.to_value(),
@@ -327,7 +362,12 @@ impl ObjectImpl for CpuDetector {
             "input-height" => settings.input_height.to_value(),
             "process-every-n-frames" => settings.process_every_n_frames.to_value(),
             _ => {
-                gstreamer::warning!(CAT, imp = self, "Unknown property '{}' in property getter", pspec.name());
+                gstreamer::warning!(
+                    CAT,
+                    imp = self,
+                    "Unknown property '{}' in property getter",
+                    pspec.name()
+                );
                 // Return a default value to avoid crashes
                 glib::Value::from(&0u32)
             }
@@ -347,19 +387,16 @@ impl ElementImpl for CpuDetector {
                 "DeepStream Rust Team <dev@example.com>",
             )
         });
-        
+
         Some(&*ELEMENT_METADATA)
     }
-    
+
     fn pad_templates() -> &'static [gst::PadTemplate] {
         static PAD_TEMPLATES: LazyLock<Vec<gst::PadTemplate>> = LazyLock::new(|| {
             let caps = gst_video::VideoCapsBuilder::new()
-                .format_list([
-                    gst_video::VideoFormat::Rgb,
-                    gst_video::VideoFormat::Bgr,
-                ])
+                .format_list([gst_video::VideoFormat::Rgb, gst_video::VideoFormat::Bgr])
                 .build();
-            
+
             let src_pad_template = gst::PadTemplate::new(
                 "src",
                 gst::PadDirection::Src,
@@ -367,7 +404,7 @@ impl ElementImpl for CpuDetector {
                 &caps,
             )
             .unwrap();
-            
+
             let sink_pad_template = gst::PadTemplate::new(
                 "sink",
                 gst::PadDirection::Sink,
@@ -375,72 +412,86 @@ impl ElementImpl for CpuDetector {
                 &caps,
             )
             .unwrap();
-            
+
             vec![src_pad_template, sink_pad_template]
         });
-        
+
         PAD_TEMPLATES.as_ref()
     }
 }
 
 impl BaseTransformImpl for CpuDetector {
-    const MODE: gst_base::subclass::BaseTransformMode = gst_base::subclass::BaseTransformMode::AlwaysInPlace;
+    const MODE: gst_base::subclass::BaseTransformMode =
+        gst_base::subclass::BaseTransformMode::AlwaysInPlace;
     const PASSTHROUGH_ON_SAME_CAPS: bool = false;
     const TRANSFORM_IP_ON_PASSTHROUGH: bool = false;
-    
+
     fn start(&self) -> std::result::Result<(), gst::ErrorMessage> {
         self.ensure_detector_loaded();
         Ok(())
     }
-    
-    fn transform_ip(&self, buf: &mut gst::BufferRef) -> std::result::Result<gst::FlowSuccess, gst::FlowError> {
+
+    fn transform_ip(
+        &self,
+        buf: &mut gst::BufferRef,
+    ) -> std::result::Result<gst::FlowSuccess, gst::FlowError> {
         let mut frame_count = self.frame_count.lock().unwrap();
         *frame_count += 1;
-        
+
         gst::debug!(CAT, imp = self, "Processing frame {}", *frame_count);
-        
+
         let settings = self.settings.lock().unwrap().clone();
-        
+
         // Skip processing if not on the right frame interval
         if *frame_count % (settings.process_every_n_frames as u64) != 0 {
             return Ok(gst::FlowSuccess::Ok);
         }
-        
+
         // Get video info from sink pad caps
         let element = self.obj();
         let sink_pad = element.static_pad("sink").unwrap();
         let caps = sink_pad.current_caps().unwrap();
-        let info = gst_video::VideoInfo::from_caps(&caps)
-            .map_err(|_| gst::FlowError::NotSupported)?;
-        
+        let info =
+            gst_video::VideoInfo::from_caps(&caps).map_err(|_| gst::FlowError::NotSupported)?;
+
         // Process frame and get detections
         let detections = {
             let frame = gst_video::VideoFrameRef::from_buffer_ref_readable(buf, &info)
                 .map_err(|_| gst::FlowError::Error)?;
-            
+
             // Convert frame to image for detection
             if let Some(image) = self.frame_to_image(&frame) {
                 if let Some(ref detector) = *self.detector.lock().unwrap() {
                     match detector.detect(&image) {
                         Ok(detections) => {
-                            gst::debug!(CAT, imp = self, 
-                                       "Frame {}: Detected {} objects", *frame_count, detections.len());
-                            
+                            gst::debug!(
+                                CAT,
+                                imp = self,
+                                "Frame {}: Detected {} objects",
+                                *frame_count,
+                                detections.len()
+                            );
+
                             // Emit signal with detection results
                             self.emit_inference_results(*frame_count, &detections);
-                            
+
                             // Log detections for debugging
                             for detection in &detections {
-                                gst::trace!(CAT, imp = self,
-                                           "Detection: {} at ({:.1}, {:.1}) {}x{} conf={:.2}",
-                                           detection.class_name,
-                                           detection.x, detection.y,
-                                           detection.width, detection.height,
-                                           detection.confidence);
+                                gst::trace!(
+                                    CAT,
+                                    imp = self,
+                                    "Detection: {} at ({:.1}, {:.1}) {}x{} conf={:.2}",
+                                    detection.class_name,
+                                    detection.x,
+                                    detection.y,
+                                    detection.width,
+                                    detection.height,
+                                    detection.confidence
+                                );
                             }
-                            
+
                             Some(detections)
-                        },
+                        }
                         Err(e) => {
                             gst::warning!(CAT, imp = self, "Detection failed: {}", e);
                             None
@@ -453,12 +504,12 @@ impl BaseTransformImpl for CpuDetector {
                 None
             }
         };
-        
+
         // Attach metadata to buffer if we have detections
         if let Some(detections) = detections {
             self.attach_detection_metadata(buf, &detections);
         }
-        
+
         // Buffer passes through unchanged (identity behavior)
         Ok(gst::FlowSuccess::Ok)
     }

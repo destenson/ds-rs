@@ -1,18 +1,18 @@
-use source_videos::{RtspServerBuilder, init, Result};
 use source_videos::network::NetworkProfile;
+use source_videos::{Result, RtspServerBuilder, init};
 use tokio::signal;
 
 #[tokio::main]
 async fn main() -> Result<()> {
     env_logger::Builder::from_env(env_logger::Env::default().default_filter_or("info")).init();
     init()?;
-    
+
     println!("Drone Network Simulation Demo");
     println!("==============================");
     println!();
     println!("Simulating various drone communication scenarios");
     println!();
-    
+
     // Build server with different drone network conditions
     let server = RtspServerBuilder::new()
         .port(8554)
@@ -25,9 +25,9 @@ async fn main() -> Result<()> {
         // Noisy radio link for comparison
         .add_test_pattern_with_network("noisy-radio", "snow", NetworkProfile::NoisyRadio)
         .build()?;
-    
+
     server.start()?;
-    
+
     println!("RTSP streams simulating drone communications:");
     println!();
     println!("1. Control (perfect conditions):");
@@ -67,9 +67,9 @@ async fn main() -> Result<()> {
     println!("- Watch for video artifacts and buffering differences");
     println!();
     println!("Press Ctrl+C to stop...");
-    
+
     signal::ctrl_c().await?;
     println!("\nStopping server...");
-    
+
     Ok(())
 }

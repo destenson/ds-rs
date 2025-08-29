@@ -1,16 +1,16 @@
 #![allow(unused)]
 
+use super::{Pipeline, StateManager};
 use crate::backend::{BackendManager, BackendType};
 use crate::elements::factory::ElementFactory;
 use crate::error::{DeepStreamError, Result};
-use crate::rendering::{RenderingConfig, RendererFactory, MetadataBridge};
-use super::{Pipeline, StateManager};
+use crate::rendering::{MetadataBridge, RendererFactory, RenderingConfig};
 use gstreamer as gst;
-use gstreamer::prelude::*;
 use gstreamer::glib;
-use std::sync::{Arc, Mutex};
-use std::collections::HashMap;
+use gstreamer::prelude::*;
 use serde_json;
+use std::collections::HashMap;
+use std::sync::{Arc, Mutex};
 
 /// Builder for creating configured pipelines with fluent API
 pub struct PipelineBuilder {
@@ -60,13 +60,13 @@ impl PipelineBuilder {
             metadata_bridge: None,
         }
     }
-    
+
     /// Set the backend type for element creation
     pub fn backend(mut self, backend_type: BackendType) -> Self {
         self.backend_type = Some(backend_type);
         self
     }
-    
+
     /// Add an element to the pipeline
     pub fn add_element(mut self, name: impl Into<String>, factory_name: impl Into<String>) -> Self {
         let element_config = ElementConfig {
@@ -77,7 +77,7 @@ impl PipelineBuilder {
         self.elements.push(element_config);
         self
     }
-    
+
     /// Add an element with properties
     pub fn add_element_with_props(
         mut self,
@@ -93,7 +93,7 @@ impl PipelineBuilder {
         self.elements.push(element_config);
         self
     }
-    
+
     /// Set a property on an element
     pub fn set_property(
         mut self,
@@ -104,15 +104,15 @@ impl PipelineBuilder {
         let element_name = element_name.into();
         let property_name = property_name.into();
         let value = value.into();
-        
+
         self.properties
             .entry(element_name)
             .or_insert_with(HashMap::new)
             .insert(property_name, value);
-        
+
         self
     }
-    
+
     /// Set a property using a string value (useful for enums)
     /// This will use GStreamer's set_property_from_str method which handles enum conversion
     pub fn set_property_from_str(
@@ -124,15 +124,15 @@ impl PipelineBuilder {
         let element_name = element_name.into();
         let property_name = property_name.into();
         let value = value.into();
-        
+
         self.string_properties
             .entry(element_name)
             .or_insert_with(HashMap::new)
             .insert(property_name, value);
-        
+
         self
     }
-    
+
     /// Link two elements
     pub fn link(mut self, source: impl Into<String>, destination: impl Into<String>) -> Self {
         self.links.push(LinkConfig {
@@ -142,7 +142,7 @@ impl PipelineBuilder {
         });
         self
     }
-    
+
     /// Link two elements with caps filter
     pub fn link_filtered(
         mut self,
@@ -157,7 +157,7 @@ impl PipelineBuilder {
         });
         self
     }
-    
+
     /// Link multiple elements in sequence
     pub fn link_many(mut self, elements: Vec<String>) -> Self {
         for i in 0..elements.len() - 1 {
@@ -169,135 +169,133 @@ impl PipelineBuilder {
         }
         self
     }
-    
+
     /// Set whether to automatically flush the bus on NULL state
     pub fn auto_flush_bus(mut self, auto_flush: bool) -> Self {
         self.auto_flush_bus = auto_flush;
         self
     }
-    
+
     /// Set a specific clock for the pipeline
     pub fn use_clock(mut self, clock: gst::Clock) -> Self {
         self.use_clock = Some(clock);
         self
     }
-    
+
     /// Start the pipeline in paused state
     pub fn start_paused(mut self, paused: bool) -> Self {
         self.start_paused = paused;
         self
     }
-    
+
     /// Add a source element (uridecodebin)
     pub fn add_source(self, name: impl Into<String>, uri: impl Into<String>) -> Self {
         let name = name.into();
         let uri = uri.into();
-        
+
         self.add_element(&name, "uridecodebin")
             .set_property(&name, "uri", uri)
     }
-    
+
     /// Add a file source
     pub fn add_file_source(self, name: impl Into<String>, location: impl Into<String>) -> Self {
         let name = name.into();
         let location = location.into();
-        
+
         self.add_element(&name, "filesrc")
             .set_property(&name, "location", location)
     }
-    
+
     /// Add a test source
     pub fn add_test_source(self, name: impl Into<String>) -> Self {
         self.add_element(name, "videotestsrc")
     }
-    
+
     /// Add a sink element
     pub fn add_sink(self, name: impl Into<String>, sink_type: impl Into<String>) -> Self {
         self.add_element(name, sink_type)
     }
-    
+
     /// Add an autovideosink
     pub fn add_auto_sink(self, name: impl Into<String>) -> Self {
         self.add_element(name, "autovideosink")
     }
-    
+
     /// Add a queue element
     pub fn add_queue(self, name: impl Into<String>) -> Self {
         self.add_element(name, "queue")
     }
-    
+
     /// Add a caps filter
     pub fn add_caps_filter(self, name: impl Into<String>, caps: gst::Caps) -> Self {
         let name = name.into();
         self.add_element(&name, "capsfilter")
             .set_property(&name, "caps", caps)
     }
-    
+
     /// Enable dynamic bounding box rendering
     pub fn with_rendering(mut self, config: RenderingConfig) -> Self {
         self.rendering_config = Some(config);
         self.enable_dynamic_rendering = true;
         self
     }
-    
+
     /// Enable default bounding box rendering
     pub fn with_default_rendering(mut self) -> Self {
         self.rendering_config = Some(RenderingConfig::default());
         self.enable_dynamic_rendering = true;
         self
     }
-    
+
     /// Enable ball tracking visualization
     pub fn with_ball_tracking_rendering(mut self) -> Self {
         self.rendering_config = Some(RenderingConfig::for_ball_tracking());
         self.enable_dynamic_rendering = true;
         self
     }
-    
+
     /// Set a custom metadata bridge
     pub fn with_metadata_bridge(mut self, bridge: Arc<Mutex<MetadataBridge>>) -> Self {
         self.metadata_bridge = Some(bridge);
         self
     }
-    
+
     /// Add a dynamic OSD element with rendering support
     pub fn add_dynamic_osd(mut self, name: impl Into<String>) -> Self {
         let name = name.into();
         self.enable_dynamic_rendering = true;
-        
+
         // Add OSD element
         self = self.add_element(&name, "nvdsosd");
-        
+
         // If no rendering config is set, use default
         if self.rendering_config.is_none() {
             self.rendering_config = Some(RenderingConfig::default());
         }
-        
+
         self
     }
-    
+
     /// Build the pipeline
     pub fn build(self) -> Result<Pipeline> {
         // Initialize GStreamer if not already done
         let _ = gst::init();
-        
+
         // Create backend manager
         let backend_manager = match self.backend_type {
             Some(backend_type) => Arc::new(BackendManager::with_backend(backend_type)?),
             None => Arc::new(BackendManager::new()?),
         };
-        
+
         // Create the GStreamer pipeline
-        let gst_pipeline = gst::Pipeline::builder()
-            .name(&self.name)
-            .build();
-        
+        let gst_pipeline = gst::Pipeline::builder().name(&self.name).build();
+
         // Create element factory
         let factory = ElementFactory::new(backend_manager.clone());
-        
+
         // Create and add elements
         let mut elements_map = HashMap::new();
-        
+
         for element_config in &self.elements {
             let element = if element_config.factory_name.starts_with("nv") {
                 // Use backend-specific element creation for DeepStream elements
@@ -305,7 +303,9 @@ impl PipelineBuilder {
                     "nvstreammux" => factory.create_stream_mux(Some(&element_config.name))?,
                     "nvinfer" => {
                         // For inference, we need a config path
-                        let config_path = element_config.properties.get("config-file-path")
+                        let config_path = element_config
+                            .properties
+                            .get("config-file-path")
                             .and_then(|v| v.get::<String>().ok())
                             .unwrap_or_default();
                         factory.create_inference(Some(&element_config.name), &config_path)?
@@ -316,55 +316,63 @@ impl PipelineBuilder {
                     "nvvideoconvert" => factory.create_video_convert(Some(&element_config.name))?,
                     _ => {
                         // Fallback to standard element creation
-                        factory.create_standard_element(&element_config.factory_name, Some(&element_config.name))?
+                        factory.create_standard_element(
+                            &element_config.factory_name,
+                            Some(&element_config.name),
+                        )?
                     }
                 }
             } else {
                 // Standard GStreamer element
-                factory.create_standard_element(&element_config.factory_name, Some(&element_config.name))?
+                factory.create_standard_element(
+                    &element_config.factory_name,
+                    Some(&element_config.name),
+                )?
             };
-            
+
             // Set element properties
             for (prop_name, prop_value) in &element_config.properties {
                 element.set_property_from_value(prop_name, prop_value);
             }
-            
+
             // Apply properties from the separate properties map
             if let Some(props) = self.properties.get(&element_config.name) {
                 for (prop_name, prop_value) in props {
                     element.set_property_from_value(prop_name, prop_value);
                 }
             }
-            
+
             // Apply string properties using set_property_from_str
             if let Some(str_props) = self.string_properties.get(&element_config.name) {
                 for (prop_name, prop_value) in str_props {
                     element.set_property_from_str(prop_name, prop_value);
                 }
             }
-            
+
             gst_pipeline.add(&element).map_err(|_| {
                 DeepStreamError::Pipeline(format!(
                     "Failed to add element {} to pipeline",
                     element_config.name
                 ))
             })?;
-            
+
             elements_map.insert(element_config.name.clone(), element);
         }
-        
+
         // Link elements
         for link_config in &self.links {
-            let source = elements_map.get(&link_config.source)
-                .ok_or_else(|| DeepStreamError::ElementNotFound {
+            let source = elements_map.get(&link_config.source).ok_or_else(|| {
+                DeepStreamError::ElementNotFound {
                     element: link_config.source.clone(),
-                })?;
-            
-            let destination = elements_map.get(&link_config.destination)
-                .ok_or_else(|| DeepStreamError::ElementNotFound {
+                }
+            })?;
+
+            let destination = elements_map.get(&link_config.destination).ok_or_else(|| {
+                DeepStreamError::ElementNotFound {
                     element: link_config.destination.clone(),
-                })?;
-            
+                }
+            })?;
+
             if let Some(caps) = &link_config.caps {
                 source.link_filtered(destination, caps).map_err(|_| {
                     DeepStreamError::PadLinking(format!(
@@ -381,34 +389,34 @@ impl PipelineBuilder {
                 })?;
             }
         }
-        
+
         // Configure pipeline settings
         gst_pipeline.set_auto_flush_bus(self.auto_flush_bus);
         if let Some(clock) = self.use_clock {
             gst_pipeline.use_clock(Some(&clock));
         }
-        
+
         // Configure dynamic rendering if enabled
         if self.enable_dynamic_rendering {
             // Create metadata bridge if not provided
-            let metadata_bridge = self.metadata_bridge.unwrap_or_else(|| {
-                Arc::new(Mutex::new(MetadataBridge::new()))
-            });
-            
+            let metadata_bridge = self
+                .metadata_bridge
+                .unwrap_or_else(|| Arc::new(Mutex::new(MetadataBridge::new())));
+
             // Connect detector signals to metadata bridge
             for (element_name, element) in &elements_map {
                 if element_name.contains("detector") || element_name.contains("nvinfer") {
                     // Connect inference-results signal to metadata bridge
                     let bridge_clone = metadata_bridge.clone();
                     element.connect("inference-results", false, move |values| {
-                        if let (Some(frame_num), Some(json_str)) = (
-                            values[1].get::<u64>().ok(),
-                            values[2].get::<String>().ok()
-                        ) {
+                        if let (Some(frame_num), Some(json_str)) =
+                            (values[1].get::<u64>().ok(), values[2].get::<String>().ok())
+                        {
                             // Parse the JSON and update the metadata bridge
                             if let Ok(data) = serde_json::from_str::<serde_json::Value>(&json_str) {
                                 if let Some(detections) = data["detections"].as_array() {
-                                    let objects: Vec<crate::metadata::ObjectMeta> = detections.iter()
+                                    let objects: Vec<crate::metadata::ObjectMeta> = detections
+                                        .iter()
                                         .enumerate()
                                         .filter_map(|(idx, d)| {
                                             let bbox = crate::metadata::BoundingBox::new(
@@ -417,27 +425,28 @@ impl PipelineBuilder {
                                                 d["width"].as_f64()? as f32,
                                                 d["height"].as_f64()? as f32,
                                             );
-                                            
+
                                             let mut obj_meta = crate::metadata::ObjectMeta::new(
-                                                frame_num * 1000 + idx as u64  // Unique ID per detection
+                                                frame_num * 1000 + idx as u64, // Unique ID per detection
                                             );
-                                            
+
                                             obj_meta.set_class(
                                                 d["class_id"].as_u64()? as i32,
-                                                d["class_name"].as_str()?
+                                                d["class_name"].as_str()?,
                                             );
-                                            
+
                                             obj_meta.set_detection_bbox(
                                                 bbox,
-                                                d["confidence"].as_f64()? as f32
+                                                d["confidence"].as_f64()? as f32,
                                             );
-                                            
+
                                             Some(obj_meta)
                                         })
                                         .collect();
-                                    
+
                                     if let Ok(mut bridge) = bridge_clone.lock() {
-                                        let timestamp = gst::ClockTime::from_nseconds(frame_num * 1_000_000);
+                                        let timestamp =
+                                            gst::ClockTime::from_nseconds(frame_num * 1_000_000);
                                         bridge.update_objects(objects, timestamp);
                                     }
                                 }
@@ -445,11 +454,14 @@ impl PipelineBuilder {
                         }
                         None
                     });
-                    
-                    log::info!("Connected inference-results signal from {} to metadata bridge", element_name);
+
+                    log::info!(
+                        "Connected inference-results signal from {} to metadata bridge",
+                        element_name
+                    );
                 }
             }
-            
+
             // Find OSD elements and configure them
             for (element_name, element) in &elements_map {
                 if element_name.contains("osd") || element_name.contains("OSD") {
@@ -465,10 +477,10 @@ impl PipelineBuilder {
                 }
             }
         }
-        
+
         // Create state manager
         let state_manager = Arc::new(Mutex::new(StateManager::new()));
-        
+
         // Create the pipeline wrapper
         let pipeline = Pipeline {
             gst_pipeline,
@@ -477,12 +489,12 @@ impl PipelineBuilder {
             backend_manager,
             name: self.name,
         };
-        
+
         // Set initial state if requested
         if self.start_paused {
             pipeline.pause()?;
         }
-        
+
         Ok(pipeline)
     }
 }
@@ -495,31 +507,31 @@ fn configure_osd_for_rendering(
     backend_type: BackendType,
 ) -> Result<()> {
     use crate::rendering::BoundingBoxRenderer;
-    
+
     // Create backend-specific renderer
     let mut renderer = RendererFactory::create_renderer_with_config(
         backend_type,
         Some(&format!("{}-renderer", osd_element.name())),
         config.clone(),
     )?;
-    
+
     // Connect metadata bridge to renderer
     renderer.connect_metadata_source(metadata_bridge.clone())?;
-    
+
     // Configure OSD element based on rendering config
     // Only set properties if this is a DeepStream nvdsosd element
     if backend_type == crate::backend::BackendType::DeepStream {
         if config.enable_bbox {
             osd_element.set_property("display-bbox", 1i32);
         }
-        
+
         if config.enable_labels {
             osd_element.set_property("display-text", 1i32);
-            
+
             // Set font configuration if supported
-            let font_desc = format!("{} {}", 
-                config.font_config.family,
-                config.font_config.size as i32
+            let font_desc = format!(
+                "{} {}",
+                config.font_config.family, config.font_config.size as i32
             );
             osd_element.set_property("font-desc", &font_desc);
         }
@@ -537,10 +549,13 @@ fn configure_osd_for_rendering(
         // For other backends
         log::debug!("Backend {} OSD configuration not implemented", backend_type);
     }
-    
-    log::info!("Configured OSD element '{}' for dynamic rendering with {} backend",
-              osd_element.name(), backend_type);
-    
+
+    log::info!(
+        "Configured OSD element '{}' for dynamic rendering with {} backend",
+        osd_element.name(),
+        backend_type
+    );
+
     Ok(())
 }
 
@@ -554,11 +569,11 @@ impl PipelineBuilder {
     ) -> Self {
         let name = name.into();
         let config_path = config_path.into();
-        
+
         self.add_element(&name, "nvinfer")
             .set_property(&name, "config-file-path", config_path)
     }
-    
+
     /// Add DeepStream tracker
     pub fn add_deepstream_tracker(
         self,
@@ -567,14 +582,14 @@ impl PipelineBuilder {
     ) -> Self {
         let name = name.into();
         let mut builder = self.add_element(&name, "nvtracker");
-        
+
         if let Some(config) = config_path {
             builder = builder.set_property(&name, "ll-config-file", config);
         }
-        
+
         builder
     }
-    
+
     /// Add DeepStream stream muxer
     pub fn add_deepstream_mux(
         self,
@@ -584,32 +599,27 @@ impl PipelineBuilder {
         height: u32,
     ) -> Self {
         let name = name.into();
-        
+
         self.add_element(&name, "nvstreammux")
             .set_property(&name, "batch-size", batch_size)
             .set_property(&name, "width", width)
             .set_property(&name, "height", height)
     }
-    
+
     /// Add DeepStream OSD
     pub fn add_deepstream_osd(self, name: impl Into<String>) -> Self {
         self.add_element(name, "nvdsosd")
     }
-    
+
     /// Add DeepStream tiler
-    pub fn add_deepstream_tiler(
-        self,
-        name: impl Into<String>,
-        rows: u32,
-        columns: u32,
-    ) -> Self {
+    pub fn add_deepstream_tiler(self, name: impl Into<String>, rows: u32, columns: u32) -> Self {
         let name = name.into();
-        
+
         self.add_element(&name, "nvtiler")
             .set_property(&name, "rows", rows)
             .set_property(&name, "columns", columns)
     }
-    
+
     /// Build a simple DeepStream pipeline
     pub fn build_deepstream_pipeline(
         name: impl Into<String>,
@@ -638,11 +648,11 @@ impl PipelineBuilder {
 #[cfg(test)]
 mod tests {
     use super::*;
-    
+
     #[test]
     fn test_pipeline_builder() {
         let _ = gst::init();
-        
+
         let pipeline = PipelineBuilder::new("test-pipeline")
             .backend(BackendType::Mock)
             .add_test_source("source")
@@ -651,14 +661,14 @@ mod tests {
             .link("source", "queue")
             .link("queue", "sink")
             .build();
-        
+
         assert!(pipeline.is_ok());
     }
-    
+
     #[test]
     fn test_builder_properties() {
         let _ = gst::init();
-        
+
         let pipeline = PipelineBuilder::new("test-pipeline")
             .backend(BackendType::Mock)
             .add_element("source", "videotestsrc")
@@ -668,21 +678,21 @@ mod tests {
             .auto_flush_bus(false)
             .start_paused(true)
             .build();
-        
+
         assert!(pipeline.is_ok());
         let pipeline = pipeline.unwrap();
         assert!(pipeline.is_paused());
     }
-    
+
     #[test]
     fn test_caps_filter() {
         let _ = gst::init();
-        
+
         let caps = gst::Caps::builder("video/x-raw")
             .field("width", 640)
             .field("height", 480)
             .build();
-        
+
         let pipeline = PipelineBuilder::new("test-pipeline")
             .backend(BackendType::Mock)
             .add_test_source("source")
@@ -691,7 +701,7 @@ mod tests {
             .link("source", "filter")
             .link("filter", "sink")
             .build();
-        
+
         assert!(pipeline.is_ok());
     }
 }

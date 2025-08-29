@@ -1,10 +1,10 @@
-use crate::source::SourceController;
 use super::config;
-use std::sync::{Arc, Mutex};
-use std::cell::RefCell;
-use std::rc::Rc;
+use crate::source::SourceController;
 use gstreamer::glib;
 use rand::Rng;
+use std::cell::RefCell;
+use std::rc::Rc;
+use std::sync::{Arc, Mutex};
 
 /// State for managing source addition and deletion timers
 pub struct TimerState {
@@ -23,7 +23,7 @@ impl TimerState {
     ) -> Self {
         let mut enabled_sources = vec![false; config::MAX_NUM_SOURCES];
         enabled_sources[0] = true; // Initial source is already added
-        
+
         Self {
             source_controller,
             initial_uri,
@@ -39,7 +39,7 @@ impl TimerState {
 pub fn add_sources_callback(state: Rc<RefCell<TimerState>>) -> glib::ControlFlow {
     let timestamp = crate::timestamp();
     let mut state_borrow = state.borrow_mut();
-    
+
     // Find an available slot
     let mut source_id = None;
     for i in 0..config::MAX_NUM_SOURCES {
@@ -48,35 +48,40 @@ pub fn add_sources_callback(state: Rc<RefCell<TimerState>>) -> glib::ControlFlow
             break;
         }
     }
-    
+
     if let Some(slot) = source_id {
         println!("[{:.3}] Timer: Adding source at slot {}", timestamp, slot);
-        
+
         // Add the source
         let result = {
             let controller = state_borrow.source_controller.lock().unwrap();
             controller.add_source(&state_borrow.initial_uri)
         };
-        
+
         match result {
             Ok(id) => {
                 state_borrow.enabled_sources[slot] = true;
                 state_borrow.num_sources += 1;
-                println!("[{:.3}] Added source {} at slot {} (total: {})", 
-                         timestamp, id, slot, state_borrow.num_sources);
-                
+                println!(
+                    "[{:.3}] Added source {} at slot {} (total: {})",
+                    timestamp, id, slot, state_borrow.num_sources
+                );
+
                 // Check if we've reached the maximum
                 if state_borrow.num_sources >= config::MAX_NUM_SOURCES {
-                    println!("[{:.3}] Reached MAX_NUM_SOURCES ({}), starting deletion timer", 
-                             timestamp, config::MAX_NUM_SOURCES);
-                    
+                    println!(
+                        "[{:.3}] Reached MAX_NUM_SOURCES ({}), starting deletion timer",
+                        timestamp,
+                        config::MAX_NUM_SOURCES
+                    );
+
                     // Start the deletion timer
                     let state_clone = state.clone();
                     glib::timeout_add_seconds_local(
                         config::SOURCE_DELETE_INTERVAL_SECS as u32,
-                        move || delete_sources_callback(state_clone.clone())
+                        move || delete_sources_callback(state_clone.clone()),
                     );
-                    
+
                     // Stop the addition timer
                     return glib::ControlFlow::Break;
                 }
@@ -86,7 +91,7 @@ pub fn add_sources_callback(state: Rc<RefCell<TimerState>>) -> glib::ControlFlow
             }
         }
     }
-    
+
     glib::ControlFlow::Continue
 }
 
@@ -94,7 +99,7 @@ pub fn add_sources_callback(state: Rc<RefCell<TimerState>>) -> glib::ControlFlow
 pub fn delete_sources_callback(state: Rc<RefCell<TimerState>>) -> glib::ControlFlow {
     let timestamp = crate::timestamp();
     let mut state_borrow = state.borrow_mut();
-    
+
     // First, handle any sources that have reached EOS
     let eos_removed_count = {
         let controller = state_borrow.source_controller.lock().unwrap();
@@ -108,16 +113,16 @@ pub fn delete_sources_callback(state: Rc<RefCell<TimerState>>) -> glib::ControlF
             0
         }
     };
-    
+
     // Update the count after releasing the lock
     state_borrow.num_sources = state_borrow.num_sources.saturating_sub(eos_removed_count);
-    
+
     if state_borrow.num_sources == 0 {
         println!("[{:.3}] All sources stopped, quitting", timestamp);
         state_borrow.main_loop.quit();
         return glib::ControlFlow::Break;
     }
-    
+
     // Find an enabled source to remove randomly
     let mut enabled_indices = Vec::new();
     for (i, &enabled) in state_borrow.enabled_sources.iter().enumerate() {
@@ -125,14 +130,17 @@ pub fn delete_sources_callback(state: Rc<RefCell<TimerState>>) -> glib::ControlF
             enabled_indices.push(i);
         }
     }
-    
+
     if !enabled_indices.is_empty() {
         let mut rng = rand::thread_rng();
         let random_index = rng.gen_range(0..enabled_indices.len());
         let slot_to_remove = enabled_indices[random_index];
-        
-        println!("[{:.3}] Calling stop for slot {}", timestamp, slot_to_remove);
-        
+
+        println!(
+            "[{:.3}] Calling stop for slot {}",
+            timestamp, slot_to_remove
+        );
+
         // Get the actual sources to find the one at this slot
         let removal_result = {
             let controller = state_borrow.source_controller.lock().unwrap();
@@ -148,15 +156,17 @@ pub fn delete_sources_callback(state: Rc<RefCell<TimerState>>) -> glib::ControlF
                 None
             }
         };
-        
+
         if let Some((source_id, result)) = removal_result {
             match result {
                 Ok(_) => {
                     state_borrow.enabled_sources[slot_to_remove] = false;
                     state_borrow.num_sources -= 1;
-                    println!("[{:.3}] Removed source {} from slot {} (remaining: {})", 
-                             timestamp, source_id, slot_to_remove, state_borrow.num_sources);
-                    
+                    println!(
+                        "[{:.3}] Removed source {} from slot {} (remaining: {})",
+                        timestamp, source_id, slot_to_remove, state_borrow.num_sources
+                    );
+
                     if state_borrow.num_sources == 0 {
                         println!("[{:.3}] All sources stopped, quitting", timestamp);
                         state_borrow.main_loop.quit();
@@ -169,6 +179,6 @@ pub fn delete_sources_callback(state: Rc<RefCell<TimerState>>) -> glib::ControlF
             }
         }
     }
-    
+
     glib::ControlFlow::Continue
 }

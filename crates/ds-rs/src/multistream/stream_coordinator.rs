@@ -2,15 +2,17 @@
 
 //! Stream coordination for timing, synchronization and load balancing
 
-use crate::source::SourceId;
 use crate::error::Result;
-use std::sync::{Arc, RwLock, Mutex};
-use std::collections::{HashMap, BinaryHeap};
+use crate::source::SourceId;
 use std::cmp::Ordering;
+use std::collections::{BinaryHeap, HashMap};
+use std::sync::{Arc, Mutex, RwLock};
 use std::time::{Duration, Instant};
 
 /// Priority level for stream processing
-#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, serde::Serialize, serde::Deserialize)]
+#[derive(
+    Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, serde::Serialize, serde::Deserialize,
+)]
 pub enum StreamPriority {
     Low = 0,
     Normal = 1,
@@ -46,7 +48,9 @@ impl PartialOrd for StreamSchedule {
 impl Ord for StreamSchedule {
     fn cmp(&self, other: &Self) -> Ordering {
         // Higher priority first, then earlier time
-        other.priority.cmp(&self.priority)
+        other
+            .priority
+            .cmp(&self.priority)
             .then_with(|| self.next_process_time.cmp(&other.next_process_time))
     }
 }
@@ -68,7 +72,7 @@ impl StreamCoordinator {
             sync_manager: Arc::new(SyncManager::new()),
         }
     }
-    
+
     /// Register a new stream for coordination
     pub fn register_stream(&self, source_id: SourceId, pipeline_id: usize) -> Result<()> {
         let schedule = StreamSchedule {
@@ -79,36 +83,39 @@ impl StreamCoordinator {
             processing_interval: Duration::from_millis(33), // ~30 FPS default
             quality_factor: 1.0,
         };
-        
-        self.schedules.write().unwrap().insert(source_id, schedule.clone());
+
+        self.schedules
+            .write()
+            .unwrap()
+            .insert(source_id, schedule.clone());
         self.processing_queue.lock().unwrap().push(schedule);
         self.load_balancer.add_stream(source_id, pipeline_id);
-        
+
         Ok(())
     }
-    
+
     /// Unregister a stream
     pub fn unregister_stream(&self, source_id: SourceId) -> Result<()> {
         self.schedules.write().unwrap().remove(&source_id);
         self.load_balancer.remove_stream(source_id);
-        
+
         // Remove from processing queue
         let mut queue = self.processing_queue.lock().unwrap();
         let filtered: Vec<_> = queue.drain().filter(|s| s.source_id != source_id).collect();
         for schedule in filtered {
             queue.push(schedule);
         }
-        
+
         Ok(())
     }
-    
+
     /// Set priority for a stream
     pub fn set_stream_priority(&self, source_id: SourceId, priority: StreamPriority) -> Result<()> {
         // Update in schedules map
         if let Some(schedule) = self.schedules.write().unwrap().get_mut(&source_id) {
             schedule.priority = priority;
         }
-        
+
         // Also need to update in the processing queue
         let mut queue = self.processing_queue.lock().unwrap();
         let mut updated_schedules: Vec<_> = queue.drain().collect();
@@ -120,60 +127,60 @@ impl StreamCoordinator {
         for schedule in updated_schedules {
             queue.push(schedule);
         }
-        
+
         Ok(())
     }
-    
+
     /// Get the next stream to process
     pub fn get_next_stream(&self) -> Option<StreamSchedule> {
         let mut queue = self.processing_queue.lock().unwrap();
-        
+
         if let Some(mut schedule) = queue.pop() {
             // Update next process time
             schedule.next_process_time = Instant::now() + schedule.processing_interval;
-            
+
             // Re-add to queue for next iteration
             queue.push(schedule.clone());
-            
+
             Some(schedule)
         } else {
             None
         }
     }
-    
+
     /// Apply quality reduction to all streams
     pub fn apply_quality_reduction(&self, factor: f32) -> Result<()> {
         let mut schedules = self.schedules.write().unwrap();
-        
+
         for schedule in schedules.values_mut() {
             schedule.quality_factor = (schedule.quality_factor * factor).max(0.1);
             // Increase processing interval to reduce load
             let new_interval_ms = (schedule.processing_interval.as_millis() as f32 / factor) as u64;
             schedule.processing_interval = Duration::from_millis(new_interval_ms.min(100)); // Cap at 10 FPS
         }
-        
+
         Ok(())
     }
-    
+
     /// Apply quality increase to all streams
     pub fn apply_quality_increase(&self, factor: f32) -> Result<()> {
         let mut schedules = self.schedules.write().unwrap();
-        
+
         for schedule in schedules.values_mut() {
             schedule.quality_factor = (schedule.quality_factor * factor).min(1.0);
             // Decrease processing interval to increase frame rate
             let new_interval_ms = (schedule.processing_interval.as_millis() as f32 / factor) as u64;
             schedule.processing_interval = Duration::from_millis(new_interval_ms.max(16)); // Cap at 60 FPS
         }
-        
+
         Ok(())
     }
-    
+
     /// Synchronize stream processing
     pub fn synchronize_streams(&self, source_ids: &[SourceId]) -> Result<()> {
         self.sync_manager.create_sync_group(source_ids)
     }
-    
+
     /// Get load balancing statistics
     pub fn get_load_stats(&self) -> LoadStats {
         self.load_balancer.get_stats()
@@ -193,14 +200,17 @@ impl LoadBalancer {
             stream_assignments: Arc::new(RwLock::new(HashMap::new())),
         }
     }
-    
+
     fn add_stream(&self, source_id: SourceId, pipeline_id: usize) {
-        self.stream_assignments.write().unwrap().insert(source_id, pipeline_id);
-        
+        self.stream_assignments
+            .write()
+            .unwrap()
+            .insert(source_id, pipeline_id);
+
         let mut loads = self.pipeline_loads.write().unwrap();
         *loads.entry(pipeline_id).or_insert(0.0) += 1.0;
     }
-    
+
     fn remove_stream(&self, source_id: SourceId) {
         if let Some(pipeline_id) = self.stream_assignments.write().unwrap().remove(&source_id) {
             let mut loads = self.pipeline_loads.write().unwrap();
@@ -209,14 +219,16 @@ impl LoadBalancer {
             }
         }
     }
-    
+
     fn get_least_loaded_pipeline(&self) -> Option<usize> {
-        self.pipeline_loads.read().unwrap()
+        self.pipeline_loads
+            .read()
+            .unwrap()
             .iter()
             .min_by(|a, b| a.1.partial_cmp(b.1).unwrap())
             .map(|(id, _)| *id)
     }
-    
+
     fn get_stats(&self) -> LoadStats {
         let loads = self.pipeline_loads.read().unwrap();
         let total_load: f32 = loads.values().sum();
@@ -225,7 +237,7 @@ impl LoadBalancer {
         } else {
             0.0
         };
-        
+
         LoadStats {
             total_pipelines: loads.len(),
             average_load: avg_load,
@@ -246,14 +258,16 @@ impl SyncManager {
             sync_groups: Arc::new(RwLock::new(Vec::new())),
         }
     }
-    
+
     fn create_sync_group(&self, source_ids: &[SourceId]) -> Result<()> {
         self.sync_groups.write().unwrap().push(source_ids.to_vec());
         Ok(())
     }
-    
+
     fn get_sync_group(&self, source_id: SourceId) -> Option<Vec<SourceId>> {
-        self.sync_groups.read().unwrap()
+        self.sync_groups
+            .read()
+            .unwrap()
             .iter()
             .find(|group| group.contains(&source_id))
             .cloned()

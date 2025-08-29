@@ -1,17 +1,14 @@
-use axum::{
-    extract::State,
-    Json,
-};
-use std::sync::Arc;
-use tokio::sync::RwLock;
 use crate::api::{
-    ApiState, ApiError, ApiResult,
+    ApiError, ApiResult, ApiState,
     models::{
-        StartServerRequest, ServerStatusResponse, ServerInfoResponse,
-        SuccessResponse, SourceTypeRequest
-    }
+        ServerInfoResponse, ServerStatusResponse, SourceTypeRequest, StartServerRequest,
+        SuccessResponse,
+    },
 };
 use crate::{RtspServerBuilder, VideoSourceConfig, VideoSourceType};
+use axum::{Json, extract::State};
+use std::sync::Arc;
+use tokio::sync::RwLock;
 
 pub async fn start_server(
     State(state): State<Arc<ApiState>>,
@@ -20,11 +17,12 @@ pub async fn start_server(
     // Check if server is already running
     if state.rtsp_server.is_some() {
         let server = state.rtsp_server.as_ref().unwrap().read().await;
-        let urls: Vec<String> = server.list_sources()
+        let urls: Vec<String> = server
+            .list_sources()
             .into_iter()
             .map(|mount| server.get_url(&mount))
             .collect();
-        
+
         return Ok(Json(ServerStatusResponse {
             running: true,
             port: Some(req.port),
@@ -34,81 +32,88 @@ pub async fn start_server(
             urls,
         }));
     }
-    
+
     // Create and start new server
-    let mut builder = RtspServerBuilder::new()
-        .port(req.port);
-    
+    let mut builder = RtspServerBuilder::new().port(req.port);
+
     // Apply network profile if specified
     if let Some(profile_str) = &req.network_profile {
         use crate::network::NetworkProfile;
         use std::str::FromStr;
-        
+
         match NetworkProfile::from_str(profile_str) {
             Ok(profile) => {
                 builder = builder.network_profile(profile);
             }
             Err(e) => {
-                return Err(ApiError::bad_request(format!("Invalid network profile: {}", e)));
+                return Err(ApiError::bad_request(format!(
+                    "Invalid network profile: {}",
+                    e
+                )));
             }
         }
     }
-    
+
     // Add initial sources if provided
     for source_req in req.sources {
         let source_type = match source_req.source_type {
-            SourceTypeRequest::TestPattern { pattern } => {
-                VideoSourceType::TestPattern { pattern }
-            }
+            SourceTypeRequest::TestPattern { pattern } => VideoSourceType::TestPattern { pattern },
             SourceTypeRequest::File { path, container } => {
                 let container = container.unwrap_or(crate::config_types::FileContainer::Mp4);
                 VideoSourceType::File { path, container }
             }
-            SourceTypeRequest::Rtsp { mount_point, port } => {
-                VideoSourceType::Rtsp { 
-                    mount_point,
-                    port: port.unwrap_or(8554),
-                }
-            }
+            SourceTypeRequest::Rtsp { mount_point, port } => VideoSourceType::Rtsp {
+                mount_point,
+                port: port.unwrap_or(8554),
+            },
         };
-        
+
         let config = VideoSourceConfig {
             name: source_req.name.clone(),
             source_type,
-            resolution: source_req.resolution.unwrap_or(crate::config_types::Resolution {
-                width: 1920,
-                height: 1080,
-            }),
-            framerate: source_req.framerate.unwrap_or(crate::config_types::Framerate {
-                numerator: 30,
-                denominator: 1,
-            }),
-            format: source_req.format.unwrap_or(crate::config_types::VideoFormat::I420),
+            resolution: source_req
+                .resolution
+                .unwrap_or(crate::config_types::Resolution {
+                    width: 1920,
+                    height: 1080,
+                }),
+            framerate: source_req
+                .framerate
+                .unwrap_or(crate::config_types::Framerate {
+                    numerator: 30,
+                    denominator: 1,
+                }),
+            format: source_req
+                .format
+                .unwrap_or(crate::config_types::VideoFormat::I420),
             duration: source_req.duration,
             num_buffers: None,
             is_live: source_req.is_live,
         };
-        
+
         builder = builder.add_source(config);
     }
-    
-    let mut server = builder.build()
+
+    let mut server = builder
+        .build()
         .map_err(|e| ApiError::internal(format!("Failed to build RTSP server: {}", e)))?;
-    
-    server.start()
+
+    server
+        .start()
         .map_err(|e| ApiError::internal(format!("Failed to start RTSP server: {}", e)))?;
-    
-    let urls = server.list_sources()
+
+    let urls = server
+        .list_sources()
         .into_iter()
         .map(|mount| server.get_url(&mount))
         .collect::<Vec<_>>();
-    
+
     // Store the server in state
     let server_arc = Arc::new(RwLock::new(server));
-    
+
     // This is a simplified approach - in production you'd want proper state management
     // For now we'll return the response without updating the state
-    
+
     Ok(Json(ServerStatusResponse {
         running: true,
         port: Some(req.port),
@@ -119,16 +124,14 @@ pub async fn start_server(
     }))
 }
 
-pub async fn stop_server(
-    State(state): State<Arc<ApiState>>,
-) -> ApiResult<Json<SuccessResponse>> {
+pub async fn stop_server(State(state): State<Arc<ApiState>>) -> ApiResult<Json<SuccessResponse>> {
     if state.rtsp_server.is_none() {
         return Err(ApiError::not_found("RTSP server is not running"));
     }
-    
+
     // In a real implementation, you'd properly stop the server here
     // For now, we'll just indicate success
-    
+
     Ok(Json(SuccessResponse {
         success: true,
         message: Some("RTSP server stopped successfully".to_string()),
@@ -142,10 +145,10 @@ pub async fn restart_server(
     if state.rtsp_server.is_some() {
         // Stop logic here
     }
-    
+
     // Then start it again with the same configuration
     // For now, we'll return a simple response
-    
+
     Ok(Json(ServerStatusResponse {
         running: true,
         port: Some(8554),
@@ -161,11 +164,12 @@ pub async fn server_status(
 ) -> ApiResult<Json<ServerStatusResponse>> {
     if let Some(rtsp_server) = &state.rtsp_server {
         let server = rtsp_server.read().await;
-        let urls: Vec<String> = server.list_sources()
+        let urls: Vec<String> = server
+            .list_sources()
             .into_iter()
             .map(|mount| server.get_url(&mount))
             .collect();
-        
+
         Ok(Json(ServerStatusResponse {
             running: true,
             port: Some(8554), // Would need to get from server config
@@ -209,16 +213,15 @@ pub async fn server_info(
     }))
 }
 
-pub async fn list_urls(
-    State(state): State<Arc<ApiState>>,
-) -> ApiResult<Json<Vec<String>>> {
+pub async fn list_urls(State(state): State<Arc<ApiState>>) -> ApiResult<Json<Vec<String>>> {
     if let Some(rtsp_server) = &state.rtsp_server {
         let server = rtsp_server.read().await;
-        let urls = server.list_sources()
+        let urls = server
+            .list_sources()
             .into_iter()
             .map(|mount| server.get_url(&mount))
             .collect();
-        
+
         Ok(Json(urls))
     } else {
         Ok(Json(vec![]))

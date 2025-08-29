@@ -1,6 +1,6 @@
+use std::collections::VecDeque;
 use std::sync::{Arc, Mutex};
 use std::time::{Duration, Instant};
-use std::collections::VecDeque;
 
 /// State of the circuit breaker
 #[derive(Debug, Clone, PartialEq)]
@@ -8,10 +8,7 @@ pub enum CircuitState {
     /// Circuit is closed - normal operation
     Closed,
     /// Circuit is open - blocking all requests
-    Open {
-        opened_at: Instant,
-        reason: String,
-    },
+    Open { opened_at: Instant, reason: String },
     /// Circuit is half-open - testing if service recovered
     HalfOpen {
         started_at: Instant,
@@ -123,32 +120,38 @@ impl CircuitBreaker {
         let mut state = self.state.lock().unwrap();
         let mut success_count = self.success_count.lock().unwrap();
         let mut metrics = self.metrics.lock().unwrap();
-        
+
         metrics.total_requests += 1;
         metrics.successful_requests += 1;
         metrics.last_success_time = Some(Instant::now());
 
         match &*state {
-            CircuitState::HalfOpen { started_at, test_count } => {
+            CircuitState::HalfOpen {
+                started_at,
+                test_count,
+            } => {
                 *success_count += 1;
-                
+
                 // Update test count
                 let new_test_count = test_count + 1;
                 *state = CircuitState::HalfOpen {
                     started_at: *started_at,
                     test_count: new_test_count,
                 };
-                
+
                 // Check if we should close the circuit
                 if *success_count >= self.config.success_threshold {
                     *state = CircuitState::Closed;
                     *success_count = 0;
-                    
+
                     // Clear failure history
                     let mut failures = self.failure_times.lock().unwrap();
                     failures.clear();
-                    
-                    log::info!("Circuit breaker '{}' closed after successful recovery", self.name);
+
+                    log::info!(
+                        "Circuit breaker '{}' closed after successful recovery",
+                        self.name
+                    );
                 }
             }
             CircuitState::Closed => {
@@ -157,7 +160,10 @@ impl CircuitBreaker {
             }
             CircuitState::Open { .. } => {
                 // Shouldn't happen, but handle gracefully
-                log::warn!("Success recorded while circuit breaker '{}' is open", self.name);
+                log::warn!(
+                    "Success recorded while circuit breaker '{}' is open",
+                    self.name
+                );
             }
         }
     }
@@ -167,7 +173,7 @@ impl CircuitBreaker {
         let mut state = self.state.lock().unwrap();
         let mut failures = self.failure_times.lock().unwrap();
         let mut metrics = self.metrics.lock().unwrap();
-        
+
         let now = Instant::now();
         metrics.total_requests += 1;
         metrics.failed_requests += 1;
@@ -175,7 +181,7 @@ impl CircuitBreaker {
 
         // Add failure to history
         failures.push_back(now);
-        
+
         // Remove old failures outside the window
         let cutoff = now - self.config.window_duration;
         while let Some(front) = failures.front() {
@@ -195,7 +201,7 @@ impl CircuitBreaker {
                         reason: reason.clone(),
                     };
                     metrics.circuit_opens += 1;
-                    
+
                     log::warn!(
                         "Circuit breaker '{}' opened due to {} failures: {}",
                         self.name,
@@ -211,11 +217,11 @@ impl CircuitBreaker {
                     reason: reason.clone(),
                 };
                 metrics.circuit_opens += 1;
-                
+
                 // Reset success count
                 let mut success_count = self.success_count.lock().unwrap();
                 *success_count = 0;
-                
+
                 log::warn!(
                     "Circuit breaker '{}' reopened from half-open due to failure: {}",
                     self.name,
@@ -255,16 +261,16 @@ impl CircuitBreaker {
     pub fn reset(&self) {
         let mut state = self.state.lock().unwrap();
         *state = CircuitState::Closed;
-        
+
         let mut failures = self.failure_times.lock().unwrap();
         failures.clear();
-        
+
         let mut success_count = self.success_count.lock().unwrap();
         *success_count = 0;
-        
+
         let mut metrics = self.metrics.lock().unwrap();
         *metrics = CircuitMetrics::default();
-        
+
         log::info!("Circuit breaker '{}' reset", self.name);
     }
 
@@ -272,8 +278,12 @@ impl CircuitBreaker {
     pub fn force_state(&self, new_state: CircuitState) {
         let mut state = self.state.lock().unwrap();
         *state = new_state;
-        
-        log::info!("Circuit breaker '{}' forced to state: {:?}", self.name, state);
+
+        log::info!(
+            "Circuit breaker '{}' forced to state: {:?}",
+            self.name,
+            state
+        );
     }
 }
 
@@ -290,13 +300,9 @@ impl CircuitBreakerManager {
     }
 
     /// Create or get a circuit breaker
-    pub fn get_or_create(
-        &self,
-        name: String,
-        config: CircuitBreakerConfig,
-    ) -> Arc<CircuitBreaker> {
+    pub fn get_or_create(&self, name: String, config: CircuitBreakerConfig) -> Arc<CircuitBreaker> {
         let mut breakers = self.breakers.lock().unwrap();
-        
+
         breakers
             .entry(name.clone())
             .or_insert_with(|| Arc::new(CircuitBreaker::new(name, config)))
@@ -330,28 +336,28 @@ mod tests {
             open_duration: Duration::from_millis(100),
             ..Default::default()
         };
-        
+
         let breaker = CircuitBreaker::new("test".to_string(), config);
-        
+
         // Initially closed
         assert_eq!(breaker.get_state(), CircuitState::Closed);
         assert!(breaker.should_allow_request());
-        
+
         // Record failures to open circuit
         breaker.record_failure("Error 1".to_string());
         assert_eq!(breaker.get_state(), CircuitState::Closed);
-        
+
         breaker.record_failure("Error 2".to_string());
         assert!(matches!(breaker.get_state(), CircuitState::Open { .. }));
         assert!(!breaker.should_allow_request());
-        
+
         // Wait for open duration
         std::thread::sleep(Duration::from_millis(150));
-        
+
         // Should transition to half-open
         assert!(breaker.should_allow_request());
         assert!(matches!(breaker.get_state(), CircuitState::HalfOpen { .. }));
-        
+
         // Record successes to close circuit
         breaker.record_success();
         breaker.record_success();
@@ -365,16 +371,16 @@ mod tests {
             window_duration: Duration::from_millis(100),
             ..Default::default()
         };
-        
+
         let breaker = CircuitBreaker::new("test".to_string(), config);
-        
+
         // Record old failures
         breaker.record_failure("Old error".to_string());
         breaker.record_failure("Old error".to_string());
-        
+
         // Wait for window to expire
         std::thread::sleep(Duration::from_millis(150));
-        
+
         // These failures should not trigger opening
         breaker.record_failure("New error".to_string());
         assert_eq!(breaker.get_state(), CircuitState::Closed);
@@ -387,17 +393,17 @@ mod tests {
             open_duration: Duration::from_millis(50),
             ..Default::default()
         };
-        
+
         let breaker = CircuitBreaker::new("test".to_string(), config);
-        
+
         // Open the circuit
         breaker.record_failure("Error".to_string());
         assert!(matches!(breaker.get_state(), CircuitState::Open { .. }));
-        
+
         // Wait and transition to half-open
         std::thread::sleep(Duration::from_millis(100));
         assert!(breaker.should_allow_request());
-        
+
         // Failure in half-open should reopen
         breaker.record_failure("Error in half-open".to_string());
         assert!(matches!(breaker.get_state(), CircuitState::Open { .. }));
@@ -406,11 +412,11 @@ mod tests {
     #[test]
     fn test_metrics_tracking() {
         let breaker = CircuitBreaker::new("test".to_string(), CircuitBreakerConfig::default());
-        
+
         breaker.record_success();
         breaker.record_success();
         breaker.record_failure("Error".to_string());
-        
+
         let metrics = breaker.get_metrics();
         assert_eq!(metrics.total_requests, 3);
         assert_eq!(metrics.successful_requests, 2);
@@ -420,28 +426,22 @@ mod tests {
     #[test]
     fn test_circuit_breaker_manager() {
         let manager = CircuitBreakerManager::new();
-        
-        let breaker1 = manager.get_or_create(
-            "source1".to_string(),
-            CircuitBreakerConfig::default(),
-        );
-        
-        let breaker2 = manager.get_or_create(
-            "source1".to_string(),
-            CircuitBreakerConfig::default(),
-        );
-        
+
+        let breaker1 =
+            manager.get_or_create("source1".to_string(), CircuitBreakerConfig::default());
+
+        let breaker2 =
+            manager.get_or_create("source1".to_string(), CircuitBreakerConfig::default());
+
         // Should return the same instance
         assert!(Arc::ptr_eq(&breaker1, &breaker2));
-        
+
         // Create different breaker
-        let breaker3 = manager.get_or_create(
-            "source2".to_string(),
-            CircuitBreakerConfig::default(),
-        );
-        
+        let breaker3 =
+            manager.get_or_create("source2".to_string(), CircuitBreakerConfig::default());
+
         assert!(!Arc::ptr_eq(&breaker1, &breaker3));
-        
+
         let all = manager.get_all();
         assert_eq!(all.len(), 2);
     }

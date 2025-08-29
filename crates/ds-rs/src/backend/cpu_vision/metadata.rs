@@ -1,5 +1,5 @@
 //! CPU Vision metadata structures compatible with DeepStream format
-//! 
+//!
 //! This module provides metadata structures that can be attached to GStreamer buffers
 //! to carry object detection and tracking information through the pipeline.
 
@@ -32,22 +32,24 @@ impl DetectionMeta {
             frame_height,
         }
     }
-    
+
     /// Get number of detections
     pub fn num_objects(&self) -> usize {
         self.detections.len()
     }
-    
+
     /// Filter detections by class ID
     pub fn filter_by_class(&self, class_id: usize) -> Vec<&Detection> {
-        self.detections.iter()
+        self.detections
+            .iter()
             .filter(|d| d.class_id == class_id)
             .collect()
     }
-    
+
     /// Filter detections by confidence threshold
     pub fn filter_by_confidence(&self, min_confidence: f32) -> Vec<&Detection> {
-        self.detections.iter()
+        self.detections
+            .iter()
             .filter(|d| d.confidence >= min_confidence)
             .collect()
     }
@@ -66,7 +68,7 @@ pub struct TrackingMeta {
 pub struct TrackedDetection {
     pub detection: Detection,
     pub track_id: u64,
-    pub age: u32,  // Number of frames this object has been tracked
+    pub age: u32, // Number of frames this object has been tracked
 }
 
 impl TrackedDetection {
@@ -98,7 +100,7 @@ impl ProbeData {
 mod tests {
     use super::*;
     use gstcpuinfer::detector::Detection;
-    
+
     #[test]
     fn test_detection_meta_creation() {
         let detection = Detection {
@@ -110,7 +112,7 @@ mod tests {
             class_id: 0,
             class_name: "person".to_string(),
         };
-        
+
         let meta = DetectionMeta::new(
             vec![detection],
             1,
@@ -118,25 +120,35 @@ mod tests {
             640,
             480,
         );
-        
+
         assert_eq!(meta.num_objects(), 1);
         assert_eq!(meta.frame_number, 1);
         assert_eq!(meta.frame_width, 640);
         assert_eq!(meta.frame_height, 480);
     }
-    
+
     #[test]
     fn test_filter_by_confidence() {
         let high_conf = Detection {
-            x: 100.0, y: 100.0, width: 50.0, height: 50.0,
-            confidence: 0.9, class_id: 0, class_name: "person".to_string(),
+            x: 100.0,
+            y: 100.0,
+            width: 50.0,
+            height: 50.0,
+            confidence: 0.9,
+            class_id: 0,
+            class_name: "person".to_string(),
         };
-        
+
         let low_conf = Detection {
-            x: 200.0, y: 200.0, width: 50.0, height: 50.0,
-            confidence: 0.3, class_id: 1, class_name: "car".to_string(),
+            x: 200.0,
+            y: 200.0,
+            width: 50.0,
+            height: 50.0,
+            confidence: 0.3,
+            class_id: 1,
+            class_name: "car".to_string(),
         };
-        
+
         let meta = DetectionMeta::new(
             vec![high_conf, low_conf],
             1,
@@ -144,19 +156,24 @@ mod tests {
             640,
             480,
         );
-        
+
         let filtered = meta.filter_by_confidence(0.5);
         assert_eq!(filtered.len(), 1);
         assert_eq!(filtered[0].confidence, 0.9);
     }
-    
+
     #[test]
     fn test_tracked_detection() {
         let detection = Detection {
-            x: 100.0, y: 100.0, width: 50.0, height: 50.0,
-            confidence: 0.9, class_id: 0, class_name: "person".to_string(),
+            x: 100.0,
+            y: 100.0,
+            width: 50.0,
+            height: 50.0,
+            confidence: 0.9,
+            class_id: 0,
+            class_name: "person".to_string(),
         };
-        
+
         let tracked = TrackedDetection::new(detection, 42, 10);
         assert_eq!(tracked.track_id, 42);
         assert_eq!(tracked.age, 10);

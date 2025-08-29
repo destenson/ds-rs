@@ -1,14 +1,14 @@
-pub mod profiles;
-pub mod simulator;
 pub mod gstreamer;
+pub mod profiles;
 pub mod scenarios;
+pub mod simulator;
 
 use std::time::Duration;
 
-pub use profiles::{NetworkProfile, StandardProfiles};
-pub use simulator::{NetworkSimulator, SimulationConfig};
 pub use gstreamer::GStreamerNetworkSimulator;
-pub use scenarios::{NetworkScenario, ScenarioPlayer, ScenarioConfig};
+pub use profiles::{NetworkProfile, StandardProfiles};
+pub use scenarios::{NetworkScenario, ScenarioConfig, ScenarioPlayer};
+pub use simulator::{NetworkSimulator, SimulationConfig};
 
 /// Network conditions to simulate
 #[derive(Debug, Clone)]
@@ -57,7 +57,7 @@ impl NetworkConditions {
     pub fn perfect() -> Self {
         Self::default()
     }
-    
+
     /// Create conditions that will trigger error recovery
     pub fn problematic() -> Self {
         Self {
@@ -75,7 +75,7 @@ impl NetworkConditions {
     }
 
     /// Create custom network conditions
-    pub fn custom (packet_loss: f32, latency_ms: u32, bandwidth_kbps: u32, jitter_ms: u32) -> Self {
+    pub fn custom(packet_loss: f32, latency_ms: u32, bandwidth_kbps: u32, jitter_ms: u32) -> Self {
         Self {
             packet_loss,
             latency_ms,
@@ -89,7 +89,7 @@ impl NetworkConditions {
             delay_probability: if latency_ms > 0 { 100.0 } else { 0.0 },
         }
     }
-    
+
     /// Simulate complete connection loss
     pub fn disconnected() -> Self {
         Self {
@@ -118,19 +118,19 @@ pub enum NetworkEvent {
 pub trait NetworkController: Send + Sync {
     /// Apply network conditions
     fn apply_conditions(&self, conditions: NetworkConditions);
-    
+
     /// Get current conditions
     fn get_conditions(&self) -> NetworkConditions;
-    
+
     /// Simulate connection drop
     fn drop_connection(&self);
-    
+
     /// Restore connection
     fn restore_connection(&self);
-    
+
     /// Apply a predefined profile
     fn apply_profile(&self, profile: NetworkProfile);
-    
+
     /// Reset to perfect conditions
     fn reset(&self);
 }
@@ -138,17 +138,17 @@ pub trait NetworkController: Send + Sync {
 #[cfg(test)]
 mod tests {
     use super::*;
-    
+
     #[test]
     fn test_network_conditions() {
         let perfect = NetworkConditions::perfect();
         assert_eq!(perfect.packet_loss, 0.0);
         assert!(!perfect.connection_dropped);
-        
+
         let problematic = NetworkConditions::problematic();
         assert!(problematic.packet_loss > 0.0);
         assert!(problematic.latency_ms > 0);
-        
+
         let disconnected = NetworkConditions::disconnected();
         assert!(disconnected.connection_dropped);
     }

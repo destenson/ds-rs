@@ -1,9 +1,9 @@
 use gstreamer as gst;
 use gstreamer::glib;
 
+pub mod config;
 mod cpudetector;
 pub mod detector;
-pub mod config;
 
 #[cfg(feature = "ort")]
 pub use ort;
@@ -11,12 +11,15 @@ pub use ort;
 fn plugin_init(plugin: &gst::Plugin) -> Result<(), glib::BoolError> {
     // GST_PLUGIN_PATH=$PWD/target/release:$GST_PLUGIN_PATH
     #[cfg(debug_assertions)]
-    unsafe { 
+    unsafe {
         match std::env::var("GST_PLUGIN_PATH") {
             Ok(path) => {
                 let workspace_dir = std::env::var("CARGO_MANIFEST_DIR").unwrap();
-                std::env::set_var("GST_PLUGIN_PATH", format!("{}/target/debug:{}", workspace_dir, path));
-            },
+                std::env::set_var(
+                    "GST_PLUGIN_PATH",
+                    format!("{}/target/debug:{}", workspace_dir, path),
+                );
+            }
             Err(_) => {
                 let workspace_dir = std::env::var("CARGO_MANIFEST_DIR").unwrap();
                 std::env::set_var("GST_PLUGIN_PATH", format!("{}/target/debug", workspace_dir));
@@ -24,15 +27,21 @@ fn plugin_init(plugin: &gst::Plugin) -> Result<(), glib::BoolError> {
         };
     };
     #[cfg(all(test, not(debug_assertions)))]
-    unsafe { 
+    unsafe {
         match std::env::var("GST_PLUGIN_PATH") {
             Ok(path) => {
                 let workspace_dir = std::env::var("CARGO_MANIFEST_DIR").unwrap();
-                std::env::set_var("GST_PLUGIN_PATH", format!("{}/target/release:{}", workspace_dir, path));
-            },
+                std::env::set_var(
+                    "GST_PLUGIN_PATH",
+                    format!("{}/target/release:{}", workspace_dir, path),
+                );
+            }
             Err(_) => {
                 let workspace_dir = std::env::var("CARGO_MANIFEST_DIR").unwrap();
-                std::env::set_var("GST_PLUGIN_PATH", format!("{}/target/release", workspace_dir));
+                std::env::set_var(
+                    "GST_PLUGIN_PATH",
+                    format!("{}/target/release", workspace_dir),
+                );
             }
         };
     };

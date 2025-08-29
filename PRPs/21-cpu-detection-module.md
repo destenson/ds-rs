@@ -1,5 +1,7 @@
 # PRP-21: CPU-Based Object Detection Module
 
+**Status**: PARTIAL (2025-08-27) - CPU vision backend with detector module exists
+
 ## Summary
 Implement OpenCV DNN-based object detection for the Standard backend, replacing the current fakesink placeholder with functional CPU-optimized detection using lightweight models like YOLOv5 Nano and MobileNet SSD.
 

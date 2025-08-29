@@ -1,5 +1,7 @@
 # PRP: Simplified GStreamer Element Discovery Leveraging gstreamer-rs
 
+**Status**: NOT STARTED - No compile-time element discovery implemented
+
 ## Executive Summary
 
 Create a lightweight compile-time element discovery system that leverages gstreamer-rs's existing excellent property handling and builder patterns. Rather than generating extensive code, this approach focuses on creating a registry of available elements with their metadata, enabling better backend detection and validation while using gstreamer-rs's existing APIs for actual element creation.

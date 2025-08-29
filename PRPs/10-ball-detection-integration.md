@@ -1,5 +1,7 @@
 # PRP: Ball Detection Integration using Computer Vision
 
+**Status**: NOT STARTED - No OpenCV integration found
+
 ## Executive Summary
 
 Integrate computer vision capabilities into the ds-rs inference pipeline to detect bouncing balls in video streams. This PRP establishes the foundation for object detection by implementing OpenCV-based circle detection that works with the existing inference infrastructure, specifically targeting the bouncing ball test pattern available in source-videos.
@@ -251,6 +253,6 @@ cargo bench --features opencv ball_detection_bench
 
 - **Author**: Claude
 - **Created**: 2025-08-23
-- **Last Modified**: 2025-08-23
+- **Last Modified**: 2025-08-27
 - **Status**: Draft
 - **Confidence Level**: 7 - OpenCV integration requires careful setup but detection algorithms are well-established

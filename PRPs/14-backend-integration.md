@@ -1,5 +1,7 @@
 # PRP: Integration with Existing Backend System
 
+**Status**: NOT STARTED - No element discovery improvements implemented
+
 **STATUS: PARTIALLY SUPERSEDED** - This PRP should be simplified to focus only on:
 - Using discovered element metadata to improve backend detection
 - Leveraging gstreamer-rs for actual element creation

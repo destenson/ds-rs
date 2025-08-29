@@ -1,5 +1,7 @@
 # PRP: Detection Data Export and Streaming Integration
 
+**Status**: NOT STARTED - No export backends implemented
+
 ## Executive Summary
 
 Implement real-time export of bounding box detection data to external systems for analytics, persistence, and downstream processing. This PRP establishes data export pipelines that stream detection metadata (coordinates, confidence scores, timestamps) to various backends including MQTT brokers, RabbitMQ, databases (PostgreSQL/MongoDB), and file systems, enabling comprehensive analytics and audit trails.

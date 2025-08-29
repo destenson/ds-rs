@@ -1,5 +1,7 @@
 # PRP: Control API & WebSocket Interface
 
+**Status**: PARTIAL (as of 2025-08-27) - REST API implemented with Axum, no WebSocket yet
+
 ## Executive Summary
 
 Build a comprehensive control interface for the source-videos application using REST API for command/control and WebSocket for real-time updates. This enables external applications, scripts, and UIs to manage video sources dynamically, receive status updates, and control all aspects of the service programmatically.

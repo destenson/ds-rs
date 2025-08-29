@@ -548,7 +548,7 @@ impl OnnxDetector {
         // In transposed format, all x coords are together, then all y coords, etc.
         let is_transposed = {
             // Check objectness scores at different positions
-            let obj_positions = vec![
+            let obj_positions = [
                 outputs[4],                   // Normal: first anchor objectness
                 outputs[85 + 4],              // Normal: second anchor objectness
                 outputs[4 * num_anchors],     // Transposed: first anchor objectness
@@ -802,8 +802,10 @@ impl OnnxDetector {
         for anchor_idx in 0..num_anchors {
             // In v8/v9, data is arranged as [84, 8400]
             // So for each anchor, we need to gather values across the first dimension
+            #[allow(clippy::erasing_op)]
             let cx = outputs[0 * num_anchors + anchor_idx];
-            let cy = outputs[1 * num_anchors + anchor_idx];
+            #[allow(clippy::identity_op)]
+            let cy = outputs[1 * num_anchors + anchor_idx]; // clippy: allow(clippy::identity_op)
             let w = outputs[2 * num_anchors + anchor_idx];
             let h = outputs[3 * num_anchors + anchor_idx];
 
